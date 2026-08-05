@@ -117,10 +117,85 @@ run_fixture "gadtools-app" "GTApp" "GadTools" "inspect-gadtools.txt" "marker-gt.
 run_fixture "classact-app" "CAApp" "ClassAct" "inspect-classact.txt" "marker-ca.txt" \
 	'class="layout.gadget"'
 
+# --- action-engine click check (phase 0.2) --------------------------------
+# Boots gadtools-app, clicks its Connect button (GA_ID=1) via AmiClickTest
+# (the action engine's genuine input.device injection), and asserts the
+# window actually closed -- the fixture exits when Connect is pressed, so
+# a subsequent AmiInspect finding no matching window is the pass signal.
+# This is an end-to-end proof the synthetic click is really delivered
+# through Intuition to the gadget, not just that the events were queued.
+run_click_check() {
+	echo "run.sh: action-engine click"
+
+	rm -f "$BUILD/click-result.txt" "$BUILD/inspect-after-click.txt" "$BUILD/marker-click.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+Run >NIL: SRC:build/fixtures/GTApp
+Wait 5
+SRC:build/AmiClickTest WINDOW=GadTools ID=1 >SRC:build/click-result.txt
+Wait 3
+SRC:build/AmiInspect WINDOW=GadTools >SRC:build/inspect-after-click.txt
+Echo "DONE" >SRC:build/marker-click.txt
+EOF
+
+	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
+	rm -f "$info"
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
+		--fast 8M --noaudio --control :0 --control-info "$info" \
+		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
+	COPPERLINE_PID=$!
+
+	tries=0
+	while [ ! -f "$info" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 100 ]; then
+			echo "run.sh: FAIL (click): copperline never wrote $info"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			return
+		fi
+		sleep 0.1
+	done
+
+	"$COPPERLINE_CTL" --info "$info" run_until "{\"seconds\": $RUN_SECONDS}" > /dev/null
+	kill "$COPPERLINE_PID" 2>/dev/null || true
+	COPPERLINE_PID=""
+	rm -f "$info"
+
+	if [ ! -f "$BUILD/marker-click.txt" ]; then
+		echo "run.sh: FAIL (click): marker-click.txt never appeared -- crash or hang"
+		FAILED=1
+		return
+	fi
+
+	if ! grep -qF 'click delivered' "$BUILD/click-result.txt" 2>/dev/null; then
+		echo "run.sh: FAIL (click): AmiClickTest did not report delivery"
+		sed 's/^/run.sh:   /' "$BUILD/click-result.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+		return
+	fi
+
+	# The window must be GONE: AmiInspect writes nothing to stdout when no
+	# window matches (its error goes to stderr), so a non-empty inspect
+	# output means the fixture is still open -- the click didn't register.
+	if [ -s "$BUILD/inspect-after-click.txt" ]; then
+		echo "run.sh: FAIL (click): fixture window still open after click"
+		sed 's/^/run.sh:   /' "$BUILD/inspect-after-click.txt"
+		FAILED=1
+		return
+	fi
+
+	echo "run.sh: PASS (action-engine click)"
+}
+
+run_click_check
+
 if [ "$FAILED" -eq 0 ]; then
 	rm -f "$BUILD"/.copperline-ctl-info-*.json "$BUILD"/.copperline-log-*.txt \
 		"$BUILD"/inspect-gadtools.txt "$BUILD"/inspect-classact.txt \
-		"$BUILD"/marker-gt.txt "$BUILD"/marker-ca.txt
+		"$BUILD"/marker-gt.txt "$BUILD"/marker-ca.txt \
+		"$BUILD"/click-result.txt "$BUILD"/inspect-after-click.txt \
+		"$BUILD"/marker-click.txt
 	echo "run.sh: all fixtures PASS"
 	exit 0
 else

@@ -17,6 +17,7 @@
 #include <proto/intuition.h>
 #include <proto/gadtools.h>
 #include <proto/graphics.h>
+#include <stdio.h>
 
 struct IntuitionBase *IntuitionBase;
 struct GfxBase *GfxBase;
@@ -105,7 +106,8 @@ int main(void)
                              WA_DepthGadget, TRUE,
                              WA_Activate, TRUE,
                              WA_SimpleRefresh, TRUE,
-                             WA_IDCMP, IDCMP_CLOSEWINDOW | IDCMP_GADGETUP | IDCMP_REFRESHWINDOW,
+                             WA_IDCMP, IDCMP_CLOSEWINDOW | IDCMP_GADGETUP | IDCMP_REFRESHWINDOW
+                                       | IDCMP_MOUSEBUTTONS,
                              WA_PubScreen, (ULONG)screen,
                              TAG_DONE);
 
@@ -134,6 +136,17 @@ int main(void)
                     if (((struct Gadget *)msg->IAddress)->GadgetID == GID_CONNECT) {
                         done = TRUE;
                     }
+                    break;
+                /* Diagnostic: IDCMP_MOUSEBUTTONS only arrives for clicks
+                 * Intuition did NOT deliver to a gadget, and its
+                 * MouseX/MouseY are window-relative -- ground truth for
+                 * where a synthetic click actually landed when it misses
+                 * (added while debugging the action engine's input
+                 * injection; harmless to keep for future runs). */
+                case IDCMP_MOUSEBUTTONS:
+                    printf("GTApp: MOUSEBUTTONS code=0x%04x qual=0x%04x at window-relative [%d,%d]\n",
+                           msg->Code, msg->Qualifier, msg->MouseX, msg->MouseY);
+                    fflush(stdout); /* still running when the log is read */
                     break;
                 default:
                     break;
