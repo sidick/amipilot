@@ -1,0 +1,82 @@
+Short:        Object-level GUI automation for classic AmigaOS
+Author:       simond@irrelevant.org (Simon Dick)
+Uploader:     simond@irrelevant.org (Simon Dick)
+Type:         util/misc
+Version:      0.1
+Architecture: m68k-amigaos
+Distribution: GitHub only (not yet on Aminet)
+
+AmiInspect is a standalone Shell command that walks any window's gadget
+tree and prints its roles, labels, classes, IDs, positions, and states -
+semantically, not by pixels. It's the platform's first UIA-Inspect /
+browser element-picker equivalent: no host machine, server, or session
+required, and no coordinate-level guessing that breaks on the next
+layout change.
+
+This is the first release of AmiPilot, a project building toward full
+object-level GUI automation (find a window/gadget, act on it with
+genuinely synthesised input, assert on the result) - AmiInspect is the
+read side of that, shipped first because it's independently useful on
+its own and is the development tool everything after it gets debugged
+against.
+
+Features
+--------
+  - Prints any window's gadget tree by role, label, class, ID, position,
+    and state - target the active window, or any window by a substring
+    of its title.
+  - Plain GadTools gadgets: correctly distinguishes a checkbox from a
+    button even though both produce the identical underlying gadget
+    type, using GadTools' own documented attribute-probing contract
+    rather than a guess.
+  - BOOPSI/ReAction gadgets: reads the real, live class name
+    (button.gadget, checkbox.gadget, layout.gadget, and more) via a
+    documented NDK mechanism, and maps known classes to a role.
+  - Verified against a real, unmodified stock AmigaOS Prefs editor, not
+    just software built for this project.
+  - Honest, documented limits rather than silent gaps: a few specific,
+    well-understood cases (PLACETEXT_IN button labels, a window.class
+    window's layout.gadget-nested children) are genuinely unreadable at
+    this tier, and AmiInspect says so rather than guessing - see the
+    included guide's "Locator Tiers and Limits" page.
+
+Requirements
+------------
+  - AmigaOS 2.04 (V37) or later. Plain 68000, no FPU - nothing here does
+    float work or needs anything newer than a stock CPU.
+  - gadtools.library (any version) is optional but recommended - without
+    it, AmiInspect can't distinguish a GadTools checkbox from a plain
+    button.
+
+Installation
+------------
+  Copy "AmiInspect" to C: (or anywhere on your command Path). No reboot,
+  no configuration.
+
+Quick start
+-----------
+  AmiInspect                  inspect the active window
+  AmiInspect WINDOW=Prefs     inspect the first window whose title
+                               contains "Prefs"
+
+AI disclosure
+-------------
+  Be aware: AmiPilot was written largely by an AI coding agent
+  (Anthropic's Claude, via Claude Code), working under human direction,
+  review, and on-target testing. Every feature in this release was
+  verified on-target under the Copperline emulator against real AmigaOS
+  3.2.3 - including catching and fixing a genuine crash bug found only
+  by that testing - before being considered done. The entire source is
+  BSD-licensed and open for review.
+
+Documentation
+-------------
+  The full command reference, locator-tier/limits documentation, and
+  troubleshooting notes are online at https://sidick.github.io/amipilot/
+  and included as amipilot.guide in this archive (AmigaGuide/MultiView,
+  OS 2.x+) for offline/on-Amiga reading - same source, both forms.
+
+Source and licence
+-------------------
+  Free and open source, BSD 2-Clause. Full source, documentation and
+  issue tracker: https://github.com/sidick/amipilot

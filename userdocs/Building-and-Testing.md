@@ -1,9 +1,8 @@
 # Building and Testing
 
 This page is for building AmiPilot from source and running its on-target
-conformance check — not needed if you're just using a released
-`AmiInspect` binary (once one exists — see
-[Installation](Installation.md)).
+conformance check — not needed if you're just using the released
+`AmiInspect` binary (see [Installation](Installation.md)).
 
 ## Cross-building
 
@@ -70,6 +69,19 @@ from the same `userdocs/` source:
 ```
 make guide     # -> build/amipilot.guide
 ```
+
+## Building the release archive
+
+```
+make dist   # -> build/dist/amipilot.lha, build/dist/amipilot.readme
+```
+
+Builds `AmiInspect`, the guide, and packages them with `LICENSE` and
+`amipilot.readme` into the same `amipilot.lha` this project's releases
+ship — including building a real `lha` archiver from source first
+(Homebrew's and most Linux distros' `lha` is Lhasa, extract-only, useless
+for packaging), pinned to a known-good commit. Override with your own
+archiver: `make dist LHA=/path/to/real/lha`.
 
 ## Linting
 

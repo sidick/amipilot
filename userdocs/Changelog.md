@@ -33,14 +33,15 @@ First release: the read side of object-level GUI automation.
   button labels and `layout.gadget`-nested gadgets are both genuinely
   unreadable at this tier — see
   [Locator Tiers and Limits](Locator-Tiers-and-Limits.md).
+- `amipilot.lha` — a pre-built binary release archive (`AmiInspect` +
+  license + this documentation as an AmigaGuide) — see
+  [Installation](Installation.md).
 
 **Known gaps, tracked as real follow-up work, not silently accepted:**
 
 - `AmiInspect` doesn't yet embed a `$VER:` cookie.
 - `STRING_KIND` and `INTEGER_KIND` GadTools gadgets aren't distinguished
   from each other (both report as `string`).
-- No pre-built binary is attached to this release yet — source only; see
-  [Installation](Installation.md).
 - No public CI on-target run yet — `make test-target` needs a
   machine-specific Workbench install (see
   [Building and Testing](Building-and-Testing.md)) that CI doesn't have.

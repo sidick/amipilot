@@ -134,5 +134,51 @@ guide:
 	@mkdir -p $(BUILD)
 	python3 tools/docs2guide.py userdocs $(BUILD)/amipilot.guide
 
+# --- lha: build the real LHa for UNIX (archive-capable), pinned ------------
+# Homebrew's and Ubuntu's `lha` is Lhasa -- extract-only, useless for
+# packaging -- and the last lha *release* tag (2021) no longer compiles with
+# modern compilers, so build a pinned master commit from source into
+# build/tools/. Needs git + autoconf/automake. Override with a known-good
+# archiver: make dist LHA=/path/to/real/lha
+# Same pinned commit as sibling projects amiauth/sana2loop's own dist target.
+LHA_REPO   := https://github.com/jca02266/lha.git
+LHA_COMMIT := 86094cb56aba34de45668f39f74fcfb61e9d7fb6
+LHA        ?= $(BUILD)/tools/lha
+
+$(BUILD)/tools/lha:
+	@mkdir -p $(BUILD)/tools
+	rm -rf $(BUILD)/tools/lha-src
+	git clone -q $(LHA_REPO) $(BUILD)/tools/lha-src
+	cd $(BUILD)/tools/lha-src && \
+		git -c advice.detachedHead=false checkout -q $(LHA_COMMIT) && \
+		autoreconf -fi >/dev/null 2>&1 && ./configure >/dev/null && \
+		$(MAKE) >/dev/null
+	cp $(BUILD)/tools/lha-src/src/lha $(BUILD)/tools/lha
+	rm -rf $(BUILD)/tools/lha-src
+
+# --- dist: assemble the release archive (AmiInspect + guide + license) ----
+# Builds the m68k binary itself (build-test.yml's dist job runs `make dist`
+# standalone, with no prior `build` job's artifacts to reuse - see the
+# verb-contract comment above); the lha archiver is built automatically
+# (above). Produces build/dist/amipilot.lha (drawer with AmiInspect+guide+
+# license+readme) and build/dist/amipilot.readme alongside it.
+#
+# Fixtures aren't included: they're conformance test apps for this
+# project's own development, not user-facing tools -- see
+# fixtures/README.md.
+#
+# No $VER: self-check yet (unlike sibling projects' dist targets): AmiInspect
+# doesn't embed a $VER cookie yet -- a known, documented gap (see
+# userdocs/Changelog.md and userdocs/Installation.md's "Checking which
+# version you have"), not an oversight here.
+dist: amiga guide $(LHA)
+	rm -rf $(BUILD)/dist
+	mkdir -p $(BUILD)/dist/amipilot
+	cp $(INSPECT_BIN) $(BUILD)/amipilot.guide LICENSE amipilot.readme \
+		$(BUILD)/dist/amipilot/
+	cp amipilot.readme $(BUILD)/dist/
+	cd $(BUILD)/dist && $(abspath $(LHA)) aq amipilot.lha amipilot
+	@ls -l $(BUILD)/dist/amipilot.lha $(BUILD)/dist/amipilot.readme
+
 clean:
 	rm -rf $(BUILD)

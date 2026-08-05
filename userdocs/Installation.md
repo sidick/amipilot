@@ -25,13 +25,11 @@ same underlying gadget type; see
 
 ## Installing
 
-0.1 is source-only — the
-[GitHub release](https://github.com/sidick/amipilot/releases) has no
-pre-built binary attached yet, so cross-compile it first (see
-[Building and Testing](Building-and-Testing.md)). Once you have
-`build/AmiInspect`, installation is just:
-
-Copy `AmiInspect` to `C:` (or anywhere on your command `Path`).
+Download `amipilot.lha` from the
+[GitHub release](https://github.com/sidick/amipilot/releases), extract
+it, and copy `AmiInspect` to `C:` (or anywhere on your command `Path`).
+The archive also carries this documentation as `amipilot.guide`
+(AmigaGuide/MultiView) and the license.
 
 That's it — no reboot, no configuration. Run it from a Shell:
 
@@ -39,17 +37,15 @@ That's it — no reboot, no configuration. Run it from a Shell:
 > AmiInspect
 ```
 
+If you'd rather build it yourself than use the released binary, see
+[Building and Testing](Building-and-Testing.md) (`make dist` produces the
+same archive this release ships).
+
 ## Checking which version you have
 
 `AmiInspect` does not yet embed a `$VER:` cookie (a known gap — see
 [Changelog](Changelog.md)), so check the release you downloaded it from
 instead: [github.com/sidick/amipilot/releases](https://github.com/sidick/amipilot/releases).
-
-## Building from source
-
-See [Building and Testing](Building-and-Testing.md) if you'd rather
-cross-compile `AmiInspect` (and the conformance fixtures) yourself than
-use a released binary.
 
 ## Next steps
 
