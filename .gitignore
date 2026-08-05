@@ -1,0 +1,26 @@
+# Build output
+/build/
+/site/
+
+# Prerequisites
+*.d
+
+# Object files
+*.o
+*.ko
+*.obj
+
+# Linker output
+*.ilk
+*.map
+*.exp
+
+# Debug files
+*.dSYM/
+*.su
+
+# Python
+__pycache__/
+*.egg-info/
+.pytest_cache/
+.venv/

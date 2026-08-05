@@ -1,0 +1,25 @@
+# SPDX-License-Identifier: BSD-2-Clause
+# Copyright (c) 2026 Simon Dick
+
+# CI -- run on every push to main and every PR targeting main.
+#
+# Calls sidick/amiga-workflows' build-test.yml, which implements the
+# five-verb contract (build/test-host/test-target/lint/dist all resolve to
+# Makefile targets of the same name -- see this repo's Makefile "Verb
+# contract" section).
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ci:
+    uses: sidick/amiga-workflows/.github/workflows/build-test.yml@v1
