@@ -52,6 +52,26 @@ GADTOOLS_APP_BIN := $(BUILD)/fixtures/GTApp
 CLASSACT_APP_SRC := fixtures/classact-app/src/main.c
 CLASSACT_APP_BIN := $(BUILD)/fixtures/CAApp
 
+# --- server/ (phase 0.2, in progress -- see docs/implementation-plan.md) --
+ACTION_SRCDIR := server/src
+ACTION_INCDIR := server/include
+ACTION_SRC    := $(ACTION_SRCDIR)/action.c
+ACTION_LIB    := $(BUILD)/libamipaction.a
+
+# AmiClickTest is a dev-only scoping tool proving the action engine
+# against fixtures/gadtools-app -- not a fixture, not the eventual server
+# commodity. Not part of `amiga`/`build`/`docker`: it's not a real
+# deliverable yet, so it doesn't belong in the surface CI/releases treat
+# as such. See server/src/clicktest/main.c's own header comment.
+CLICKTEST_SRCDIR := server/src/clicktest
+CLICKTEST_BIN    := $(BUILD)/AmiClickTest
+
+# AmiSetMouse: even smaller dev-only diagnostic -- the RKM's documented
+# Set_Mouse.c pointer-positioning example almost verbatim, to verify the
+# documented move mechanism in isolation before layering clicks on it.
+SETMOUSE_SRCDIR := server/src/setmouse
+SETMOUSE_BIN    := $(BUILD)/AmiSetMouse
+
 # --- Docker (shared toolchain image, see sidick/amiga-dev) ---
 IMAGE      ?= ghcr.io/sidick/amiga-dev:1
 # --user matches the container process's UID/GID to the host caller's, so
@@ -59,13 +79,15 @@ IMAGE      ?= ghcr.io/sidick/amiga-dev:1
 # container-private volume) is host-owned, not root-owned.
 DOCKER_RUN := docker run --rm --user "$$(id -u):$$(id -g)" -v "$(CURDIR)":/work -w /work $(IMAGE)
 
-.PHONY: all amiga fixtures docker clean version build test-host test-target lint dist guide
+.PHONY: all amiga fixtures server docker clean version build test-host test-target lint dist guide
 
 all: amiga
 
 amiga: $(INSPECT_BIN)
 
 fixtures: $(GADTOOLS_APP_BIN) $(CLASSACT_APP_BIN)
+
+server: $(CLICKTEST_BIN) $(SETMOUSE_BIN)
 
 $(MODEL_LIB): $(MODEL_SRC) $(MODEL_INCDIR)/intuition_model.h
 	@mkdir -p $(BUILD)
@@ -90,6 +112,19 @@ $(CLASSACT_APP_BIN): $(CLASSACT_APP_SRC)
 	@mkdir -p $(BUILD)/fixtures
 	$(CC) $(CFLAGS) -o $@ $(CLASSACT_APP_SRC) -lamiga
 
+$(ACTION_LIB): $(ACTION_SRC) $(ACTION_INCDIR)/action_engine.h
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) -I$(ACTION_INCDIR) -c $(ACTION_SRC) -o $(BUILD)/action.o
+	$(AR) rcs $@ $(BUILD)/action.o
+
+$(CLICKTEST_BIN): $(CLICKTEST_SRCDIR)/main.c $(ACTION_LIB)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) -I$(ACTION_INCDIR) -o $@ $(CLICKTEST_SRCDIR)/main.c $(ACTION_LIB)
+
+$(SETMOUSE_BIN): $(SETMOUSE_SRCDIR)/main.c
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) -o $@ $(SETMOUSE_SRCDIR)/main.c
+
 docker:
 	$(DOCKER_RUN) make amiga fixtures
 
@@ -111,7 +146,8 @@ test-host:
 # run.sh itself skips (exit 0, not a false pass) when that file is
 # absent, so this stays a real check locally and an honest no-op in CI
 # rather than silently claiming coverage it can't have.
-test-target: amiga fixtures
+# server too: run.sh's action-engine click check needs AmiClickTest.
+test-target: amiga fixtures server
 	sh tests/copperline/run.sh
 
 lint:
