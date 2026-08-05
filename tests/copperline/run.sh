@@ -188,14 +188,77 @@ EOF
 	echo "run.sh: PASS (action-engine click)"
 }
 
+# --- action-engine type check (phase 0.2) ---------------------------------
+# Clicks the Host string gadget (GA_ID=2) to focus it, types a string via
+# AmipTypeString (real IECLASS_RAWKEY events through MapANSI), then asserts
+# AmiInspect reads the typed text back out of the live StringInfo buffer --
+# proof the whole round trip (click-to-focus, keymap-aware typing, and the
+# walker's new value= field) really works, not just that events were sent.
+run_type_check() {
+	echo "run.sh: action-engine type"
+
+	rm -f "$BUILD/type-result.txt" "$BUILD/inspect-after-type.txt" "$BUILD/marker-type.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+Run >NIL: SRC:build/fixtures/GTApp
+Wait 5
+SRC:build/AmiClickTest WINDOW=GadTools ID=2 TEXT="hello amipilot" >SRC:build/type-result.txt
+Wait 3
+SRC:build/AmiInspect WINDOW=GadTools >SRC:build/inspect-after-type.txt
+Echo "DONE" >SRC:build/marker-type.txt
+EOF
+
+	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
+	rm -f "$info"
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
+		--fast 8M --noaudio --control :0 --control-info "$info" \
+		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
+	COPPERLINE_PID=$!
+
+	tries=0
+	while [ ! -f "$info" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 100 ]; then
+			echo "run.sh: FAIL (type): copperline never wrote $info"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			return
+		fi
+		sleep 0.1
+	done
+
+	"$COPPERLINE_CTL" --info "$info" run_until "{\"seconds\": $RUN_SECONDS}" > /dev/null
+	kill "$COPPERLINE_PID" 2>/dev/null || true
+	COPPERLINE_PID=""
+	rm -f "$info"
+
+	if [ ! -f "$BUILD/marker-type.txt" ]; then
+		echo "run.sh: FAIL (type): marker-type.txt never appeared -- crash or hang"
+		FAILED=1
+		return
+	fi
+
+	if ! grep -qF 'value="hello amipilot"' "$BUILD/inspect-after-type.txt" 2>/dev/null; then
+		echo "run.sh: FAIL (type): typed text not found in string gadget"
+		sed 's/^/run.sh:   /' "$BUILD/inspect-after-type.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+		return
+	fi
+
+	echo "run.sh: PASS (action-engine type)"
+}
+
 run_click_check
+run_type_check
 
 if [ "$FAILED" -eq 0 ]; then
 	rm -f "$BUILD"/.copperline-ctl-info-*.json "$BUILD"/.copperline-log-*.txt \
 		"$BUILD"/inspect-gadtools.txt "$BUILD"/inspect-classact.txt \
 		"$BUILD"/marker-gt.txt "$BUILD"/marker-ca.txt \
 		"$BUILD"/click-result.txt "$BUILD"/inspect-after-click.txt \
-		"$BUILD"/marker-click.txt
+		"$BUILD"/marker-click.txt \
+		"$BUILD"/type-result.txt "$BUILD"/inspect-after-type.txt \
+		"$BUILD"/marker-type.txt
 	echo "run.sh: all fixtures PASS"
 	exit 0
 else

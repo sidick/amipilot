@@ -71,4 +71,25 @@ BOOL AmipClickAt(struct Screen *screen, WORD x, WORD y, AmipMouseButton button);
  * here (see the TODO at this function's definition). */
 BOOL AmipClickGadget(struct Window *window, struct Gadget *gadget);
 
+/* Types text as genuine IECLASS_RAWKEY press/release events into
+ * whatever currently has keyboard focus (click/activate the target
+ * first). Each printable character is inverted into its rawkey +
+ * qualifier combination under the LIVE keymap via keymap.library's
+ * MapANSI() -- self-adapting to non-US layouts, same technique as
+ * ../amirfb's proven keyboard injection. '\n' maps to Return
+ * (keymap-independent rawkey 0x44) directly.
+ *
+ * Pacing approximates human typing (~a few characters per second, a
+ * real press duration on every key) rather than machine-speed
+ * back-to-back events -- both so the target program's event loop sees
+ * a realistic input stream, and because that's the input regime all
+ * shipped software was actually tested against.
+ *
+ * Consumes the global KeymapBase (proto/keymap.h extern) the same way
+ * the walker consumes GadToolsBase: the calling program owns opening/
+ * closing keymap.library. Returns FALSE (typing nothing) if KeymapBase
+ * is NULL, a character can't be generated under the active keymap, or
+ * event injection fails. */
+BOOL AmipTypeString(CONST_STRPTR text);
+
 #endif /* AMIPILOT_ACTION_ENGINE_H */
