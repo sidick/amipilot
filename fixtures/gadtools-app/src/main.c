@@ -69,7 +69,7 @@ int main(void)
     ng.ng_GadgetID = GID_CONNECT;
     ng.ng_Flags = PLACETEXT_IN;
     ng.ng_VisualInfo = visualInfo;
-    gad = CreateGadget(BUTTON_KIND, gad, &ng, TAG_DONE);
+    gad = CreateGadget(BUTTON_KIND, gad, &ng, GT_Underscore, '_', TAG_DONE);
 
     ng.ng_TopEdge += 24;
     ng.ng_GadgetText = (UBYTE *)"_Host:";
@@ -78,6 +78,7 @@ int main(void)
     gad = CreateGadget(STRING_KIND, gad, &ng,
                         GTST_String, (ULONG)"",
                         GTST_MaxChars, 64,
+                        GT_Underscore, '_',
                         TAG_DONE);
 
     ng.ng_TopEdge += 24;
@@ -86,6 +87,7 @@ int main(void)
     ng.ng_Flags = PLACETEXT_RIGHT;
     gad = CreateGadget(CHECKBOX_KIND, gad, &ng,
                         GTCB_Checked, FALSE,
+                        GT_Underscore, '_',
                         TAG_DONE);
 
     if (gad == NULL) {
