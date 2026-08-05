@@ -30,7 +30,7 @@ layer between the two.
 
 ```
   host: pytest/scripts ── amipilot client (Python package)
-                              |  line/JSON protocol
+                              |  line protocol
                      serial.device  |  bsdsocket TCP  |  local ARexx
                               |
         +---------------------v----------------------+
@@ -160,13 +160,30 @@ any specific application affected by this, not a general fix.
 ## Protocol and client
 
 - One verb set, three surfaces: an ARexx port (the first transport shipped,
-  for on-Amiga scripting), then line-oriented request/response with JSON
-  payloads over serial.device and TCP.
+  for on-Amiga scripting), then line-oriented request/response over
+  serial.device and TCP.
+- **No JSON anywhere in the protocol (decided 2026-08-05, amending the
+  original "JSON payloads" sketch).** Requests on the wire are the exact
+  same command grammar the ARexx port already parses (`arexx_cmd.c`,
+  proven on-target) — the serial transport becomes a thin framing layer
+  over the existing dispatch rather than a second parser. Responses are
+  length-prefixed text (`RC <code> <byte-count>` then exactly that many
+  payload bytes): binary-safe with zero escaping on either side, and the
+  payload for structured verbs stays the same stable, documented,
+  test-asserted text format `AmiInspect`/`TREE` already emit. Rationale:
+  a JSON parser on a 68000 is real code and real failure modes for
+  requests that are structurally `CLICK GadTools 1`; the same
+  all-consumers-without-a-JSON-parser argument that shaped the manifest
+  format (`manifest/SPEC.md`) applies harder here; and JSON's one real
+  benefit (free parsing in host Python) is offset by the host needing to
+  understand the tree text format regardless. If a future verb genuinely
+  needs nested structure, that's what the protocol version handshake is
+  for — not a reason to pay JSON's cost from day one.
 - **Version handshake from 0.1.** Verbs land marked *stable* or
   *experimental* (experimental verbs may change between minors; stable ones
   never break within a major), and the host client pins the server versions
   it speaks.
-- Verbs (v1): `windows/list`, `tree` (full window/gadget model as JSON —
+- Verbs (v1): `windows/list`, `tree` (full window/gadget model —
   roles, labels, classes, IDs, states), `find`, `click`, `doubleclick`,
   `drag`, `type`, `menu-pick` (menu strips are walkable data; selection via
   the menu's keyboard shortcut where present, pointer navigation otherwise),
@@ -181,9 +198,10 @@ any specific application affected by this, not a general fix.
 Discovering locators is the whole workflow for scripting an app you didn't
 write, so the `tree` model surfaces three ways:
 
-- **`amipilot dump` on the host** — pretty-printed or JSON tree of any
-  window, piped straight into a quirk profile or test file: *dump, copy,
-  script*.
+- **`amipilot dump` on the host** — pretty-printed tree of any window
+  (with a machine-readable output mode rendered host-side — the wire
+  itself stays JSON-free, see "Protocol and client"), piped straight
+  into a quirk profile or test file: *dump, copy, script*.
 - **`AmiInspect`, a standalone on-Amiga Shell command** (ReadArgs, no host
   or server session required): prints the frontmost or named window's gadget
   tree — roles, labels, classes, IDs, positions, states. The platform's
@@ -257,7 +275,7 @@ stage, launch, drive, harvest, clean up, disconnect.
   fine; failing on older is not.
 - **CPU:** all binaries compiled for plain 68000, no FPU, no float in hot
   paths. The server's work — copying structures under brief locks, polling
-  its own model, formatting text/JSON — is trivial even at 7 MHz.
+  its own model, formatting text — is trivial even at 7 MHz.
 - **RAM:** server + model copies budgeted well under 100 KB resident,
   allocated from any memory (nothing needs chip RAM). AmiPilot itself is
   small; the real floor is whatever the application under test needs.
@@ -345,7 +363,9 @@ transport.
 *Release gate:* an ARexx script clicks a button on the test app and asserts
 a label changed — on-Amiga automation with no host involved.
 
-**0.3 — the wire and the host client (2 weekends):** the line/JSON protocol
+**0.3 — the wire and the host client (2 weekends):** the line protocol
+(same command grammar as the ARexx port, length-prefixed text responses —
+see "Protocol and client" for the no-JSON decision)
 with its version handshake over **serial.device**, the host Python client
 and `amipilot dump`, the pytest plugin with emulator fixtures, and the
 manifest contract (schema published and versioned) with manifest locators.
