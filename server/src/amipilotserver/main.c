@@ -33,6 +33,24 @@
 #include "arexx.h"
 #include "intuition_model.h"
 
+#define STR(s)  #s
+#define XSTR(s) STR(s)
+
+#ifndef VERSION
+#define VERSION 0
+#endif
+#ifndef REVISION
+#define REVISION 0
+#endif
+
+/* Standard AmigaDOS "$VER:" version cookie -- see amiinspect/src/main.c's
+ * copy of this same pattern for the full rationale (RKRM: DOS, "The
+ * Version Cookie"; `static volatile` so -O2 can't drop the
+ * never-read-in-program array). version.mk is the single source of
+ * truth for VERSION/REVISION. */
+static volatile char version[] =
+    "$VER: AmiPilotServer " XSTR(VERSION) "." XSTR(REVISION) " (05.08.2026)";
+
 struct IntuitionBase *IntuitionBase = NULL;
 /* Consumed by intuition-model/walk.c's BUTTON_KIND/CHECKBOX_KIND
  * discriminator (GT_GetGadgetAttrsA) -- optional, same graceful

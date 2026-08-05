@@ -2,7 +2,10 @@
 
 AmiPilot's stated design principle is **honest best-effort**: read what's
 genuinely readable, and say plainly what isn't, rather than guess. This
-page is the up-to-date, plain-language version of that promise for 0.1.
+page is the up-to-date, plain-language version of that promise —
+covering both what `AmiInspect` can see and what `AmiPilotServer`'s
+`CLICK`/`TYPE`/`GETTEXT` can act on, since a gadget invisible to one is
+unreachable by the other.
 
 ## What's classified today
 
@@ -67,10 +70,13 @@ any hand-rolled rendering, by definition.
 
 ## Why this matters for automation, not just inspection
 
-Everything on this page describes what `AmiInspect` can *see*. A future
-release's *locator* model (finding a specific gadget to act on, not just
-listing everything) inherits exactly these same limits — a gadget
-`AmiInspect` can't classify or reach today is a gadget no later automation
-verb will be able to target either, until the underlying gap closes. See
-the [implementation plan](https://github.com/sidick/amipilot/blob/main/docs/implementation-plan.md#locator-tiers)
+Everything on this page describes what `AmiInspect` can *see* — and
+`AmiPilotServer`'s `CLICK`/`TYPE`/`GETTEXT` (see the
+[ARexx Reference](ARexx-Reference.md)) locate their target the exact
+same way, by walking the live structure and matching a `GA_ID`. A gadget
+`AmiInspect` can't classify or reach is a gadget no automation verb can
+target either, until the underlying gap closes — a `layout.gadget`
+child, for instance, has no `GA_ID` to `CLICK` by, for the same reason
+`AmiInspect` can't list it. See the
+[implementation plan](https://github.com/sidick/amipilot/blob/main/docs/implementation-plan.md#locator-tiers)
 for the full tiered locator model this is building toward.

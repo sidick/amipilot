@@ -26,6 +26,7 @@ window's `FirstGadget` chain):
 ```
 window "<title>" [<left>,<top> <width>x<height>]
   gadget id=<id> role=<role> class="<class>" label="<label>" [<left>,<top> <width>x<height>]
+  gadget id=<id> role=string class="<class>" label="<label>" value="<value>" [<left>,<top> <width>x<height>]
 ```
 
 - **`id`** — the gadget's `GA_ID`. `0` for gadgets that never had one set
@@ -46,6 +47,10 @@ window "<title>" [<left>,<top> <width>x<height>]
   bug — see [Locator Tiers and Limits](Locator-Tiers-and-Limits.md) for
   the specific, documented cases where a label is genuinely unreadable at
   this tier.
+- **`value`** — a string or integer gadget's live editable contents,
+  read straight out of its `StringInfo` buffer. Only present for those
+  two roles; omitted entirely for everything else (a button has no
+  separate "value" from its label, for instance).
 - Position/size are in the gadget's own coordinate space (window-relative
   for ordinary gadgets; several window-chrome system gadgets use negative
   offsets from the window's right/bottom edge — that's correct, not a

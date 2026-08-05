@@ -4,4 +4,4 @@
 # wire protocol's version handshake, would read); REVISION is the minor.
 # Started at 0.1 per docs/implementation-plan.md's phase 0.1 release gate.
 VERSION  := 0
-REVISION := 1
+REVISION := 2
