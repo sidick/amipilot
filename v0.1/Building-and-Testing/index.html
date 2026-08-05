@@ -696,6 +696,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#building-the-release-archive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building the release archive
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#linting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -810,6 +821,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#building-the-release-archive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Building the release archive
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#linting" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -847,9 +869,8 @@
 
 <h1 id="building-and-testing">Building and Testing<a class="headerlink" href="#building-and-testing" title="Permanent link">&para;</a></h1>
 <p>This page is for building AmiPilot from source and running its on-target
-conformance check — not needed if you're just using a released
-<code>AmiInspect</code> binary (once one exists — see
-<a href="../Installation/">Installation</a>).</p>
+conformance check — not needed if you're just using the released
+<code>AmiInspect</code> binary (see <a href="../Installation/">Installation</a>).</p>
 <h2 id="cross-building">Cross-building<a class="headerlink" href="#cross-building" title="Permanent link">&para;</a></h2>
 <p>The Amiga build uses the Bebbo <code>m68k-amigaos-gcc</code> cross-toolchain.</p>
 <pre><code>make docker   # cross-compiles build/AmiInspect and the conformance
@@ -896,6 +917,15 @@ mkdocs build   # static site into site/
 from the same <code>userdocs/</code> source:</p>
 <pre><code>make guide     # -&gt; build/amipilot.guide
 </code></pre>
+<h2 id="building-the-release-archive">Building the release archive<a class="headerlink" href="#building-the-release-archive" title="Permanent link">&para;</a></h2>
+<pre><code>make dist   # -&gt; build/dist/amipilot.lha, build/dist/amipilot.readme
+</code></pre>
+<p>Builds <code>AmiInspect</code>, the guide, and packages them with <code>LICENSE</code> and
+<code>amipilot.readme</code> into the same <code>amipilot.lha</code> this project's releases
+ship — including building a real <code>lha</code> archiver from source first
+(Homebrew's and most Linux distros' <code>lha</code> is Lhasa, extract-only, useless
+for packaging), pinned to a known-good commit. Override with your own
+archiver: <code>make dist LHA=/path/to/real/lha</code>.</p>
 <h2 id="linting">Linting<a class="headerlink" href="#linting" title="Permanent link">&para;</a></h2>
 <pre><code>make lint   # semgrep --config auto over the C sources
 </code></pre>

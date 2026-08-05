@@ -809,14 +809,15 @@ for the full engineering detail and phase sequencing behind each one.</p>
   button labels and <code>layout.gadget</code>-nested gadgets are both genuinely
   unreadable at this tier — see
   <a href="../Locator-Tiers-and-Limits/">Locator Tiers and Limits</a>.</li>
+<li><code>amipilot.lha</code> — a pre-built binary release archive (<code>AmiInspect</code> +
+  license + this documentation as an AmigaGuide) — see
+  <a href="../Installation/">Installation</a>.</li>
 </ul>
 <p><strong>Known gaps, tracked as real follow-up work, not silently accepted:</strong></p>
 <ul>
 <li><code>AmiInspect</code> doesn't yet embed a <code>$VER:</code> cookie.</li>
 <li><code>STRING_KIND</code> and <code>INTEGER_KIND</code> GadTools gadgets aren't distinguished
   from each other (both report as <code>string</code>).</li>
-<li>No pre-built binary is attached to this release yet — source only; see
-  <a href="../Installation/">Installation</a>.</li>
 <li>No public CI on-target run yet — <code>make test-target</code> needs a
   machine-specific Workbench install (see
   <a href="../Building-and-Testing/">Building and Testing</a>) that CI doesn't have.</li>

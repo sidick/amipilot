@@ -438,17 +438,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#building-from-source" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Building from source
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#next-steps" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -821,17 +810,6 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#building-from-source" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Building from source
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
   <a href="#next-steps" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -889,23 +867,21 @@ distinguish a GadTools checkbox from a plain button (both produce the
 same underlying gadget type; see
 <a href="../Locator-Tiers-and-Limits/">Locator Tiers and Limits</a>).</p>
 <h2 id="installing">Installing<a class="headerlink" href="#installing" title="Permanent link">&para;</a></h2>
-<p>0.1 is source-only — the
-<a href="https://github.com/sidick/amipilot/releases">GitHub release</a> has no
-pre-built binary attached yet, so cross-compile it first (see
-<a href="../Building-and-Testing/">Building and Testing</a>). Once you have
-<code>build/AmiInspect</code>, installation is just:</p>
-<p>Copy <code>AmiInspect</code> to <code>C:</code> (or anywhere on your command <code>Path</code>).</p>
+<p>Download <code>amipilot.lha</code> from the
+<a href="https://github.com/sidick/amipilot/releases">GitHub release</a>, extract
+it, and copy <code>AmiInspect</code> to <code>C:</code> (or anywhere on your command <code>Path</code>).
+The archive also carries this documentation as <code>amipilot.guide</code>
+(AmigaGuide/MultiView) and the license.</p>
 <p>That's it — no reboot, no configuration. Run it from a Shell:</p>
 <pre><code>&gt; AmiInspect
 </code></pre>
+<p>If you'd rather build it yourself than use the released binary, see
+<a href="../Building-and-Testing/">Building and Testing</a> (<code>make dist</code> produces the
+same archive this release ships).</p>
 <h2 id="checking-which-version-you-have">Checking which version you have<a class="headerlink" href="#checking-which-version-you-have" title="Permanent link">&para;</a></h2>
 <p><code>AmiInspect</code> does not yet embed a <code>$VER:</code> cookie (a known gap — see
 <a href="../Changelog/">Changelog</a>), so check the release you downloaded it from
 instead: <a href="https://github.com/sidick/amipilot/releases">github.com/sidick/amipilot/releases</a>.</p>
-<h2 id="building-from-source">Building from source<a class="headerlink" href="#building-from-source" title="Permanent link">&para;</a></h2>
-<p>See <a href="../Building-and-Testing/">Building and Testing</a> if you'd rather
-cross-compile <code>AmiInspect</code> (and the conformance fixtures) yourself than
-use a released binary.</p>
 <h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
 <p>Continue with <a href="../Getting-Started/">Getting Started</a> for a first
 inspection walkthrough.</p>
