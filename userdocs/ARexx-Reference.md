@@ -1,0 +1,92 @@
+# ARexx Reference
+
+`AmiPilotServer` is a small commodity that hosts AmiPilot's action engine
+(genuine `input.device` click/type synthesis) and the `intuition-model`
+walker behind a public ARexx port — so an ARexx script running on the
+*same* Amiga can locate and drive another program's GUI. No host
+machine, transport, or emulator involved.
+
+## Starting it
+
+```
+> Run SRC:AmiPilotServer
+```
+
+(or wherever you've copied it — see [Installation](Installation.md)). It
+opens an ARexx port named `AMIPILOT.1` (or the next free slot —
+`AMIPILOT.2`, `AMIPILOT.3`, ... — if more than one instance is running)
+and prints the name it actually got:
+
+```
+AmiPilotServer: ARexx port AMIPILOT.1 ready
+```
+
+It has no window of its own; it just sits waiting for ARexx commands
+until it receives `QUIT` or a break signal (Ctrl-C).
+
+## Commands
+
+Every command's first argument is a **window-title substring** — the
+same matching `AmiInspect WINDOW=` uses, across every screen, first
+match wins. Quote it if it contains spaces.
+
+| Command | Arguments | What it does |
+|---------|-----------|---------------|
+| `TREE` | `<window-pattern>` | Returns the matched window's full gadget tree as a multi-line string, in the same format `AmiInspect` prints (`RESULT` gains embedded newlines — most REXX interpreters handle that fine in a variable). |
+| `CLICK` | `<window-pattern> <gadget-id>` | Clicks the gadget with that `GA_ID` — a genuine `input.device` click, not a shortcut. |
+| `TYPE` | `<window-pattern> <gadget-id> <text...>` | Clicks the gadget (to focus it), then types `text` into it via real `IECLASS_RAWKEY` events, human-paced. Everything after the gadget ID is taken verbatim as the text — no quoting needed unless the text itself starts with `"`. |
+| `GETTEXT` | `<window-pattern> <gadget-id>` | Returns that gadget's current text: a string/integer gadget's live value if it has one, otherwise its label. |
+| `QUIT` | (none) | Shuts the commodity down cleanly. |
+
+## Example
+
+```rexx
+/* rexx */
+OPTIONS RESULTS
+ADDRESS 'AMIPILOT.1'
+
+'CLICK GadTools 2'
+'TYPE GadTools 2 hello amipilot'
+'GETTEXT GadTools 2'
+SAY 'Host field now reads: 'RESULT
+
+'CLICK GadTools 1'
+'QUIT'
+```
+
+Run it with `rx myscript.rexx` (`rx` is the standard AmigaOS ARexx
+launcher; `AmiPilotServer` needs a real resident `RexxMast` to talk to,
+same as any other ARexx-scriptable application). `OPTIONS RESULTS` is
+required — without it ARexx never asks the host for a `RESULT` string at
+all.
+
+## Return codes
+
+Same convention this project's sibling tools use for their own ARexx
+ports:
+
+| `RC` | Meaning |
+|------|---------|
+| `0` | Success. |
+| `5` | Warning — the window or gadget wasn't found. The command was well-formed; there was just nothing to act on. |
+| `10` | Error — unknown command, or a required argument was missing. |
+| `20` | Failure — the action itself didn't deliver (the underlying `input.device` event injection failed). |
+
+## What it needs open
+
+`AmiPilotServer` always opens `intuition.library` (V37+; fails outright
+without it), `input.device`, and `rexxsyslib.library` (fails outright
+without it — there's no point running with no ARexx port).
+`gadtools.library` and `keymap.library` are opened opportunistically:
+without the former, the same button/checkbox discrimination gap
+`AmiInspect` has applies; without the latter, `TYPE` fails outright
+(there's no way to synthesize keypresses without it) but every other
+command still works.
+
+## Next steps
+
+See [Locator Tiers and Limits](Locator-Tiers-and-Limits.md) for what a
+`window-pattern`/`gadget-id` pair can and can't reach today (the same
+structural limits `AmiInspect` documents apply here too — a gadget has
+to be visible to the walker before `AmiPilotServer` can click or type
+into it).

@@ -33,6 +33,7 @@ PAGES = [
     ('Getting-Started', 'Getting Started'),
     ('AmiInspect-Reference', 'AmiInspect Reference'),
     ('Locator-Tiers-and-Limits', 'Locator Tiers and Limits'),
+    ('ARexx-Reference', 'ARexx Reference'),
     ('Troubleshooting-and-FAQ', 'Troubleshooting and FAQ'),
     ('Building-and-Testing', 'Building and Testing'),
     ('Changelog', 'Changelog'),

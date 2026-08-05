@@ -65,3 +65,8 @@ See the [AmiInspect Reference](AmiInspect-Reference.md) for the full
 command-line template and output format, or
 [Locator Tiers and Limits](Locator-Tiers-and-Limits.md) for what
 `AmiInspect` can and can't see today.
+
+Once you've found the `GA_ID`s you need, drive them with
+`AmiPilotServer` — click, type, and read gadget state back from an
+ARexx script, no host machine involved. See the
+[ARexx Reference](ARexx-Reference.md).

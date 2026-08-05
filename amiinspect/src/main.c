@@ -21,6 +21,27 @@
 
 #include "intuition_model.h"
 
+#define STR(s)  #s
+#define XSTR(s) STR(s)
+
+#ifndef VERSION
+#define VERSION 0
+#endif
+#ifndef REVISION
+#define REVISION 0
+#endif
+
+/* Standard AmigaDOS "$VER:" version cookie (RKRM: DOS, "The Version
+ * Cookie") -- what the Shell's Version command scans a compiled
+ * executable's segments for. `static volatile` (not `static const`) so
+ * -O2 can't conclude the never-read array is dead and drop it: the
+ * whole point is that ITS BYTES are read by an external tool, not by
+ * this program. dd.mm.yyyy: the cookie's date field is three decimal
+ * numbers, not a textual month -- see version.mk for VERSION/REVISION,
+ * the single source of truth a release PR bumps. */
+static volatile char version[] =
+    "$VER: AmiInspect " XSTR(VERSION) "." XSTR(REVISION) " (05.08.2026)";
+
 struct IntuitionBase *IntuitionBase = NULL;
 /* Opened so intuition-model's walker can distinguish GadTools'
  * BUTTON_KIND from CHECKBOX_KIND (both are a plain GTYP_BOOLGADGET;

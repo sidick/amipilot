@@ -206,27 +206,36 @@ $(BUILD)/tools/lha:
 	cp $(BUILD)/tools/lha-src/src/lha $(BUILD)/tools/lha
 	rm -rf $(BUILD)/tools/lha-src
 
-# --- dist: assemble the release archive (AmiInspect + guide + license) ----
-# Builds the m68k binary itself (build-test.yml's dist job runs `make dist`
-# standalone, with no prior `build` job's artifacts to reuse - see the
-# verb-contract comment above); the lha archiver is built automatically
-# (above). Produces build/dist/amipilot.lha (drawer with AmiInspect+guide+
-# license+readme) and build/dist/amipilot.readme alongside it.
+# --- dist: assemble the release archive (AmiInspect + AmiPilotServer + ----
+#           guide + license)
+# Builds the m68k binaries themselves (build-test.yml's dist job runs
+# `make dist` standalone, with no prior `build` job's artifacts to reuse -
+# see the verb-contract comment above); the lha archiver is built
+# automatically (above). Produces build/dist/amipilot.lha (drawer with
+# AmiInspect+AmiPilotServer+guide+license+readme) and
+# build/dist/amipilot.readme alongside it.
 #
-# Fixtures aren't included: they're conformance test apps for this
-# project's own development, not user-facing tools -- see
-# fixtures/README.md.
+# Only AmiPilotServer from server/ ships, not AmiClickTest/AmiSetMouse
+# (server's other two build products) -- those are dev-only scoping
+# tools, not deliverables, same reasoning as fixtures/ being excluded
+# entirely (they're conformance test apps for this project's own
+# development -- see fixtures/README.md).
 #
-# No $VER: self-check yet (unlike sibling projects' dist targets): AmiInspect
-# doesn't embed a $VER cookie yet -- a known, documented gap (see
-# userdocs/Changelog.md and userdocs/Installation.md's "Checking which
-# version you have"), not an oversight here.
-dist: amiga guide $(LHA)
+# The $VER grep below confirms the binaries just built actually embed the
+# CURRENT version.mk VERSION.REVISION -- matching sibling projects
+# amiauth/sana2loop's own dist targets' self-check, catching a stale
+# build/ (built before a version bump) before it ships.
+dist: amiga $(AMIPILOTD_BIN) guide $(LHA)
 	rm -rf $(BUILD)/dist
 	mkdir -p $(BUILD)/dist/amipilot
-	cp $(INSPECT_BIN) $(BUILD)/amipilot.guide LICENSE amipilot.readme \
+	cp $(INSPECT_BIN) $(AMIPILOTD_BIN) $(BUILD)/amipilot.guide LICENSE amipilot.readme \
 		$(BUILD)/dist/amipilot/
 	cp amipilot.readme $(BUILD)/dist/
+	@v="$(VERSION).$(REVISION)"; \
+	for b in AmiInspect AmiPilotServer; do \
+		grep -aqF "\$$VER: $$b $$v (" $(BUILD)/dist/amipilot/$$b || \
+			{ echo "dist: $(BUILD)/dist/amipilot/$$b lacks \"\$$VER: $$b $$v (...)\" - stale build/?"; exit 1; }; \
+	done
 	cd $(BUILD)/dist && $(abspath $(LHA)) aq amipilot.lha amipilot
 	@ls -l $(BUILD)/dist/amipilot.lha $(BUILD)/dist/amipilot.readme
 
