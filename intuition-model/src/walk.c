@@ -8,13 +8,21 @@
 #include <exec/types.h>
 #include <exec/memory.h>
 #include <intuition/intuition.h>
+#include <libraries/gadtools.h>
 #include <proto/exec.h>
 #include <proto/intuition.h>
+#include <proto/gadtools.h>
 #include <string.h>
 
 #include "intuition_model.h"
 
 extern struct IntuitionBase *IntuitionBase;
+/* proto/gadtools.h declares this extern; the calling program (AmiInspect,
+ * later the server) owns opening it into gadtools.library and closing it
+ * -- see main.c. Left unopened (NULL), BUTTON_KIND vs CHECKBOX_KIND
+ * discrimination below just degrades to the old BUTTON-only guess rather
+ * than failing, since a foreign target window may not need it and we
+ * don't want the walker itself to depend on gadtools.library. */
 
 static STRPTR CopyString(CONST_STRPTR src)
 {
@@ -33,7 +41,33 @@ static STRPTR CopyString(CONST_STRPTR src)
     return dst;
 }
 
-AmipRole AmipClassifyGadget(struct Gadget *gadget)
+/* GadTools' BUTTON_KIND and CHECKBOX_KIND both create a plain
+ * GTYP_BOOLGADGET -- nothing in the bare struct Gadget distinguishes
+ * them post-creation (confirmed against fixtures/gadtools-app under
+ * real Workbench 3.2.3). GT_GetGadgetAttrsA's documented contract
+ * (gadtools.doc) is the discriminator instead: it only fills in
+ * attributes that apply to the gadget's actual kind, and returns the
+ * count it filled in. Asking a plain button for CHECKBOX_KIND's
+ * GTCB_Checked is a safe, documented no-op (numProcessed stays 0) --
+ * this is officially sanctioned kind probing, not a guessed heuristic. */
+static AmipRole ClassifyBoolGadget(struct Gadget *gadget, struct Window *window)
+{
+    LONG checked = FALSE;
+    LONG numProcessed;
+
+    if (GadToolsBase == NULL || window == NULL) {
+        return AMIP_ROLE_BUTTON;
+    }
+
+    numProcessed = GT_GetGadgetAttrs(gadget, window, NULL, GTCB_Checked, (ULONG)&checked, TAG_DONE);
+    if (numProcessed >= 1) {
+        return AMIP_ROLE_CHECKBOX;
+    }
+
+    return AMIP_ROLE_BUTTON;
+}
+
+static AmipRole ClassifyGadget(struct Gadget *gadget, struct Window *window)
 {
     if (gadget == NULL) {
         return AMIP_ROLE_UNKNOWN;
@@ -41,15 +75,7 @@ AmipRole AmipClassifyGadget(struct Gadget *gadget)
 
     switch (gadget->GadgetType & GTYP_GTYPEMASK) {
         case GTYP_BOOLGADGET:
-            /* TODO(confirmed against fixtures/gadtools-app under real
-             * Workbench 3.2.3): GadTools' BUTTON_KIND and CHECKBOX_KIND
-             * both create a plain GTYP_BOOLGADGET -- nothing in the bare
-             * struct Gadget distinguishes them post-creation, so a real
-             * checkbox currently misclassifies as AMIP_ROLE_BUTTON. Needs
-             * research into recovering the GadTools "kind" after the
-             * fact (there is no public field for it) before this can be
-             * split into BUTTON vs CHECKBOX correctly. */
-            return AMIP_ROLE_BUTTON;
+            return ClassifyBoolGadget(gadget, window);
         case GTYP_STRGADGET:
             return AMIP_ROLE_STRING;
         case GTYP_PROPGADGET:
@@ -68,7 +94,7 @@ AmipRole AmipClassifyGadget(struct Gadget *gadget)
     return AMIP_ROLE_UNKNOWN;
 }
 
-static AmipGadgetModel *WalkGadgetList(struct Gadget *gadget)
+static AmipGadgetModel *WalkGadgetList(struct Gadget *gadget, struct Window *window)
 {
     AmipGadgetModel *head = NULL;
     AmipGadgetModel *tail = NULL;
@@ -80,7 +106,7 @@ static AmipGadgetModel *WalkGadgetList(struct Gadget *gadget)
         }
 
         node->gadgetId = gadget->GadgetID;
-        node->role = AmipClassifyGadget(gadget);
+        node->role = ClassifyGadget(gadget, window);
         /* TODO(confirmed against fixtures/gadtools-app): this reads
          * gadget->GadgetText, which GadTools only populates for
          * PLACETEXT_LEFT/RIGHT/ABOVE/BELOW. A PLACETEXT_IN button (the
@@ -121,7 +147,7 @@ static AmipWindowModel *WalkOneWindow(struct Window *window)
     model->top = window->TopEdge;
     model->width = window->Width;
     model->height = window->Height;
-    model->gadgets = WalkGadgetList(window->FirstGadget);
+    model->gadgets = WalkGadgetList(window->FirstGadget, window);
 
     return model;
 }

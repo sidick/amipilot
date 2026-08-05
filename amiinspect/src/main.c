@@ -15,12 +15,18 @@
 #include <proto/exec.h>
 #include <proto/dos.h>
 #include <proto/intuition.h>
+#include <proto/gadtools.h>
 #include <stdio.h>
 #include <string.h>
 
 #include "intuition_model.h"
 
 struct IntuitionBase *IntuitionBase = NULL;
+/* Opened so intuition-model's walker can distinguish GadTools'
+ * BUTTON_KIND from CHECKBOX_KIND (both are a plain GTYP_BOOLGADGET;
+ * see walk.c's ClassifyBoolGadget). Optional: a missing gadtools.library
+ * just means that discrimination degrades to "button", nothing fails. */
+struct Library *GadToolsBase = NULL;
 
 #define TEMPLATE "WINDOW/K"
 
@@ -81,9 +87,17 @@ int main(void)
         return RETURN_FAIL;
     }
 
+    /* Best-effort: a target window not using GadTools, or a system
+     * without it, still gets inspected -- just without BUTTON_KIND vs
+     * CHECKBOX_KIND discrimination. */
+    GadToolsBase = OpenLibrary((CONST_STRPTR)"gadtools.library", 37);
+
     rdargs = ReadArgs((CONST_STRPTR)TEMPLATE, (LONG *)&args, NULL);
     if (rdargs == NULL) {
         PrintFault(IoErr(), (CONST_STRPTR)"AmiInspect");
+        if (GadToolsBase != NULL) {
+            CloseLibrary(GadToolsBase);
+        }
         CloseLibrary((struct Library *)IntuitionBase);
         return RETURN_FAIL;
     }
@@ -104,6 +118,9 @@ int main(void)
     }
 
     FreeArgs(rdargs);
+    if (GadToolsBase != NULL) {
+        CloseLibrary(GadToolsBase);
+    }
     CloseLibrary((struct Library *)IntuitionBase);
     return rc;
 }
