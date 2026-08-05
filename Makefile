@@ -104,12 +104,15 @@ build: amiga fixtures
 test-host:
 	@echo "test-host: no host-side tests yet (lands in phase 0.3, see docs/implementation-plan.md)"
 
-# No automated on-target harness exists yet (that's phase 0.3/0.4 --
-# scripted Amiberry/Copperline boot + assert). The gadtools-app fixture
-# has been smoke-tested manually via the amiberry MCP tools, but nothing
-# here drives that automatically yet.
-test-target:
-	@echo "test-target: no automated on-target harness yet (lands in phase 0.3/0.4, see docs/implementation-plan.md)"
+# tests/copperline/run.sh boots both fixtures headlessly under Copperline
+# and asserts AmiInspect's classification output -- but it needs
+# tests/copperline/copperline.local.toml (gitignored: a real Kickstart
+# ROM + Workbench install path, machine-specific), which CI doesn't have.
+# run.sh itself skips (exit 0, not a false pass) when that file is
+# absent, so this stays a real check locally and an honest no-op in CI
+# rather than silently claiming coverage it can't have.
+test-target: amiga fixtures
+	sh tests/copperline/run.sh
 
 lint:
 	pip install --quiet semgrep

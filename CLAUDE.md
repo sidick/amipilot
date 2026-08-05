@@ -38,13 +38,16 @@ calls them by name, not because they're the primary local entry points:
 ```sh
 make build           # = amiga + fixtures
 make test-host        # currently a real no-op (no host/ code yet, phase 0.3)
-make test-target      # currently a real no-op (no automated on-target harness yet)
+make test-target      # boots both fixtures under Copperline, asserts AmiInspect's output
 make lint             # semgrep --config auto over intuition-model/ amiinspect/ server/ fixtures/
 ```
 
-There is no automated on-target test runner yet. Verifying a change means
-actually booting an emulator and running the binary against it (see
-"On-target testing" below) — `make test-target` won't do this for you.
+`make test-target` (`tests/copperline/run.sh`) is a real check when
+`tests/copperline/copperline.local.toml` exists locally (see "On-target
+testing" below); it skips cleanly, not a false pass, when that
+machine-specific file is absent (e.g. in CI, which has no such
+Workbench/ROM asset yet). It caught the `GTYP_CUSTOMGADGET` masking
+crash below when deliberately reintroduced — proven, not just written.
 
 Toolchain flags worth knowing before touching the Makefile: `-m68000
 -msoft-float` (the real target floor, not a default — see "Minimum

@@ -18,27 +18,52 @@ it replaced driving Amiberry's GUI by hand.
      file in between).
    - The `SRC` `[[filesys]]` mount: path to this repo's checkout, so
      `build/` binaries are reachable as `SRC:build/...` with no copy step.
-2. `make amiga fixtures` (or `make docker`) first — the mounts only
-   expose whatever's already on disk.
+2. On that Workbench install, add the **dev-test hook** to `S:User-Startup`
+   once (this is a one-time, permanent addition — not something to redo
+   per test run):
+   ```
+   If EXISTS SRC:tests/copperline/smoke.script
+     Execute SRC:tests/copperline/smoke.script
+   EndIf
+   ```
+   From then on, staging `tests/copperline/smoke.script` (gitignored) on
+   the host and booting is enough to run arbitrary AmigaDOS commands at
+   startup — no further edits to the shared `User-Startup` needed, so
+   tests stop touching state your interactive Amiberry sessions also use.
 
-## Running a smoke test
+## Automated regression check
 
-There's no automated harness yet (that's phase 0.3/0.4 — see
-`docs/implementation-plan.md`). Today's approach: temporarily add commands
-to `S:User-Startup` on the mounted Workbench volume, boot headlessly, and
-read the results back from a file written under `SRC:build/`. This
-directly mutates a real, possibly-shared Workbench install (e.g. one you
-also use interactively via Amiberry) — always back up `S:User-Startup`
-first and restore it afterward. A future phase should replace this with a
-dedicated bootable fixture image this repo owns outright, so tests stop
-touching external state.
+`make test-target` (from the repo root) runs `run.sh`: builds nothing
+itself (run `make amiga fixtures` first, or let `make test-target`'s own
+prerequisites do it), boots both `fixtures/gadtools-app` and
+`fixtures/classact-app` headlessly in turn, and asserts specific
+`AmiInspect` classification lines confirmed correct during phase 0.1
+development. Fails loudly (nonzero exit, log + output left under `build/`)
+on a crash, a hang, or a classification regression — this is what caught
+the `GTYP_CUSTOMGADGET` bitmask bug when deliberately reintroduced to
+prove the check works.
+
+Skips cleanly (exit 0, not a false pass) when `copperline.local.toml` is
+absent, since CI has no such machine-specific Workbench/ROM asset yet —
+see the Makefile's `test-target` target.
 
 ```sh
-# 1. Back up, then append test commands to S:User-Startup on the
-#    Workbench mount, e.g.:
+make amiga fixtures
+make test-target
+```
+
+## Ad hoc smoke testing (debugging, new fixtures)
+
+For anything `run.sh` doesn't already assert on, write
+`tests/copperline/smoke.script` directly and drive Copperline by hand via
+its `--control` JSON-RPC server (`copperline-ctl`):
+
+```sh
+# 1. Write tests/copperline/smoke.script, e.g.:
 #      Run >NIL: SRC:build/fixtures/GTApp
-#      Wait 3
+#      Wait 5
 #      SRC:build/AmiInspect WINDOW=GadTools >SRC:build/out.txt
+#      Echo "DONE" >SRC:build/marker.txt
 
 # 2. Boot headless with the control server:
 copperline --config tests/copperline/copperline.local.toml \
@@ -52,7 +77,8 @@ copperline-ctl --info /tmp/ccp.json run_until '{"seconds": 20}'
 #    parsing needed:
 cat build/out.txt
 
-# 5. Clean up: kill copperline, restore the original S:User-Startup.
+# 5. Kill the copperline process; delete smoke.script when done (it's
+#    gitignored scratch, not committed).
 ```
 
 `run_until {"stable_frames": N}` (wait for N identical rendered frames —
@@ -60,3 +86,8 @@ much better than a guessed `seconds` delay) is unreliable immediately
 after power-on, since the first several frames are identically black
 before Kickstart starts drawing; give it a `seconds` head start first, or
 use it later in a sequence once something is already on screen.
+
+If a run produces no output at all, check `build/` actually has fresh
+binaries first (`SRC:build/AmiInspect: Unknown command` means `make
+clean` ran and nothing rebuilt since — not a Copperline or hostfs
+problem) before assuming something is broken on the Amiga side.
