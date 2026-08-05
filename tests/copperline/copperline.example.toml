@@ -1,0 +1,21 @@
+# Template for tests/copperline/copperline.local.toml (gitignored -- copy
+# this file to that name and fill in your own paths). See README.md in
+# this directory and CLAUDE.md's "On-target testing" section for the full
+# workflow this config supports.
+#
+# Points Copperline's hostfs at the same two directories a local
+# Amiberry-based dev setup already uses, so nothing needs building or
+# copying twice: a Kickstart 3.2 Workbench install (for booting) and this
+# repo's own working directory (for freshly built binaries).
+
+rom = "/path/to/your/Kickstarts/A1200.47.115.rom"
+
+[[filesys]]
+path = "/path/to/your/Workbench-install-directory"
+volume = "Workbench"
+bootpri = 6
+
+[[filesys]]
+path = "/path/to/this/repo/checkout"
+volume = "SRC"
+bootpri = -128

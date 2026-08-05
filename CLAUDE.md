@@ -1,0 +1,176 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## What this is
+
+AmiPilot is an object-level GUI automation system for classic AmigaOS: an
+on-Amiga automation server plus a host-side Python client that drive real
+Amiga GUIs semantically (find a window/gadget by ID, label, or role; act
+with genuinely synthesised input; assert on state) rather than by pixel
+coordinates or screen scraping. The full design, locator-tier model, wire
+protocol, and phase sequencing live in `docs/implementation-plan.md` —
+read that before making architectural decisions; this file only covers
+what's needed to build and navigate the code day to day.
+
+**Current state:** early scaffolding, phase 0.1. Only `intuition-model/`
+(the walker library) and `amiinspect/` (the Shell command) are real and
+building. `server/`, `host/`, `manifest/`, and `tests/` are stub
+directories with a `README.md` each pointing at their phase — don't assume
+code exists there.
+
+## Build commands
+
+Requires Bebbo's m68k-amigaos GCC (`m68k-amigaos-gcc`) on `PATH`, or use
+the container image:
+
+```sh
+make amiga          # build intuition-model + AmiInspect
+make fixtures        # build the on-Amiga fixture apps (fixtures/*)
+make docker          # run 'make amiga fixtures' inside ghcr.io/sidick/amiga-dev
+make clean
+```
+
+CI verb contract (`sidick/amiga-workflows/build-test.yml`, invoked from
+`.github/workflows/ci.yml`) — these Makefile targets exist because CI
+calls them by name, not because they're the primary local entry points:
+
+```sh
+make build           # = amiga + fixtures
+make test-host        # currently a real no-op (no host/ code yet, phase 0.3)
+make test-target      # currently a real no-op (no automated on-target harness yet)
+make lint             # semgrep --config auto over intuition-model/ amiinspect/ server/ fixtures/
+```
+
+There is no automated on-target test runner yet. Verifying a change means
+actually booting an emulator and running the binary against it (see
+"On-target testing" below) — `make test-target` won't do this for you.
+
+Toolchain flags worth knowing before touching the Makefile: `-m68000
+-msoft-float` (the real target floor, not a default — see "Minimum
+requirements" below) and `-noixemul` (links against libnix, not
+ixemul.library — see the `libnix` skill for its conventions if editing
+startup/library-open code).
+
+## Minimum requirements
+
+AmigaOS 2.04 (V37) floor, plain 68000, no FPU, ~1MB RAM. Recommended/
+CI-tested config is OS 3.1, 68020, 2MB chip + 8MB fast. Full rationale in
+`docs/implementation-plan.md` under "Minimum requirements" — check it
+before using any API newer than V37, or anything requiring an FPU.
+
+## On-target testing
+
+No automated harness exists yet (that's phase 0.3/0.4). Two ways to
+actually run code against real AmigaOS behavior today:
+
+**Preferred: Copperline** (`brew install copperline`), a deterministic,
+scriptable emulator — see `tests/copperline/README.md` for full setup.
+Its `--control` JSON-RPC server (driven via `copperline-ctl`) gives
+frame-accurate `run_until {seconds|stable_frames}` waits and an
+`input.mouse_to {x, y}` that servos the pointer to an exact pixel by
+watching sprite 0, instead of guessing relative mouse deltas and
+screenshotting to check. For a scripted boot-run-verify cycle with *no*
+GUI input at all, add commands to `S:User-Startup` on the mounted
+Workbench volume (**back it up first, restore it after** — this mutates
+a real, possibly-shared Workbench install) and read results straight off
+the host filesystem via the `SRC:` hostfs mount — no screenshot parsing,
+no window-focus fights. This is how the checkbox-classification fix and
+the `GT_Underscore` fix below were verified.
+
+**Fallback: Amiberry MCP tools** (`mcp__amiberry__*`) for interactive,
+by-hand debugging (visually checking layout, poking around) against the
+`amipilot.uae` config (Kickstart 3.2, A1200/AGA, Workbench 3.2.3). Slower
+and fussier for anything scripted — expect to fight relative mouse deltas
+and window z-order — so reach for Copperline first unless you specifically
+need to watch it interactively.
+1. `mcp__amiberry__launch_and_wait_for_ipc` with `config: "amipilot.uae"`.
+2. Immediately call `mcp__amiberry__set_active_instance` with `instance:
+   0` — without this, IPC calls silently fail with "Connection refused"
+   even though the socket is live (a stray-connector-process quirk, not a
+   real connection problem).
+3. The config mounts this repo's working directory as `SRC:` and a
+   Workbench hard drive as `DH0:` — freshly built binaries under `build/`
+   are immediately visible as `SRC:build/...` with no copying step.
+4. Open a Shell (Right-Amiga+E → type `NewShell` → Return), `run
+   SRC:build/fixtures/GTApp` to launch a target, `SRC:build/AmiInspect
+   WINDOW=<substring>` to inspect it. Redirect output to a file on `SRC:`
+   and read it back rather than trusting a screenshot.
+5. `mcp__amiberry__kill_amiberry` when done.
+
+Both paths: always rebuild (`make amiga fixtures`) before booting — the
+hostfs/SRC: mount only exposes what's already on disk, and `make clean`
+silently leaves you testing against a binary that no longer exists.
+
+Two known gaps already found this way, documented as TODO comments at
+their exact site in `intuition-model/src/walk.c`, not silently patched
+around: GadTools only populates `gadget->GadgetText` for
+`PLACETEXT_LEFT/RIGHT/ABOVE/BELOW`, so `PLACETEXT_IN` button labels
+legitimately read empty; and `BUTTON_KIND`/`CHECKBOX_KIND` both produce a
+plain `GTYP_BOOLGADGET`, requiring a `GT_GetGadgetAttrsA` kind-probe
+(see `ClassifyBoolGadget`) to tell them apart rather than a single flag
+check.
+
+## Architecture
+
+**`intuition-model/`** — the reusable Intuition walker library, with no
+dependency on the server. All structure walking happens under a brief
+`LockIBase()` hold, copying data out into a private model
+(`AmipWindowModel` → linked list of `AmipGadgetModel`) before releasing
+the lock; nothing hands out live Intuition pointers, and nothing patches
+anything (no `SetFunction` anywhere in this codebase — see "Design
+principles" in the implementation plan). `AmipRole` is an AT-SPI-style
+classification independent of which toolkit produced the gadget
+(GadTools, BOOPSI/ReAction, MUI). Role classification currently covers
+plain GadTools kinds only (`ClassifyGadget`/`ClassifyBoolGadget` in
+`walk.c`); BOOPSI/ReAction class-specific readers are a later phase 0.1
+TODO.
+
+Library-base convention: functions that need `gadtools.library` (the
+`CHECKBOX_KIND` discriminator) consume the global `GadToolsBase` via
+`proto/gadtools.h`'s `extern` declaration but never open or close it —
+the calling program (currently `amiinspect/src/main.c`) owns that
+lifecycle, same pattern as `IntuitionBase`. If `GadToolsBase` is `NULL`
+(library not opened, or genuinely unavailable), classification degrades
+gracefully rather than failing.
+
+**`amiinspect/`** — standalone Shell command (`ReadArgs` template
+`WINDOW/K`), the platform's first UIA-Inspect-equivalent. Finds a window
+by title substring (or defaults to the active window), walks it via
+`intuition-model`, prints the gadget tree. No host or server session
+required — this is deliberately usable standing at the machine itself.
+This is also *the* development/verification tool for everything else in
+the walker: when in doubt about what a gadget structure actually looks
+like, run `AmiInspect` against it rather than guessing from headers.
+
+**`fixtures/`** — hand-written test apps used to exercise the walker
+against real gadgets instead of only a window's built-in system gadgets.
+`gadtools-app/` is a plain GadTools app (button + string + checkbox, real
+`GA_ID`s) built directly against system libraries — it is the *target*
+being inspected, not a consumer of `intuition-model`, so it doesn't link
+against the library. When adding a fixture, remember `GT_Underscore` in
+every `CreateGadget` tag list, or the `_` shortcut markers in labels
+render as literal underscores instead of underlined shortcuts.
+
+**`server/`, `host/`, `manifest/`, `tests/`** — not yet implemented.
+Phase 0.2 (server, ARexx-driven), phase 0.3 (wire protocol, host Python
+client + pytest plugin, manifest-ID contract), phase 0.4 (TCP, program
+launch, file API). Read the corresponding `README.md` and the
+implementation plan's "Phases" section before starting work in any of
+these.
+
+## House conventions (this repo and its siblings)
+
+- Version lives in `version.mk` (`VERSION`/`REVISION`, Amiga major.minor).
+- License is BSD 2-Clause; new source files don't need a header (LICENSE
+  file covers the repo), but workflow/CI files carry an SPDX header — see
+  `.github/workflows/ci.yml` for the pattern.
+- CI is a thin wrapper around a shared reusable workflow
+  (`sidick/amiga-workflows/build-test.yml@v1`) that calls the Makefile's
+  five-verb contract. Don't rename `build`/`test-host`/`test-target`/
+  `lint`/`dist` — CI depends on those exact names.
+- Real functions, not guessed heuristics: when the correct behavior isn't
+  obvious from the header alone (as with the checkbox/button
+  discrimination), find the documented contract (autodocs, RKRM) rather
+  than assuming a plausible-looking flag check is right — then verify
+  against a real fixture in the emulator, don't trust compilation alone.

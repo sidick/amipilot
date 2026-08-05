@@ -224,12 +224,14 @@ stage, launch, drive, harvest, clean up, disconnect.
   (it's just serial.device). TCP — requires a bsdsocket.library stack
   (Roadshow, AmiTCP, Miami), which in practice means '020-class machines
   with a few MB of fast RAM; that is the stack's floor, not AmiPilot's.
-- **CI reference config:** an emulated A1200 (OS 3.1, 68020, 2 MB chip +
-  8 MB fast) as the primary run, plus a periodic A500-class run (OS 2.04*,
-  68000, minimal RAM) to keep the stated minimum honest.
-  *Emulator OS-image licensing permitting; otherwise the oldest legally
-  convenient 2.x/3.x image stands in and 2.04 support is verified on real
-  hardware per release.
+- **CI reference config:** a Copperline A1200 profile (OS 3.1, 68020,
+  2 MB chip + 8 MB fast) as the primary run, plus a periodic A500-class
+  run (OS 2.04*, 68000, minimal RAM) to keep the stated minimum honest.
+  *ROM-image licensing permitting; Copperline ships a redistributable
+  bundled AROS Kickstart replacement as its no-ROM-given default (weaker —
+  can't validate real-Kickstart-specific behaviour — but needs no licensed
+  asset, so it's what public CI runs), with a real ROM used locally and on
+  release-gate runs and 2.04 support verified on real hardware per release.
 
 ## Toolchain and CI
 
@@ -238,9 +240,17 @@ stage, launch, drive, harvest, clean up, disconnect.
   guarded at runtime).
 - **Host client:** Python 3, packaged normally (`pip install amipilot`),
   pytest plugin as an entry point.
-- **CI:** headless emulator (Amiberry or FS-UAE) booting a fixed OS config
-  with the server started; the deterministic serial path is the CI
-  transport. Real-hardware runs use the same suite over TCP.
+- **CI:** [Copperline](https://copperline.dev), a deterministic,
+  from-scratch Amiga emulator with a headless JSON-RPC control protocol
+  (`--control`, driven by the bundled `copperline-ctl`) purpose-built for
+  exactly this kind of scripted boot-run-verify cycle: frame-accurate
+  `run_until {seconds|stable_frames}` waits instead of guessed sleeps, and
+  hostfs (`[[filesys]]`) mounts that expose a build directory to the guest
+  live, with no disk-image step. Boots a fixed OS config with the server
+  started; the deterministic serial path is the CI transport. Real-hardware
+  runs use the same suite over TCP. (An interactive emulator such as
+  Amiberry remains useful for by-hand debugging, but is not the CI engine —
+  see `CLAUDE.md`'s "On-target testing" for why.)
 
 ## Testing strategy
 
@@ -250,10 +260,13 @@ stage, launch, drive, harvest, clean up, disconnect.
 - **Foreign-app tier** tested against a fixed set of stock programs
   (Workbench windows, Prefs editors, a GadTools app, a ClassAct app) with
   golden interaction scripts.
-- **Determinism:** under the emulator, identical scripts must produce
-  identical event streams and model states run-over-run; flake budget is
-  zero by construction. Zero-sleep policy in all shipped examples —
-  wait-for semantics are the only synchronisation primitive.
+- **Determinism:** under Copperline's deterministic core, identical
+  scripts must produce identical event streams and model states
+  run-over-run; flake budget is zero by construction. Zero-sleep policy in
+  all shipped examples — wait-for semantics are the only synchronisation
+  primitive, mirroring the control protocol's own `run_until
+  {stable_frames}` (wait for N identical rendered frames, not a guessed
+  delay).
 - **Real-hardware pass per release** over TCP; divergences treated as
   findings (app timing, driver behaviour, or emulator inaccuracy).
 
