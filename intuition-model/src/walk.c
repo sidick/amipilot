@@ -153,6 +153,37 @@ static AmipRole ClassifyByClassID(CONST_STRPTR classID)
     return AMIP_ROLE_CUSTOM;
 }
 
+/* GFLG_RELWIDTH/RELHEIGHT/RELRIGHT/RELBOTTOM (intuition.h): a classic,
+ * pre-BOOPSI Intuition convention where the corresponding Width/Height/
+ * LeftEdge/TopEdge field is stored as a NEGATIVE offset from the window's
+ * own dimension, not an absolute value -- e.g. GFLG_RELWIDTH set with
+ * Width=-8 means "window width minus 8", not "-8 pixels wide". Confirmed
+ * against fixtures/classact-app: its root layout.gadget (attached
+ * directly to window->FirstGadget, the only child a window.class window
+ * exposes there -- see CLAUDE.md's "Confirmed limit") answers
+ * GA_Width/GA_Height successfully via GetAttr but with exactly this
+ * negative-relative encoding (GFLG_RELWIDTH|GFLG_RELHEIGHT both set),
+ * NOT a broken/garbage value as first assumed. Applies identically
+ * whether the numbers came from GetAttr or the classic fields -- this is
+ * an Intuition-level convention, not a BOOPSI one, so a classic GadTools
+ * gadget using GFLG_RELRIGHT etc would need the same resolution. */
+static void ResolveGadgetGeometry(struct Window *window, UWORD flags,
+                                   WORD *left, WORD *top, WORD *width, WORD *height)
+{
+    if (flags & GFLG_RELWIDTH) {
+        *width = (WORD)(window->Width + *width);
+    }
+    if (flags & GFLG_RELHEIGHT) {
+        *height = (WORD)(window->Height + *height);
+    }
+    if (flags & GFLG_RELRIGHT) {
+        *left = (WORD)(window->Width + *left);
+    }
+    if (flags & GFLG_RELBOTTOM) {
+        *top = (WORD)(window->Height + *top);
+    }
+}
+
 static AmipGadgetModel *WalkGadgetList(struct Gadget *gadget, struct Window *window)
 {
     AmipGadgetModel *head = NULL;
@@ -181,6 +212,8 @@ static AmipGadgetModel *WalkGadgetList(struct Gadget *gadget, struct Window *win
             CONST_STRPTR classID = (cls != NULL) ? cls->cl_ID : NULL;
             ULONG text = 0;
             ULONG id = 0;
+            ULONG left = 0, top = 0, width = 0, height = 0;
+            BOOL haveLeft, haveTop, haveWidth, haveHeight;
 
             node->role = ClassifyByClassID(classID);
             node->className = CopyString(classID);
@@ -206,6 +239,31 @@ static AmipGadgetModel *WalkGadgetList(struct Gadget *gadget, struct Window *win
             } else {
                 node->label = NULL;
             }
+
+            /* Same story again for geometry: confirmed against
+             * fixtures/classact-app that a BOOPSI gadgetclass descendant's
+             * classic LeftEdge/TopEdge/Width/Height fields read back as
+             * nonsensical (including negative Width/Height) -- GA_Left/
+             * GA_Top/GA_Width/GA_Height (LONG, per gadgetclass.h) are the
+             * real values, window-relative the same as the classic fields
+             * (GA_Left's own doc: "relative to the left edge of the
+             * window"), so no coordinate-convention change downstream.
+             * Fall back to the classic fields only if a particular
+             * attribute genuinely isn't answered -- degrade gracefully
+             * rather than leaving the whole gadget unlocatable. */
+            haveLeft   = GetAttr(GA_Left, gadget, &left);
+            haveTop    = GetAttr(GA_Top, gadget, &top);
+            haveWidth  = GetAttr(GA_Width, gadget, &width);
+            haveHeight = GetAttr(GA_Height, gadget, &height);
+
+            node->left   = haveLeft   ? (WORD)left   : gadget->LeftEdge;
+            node->top    = haveTop    ? (WORD)top    : gadget->TopEdge;
+            node->width  = haveWidth  ? (WORD)width  : gadget->Width;
+            node->height = haveHeight ? (WORD)height : gadget->Height;
+            node->state  = gadget->Flags;
+
+            ResolveGadgetGeometry(window, gadget->Flags,
+                                   &node->left, &node->top, &node->width, &node->height);
         } else {
             node->role = ClassifyGadget(gadget, window);
             node->className = NULL;
@@ -231,13 +289,16 @@ static AmipGadgetModel *WalkGadgetList(struct Gadget *gadget, struct Window *win
                     node->value = CopyString((CONST_STRPTR)si->Buffer);
                 }
             }
-        }
 
-        node->left = gadget->LeftEdge;
-        node->top = gadget->TopEdge;
-        node->width = gadget->Width;
-        node->height = gadget->Height;
-        node->state = gadget->Flags;
+            node->left = gadget->LeftEdge;
+            node->top = gadget->TopEdge;
+            node->width = gadget->Width;
+            node->height = gadget->Height;
+            node->state = gadget->Flags;
+
+            ResolveGadgetGeometry(window, gadget->Flags,
+                                   &node->left, &node->top, &node->width, &node->height);
+        }
 
         if (tail == NULL) {
             head = tail = node;

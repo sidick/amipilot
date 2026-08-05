@@ -114,8 +114,15 @@ run_fixture "gadtools-app" "GTApp" "GadTools" "inspect-gadtools.txt" "marker-gt.
 	'gadget id=2 role=string class="" label="Host:"' \
 	'gadget id=3 role=checkbox class="" label="Enabled"'
 
+# The layout.gadget entry's geometry is asserted too, not just its class:
+# GA_Width/GA_Height answer via GetAttr with GFLG_RELWIDTH/RELHEIGHT set
+# (a negative offset from the window's own size, e.g. Width=-8 meaning
+# "window width minus 8"), which read as nonsensical negative numbers
+# before ResolveGadgetGeometry() -- confirmed regression-worthy the hard
+# way, see action.c's own comment on this. 220x130 is the resolved
+# absolute size against this fixture's auto-computed 228x143 window.
 run_fixture "classact-app" "CAApp" "ClassAct" "inspect-classact.txt" "marker-ca.txt" \
-	'class="layout.gadget"'
+	'class="layout.gadget" label="" [4,11 220x130]'
 
 # --- action-engine click check (phase 0.2) --------------------------------
 # Boots gadtools-app, clicks its Connect button (GA_ID=1) via AmiClickTest
