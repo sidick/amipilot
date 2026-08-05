@@ -49,6 +49,9 @@ INSPECT_BIN    := $(BUILD)/AmiInspect
 GADTOOLS_APP_SRC := fixtures/gadtools-app/src/main.c
 GADTOOLS_APP_BIN := $(BUILD)/fixtures/GTApp
 
+CLASSACT_APP_SRC := fixtures/classact-app/src/main.c
+CLASSACT_APP_BIN := $(BUILD)/fixtures/CAApp
+
 # --- Docker (shared toolchain image, see sidick/amiga-dev) ---
 IMAGE      ?= ghcr.io/sidick/amiga-dev:1
 # --user matches the container process's UID/GID to the host caller's, so
@@ -62,7 +65,7 @@ all: amiga
 
 amiga: $(INSPECT_BIN)
 
-fixtures: $(GADTOOLS_APP_BIN)
+fixtures: $(GADTOOLS_APP_BIN) $(CLASSACT_APP_BIN)
 
 $(MODEL_LIB): $(MODEL_SRC) $(MODEL_INCDIR)/intuition_model.h
 	@mkdir -p $(BUILD)
@@ -79,6 +82,13 @@ $(INSPECT_BIN): $(INSPECT_SRCDIR)/main.c $(MODEL_LIB)
 $(GADTOOLS_APP_BIN): $(GADTOOLS_APP_SRC)
 	@mkdir -p $(BUILD)/fixtures
 	$(CC) $(CFLAGS) -o $@ $(GADTOOLS_APP_SRC)
+
+# -lamiga: DoMethod/NewObject/GetAttr (alib.h) need amiga.lib's varargs
+# marshaling -- confirmed necessary against real Kickstart 3.2 (silently
+# broken without it: links clean, but the BOOPSI calls don't work).
+$(CLASSACT_APP_BIN): $(CLASSACT_APP_SRC)
+	@mkdir -p $(BUILD)/fixtures
+	$(CC) $(CFLAGS) -o $@ $(CLASSACT_APP_SRC) -lamiga
 
 docker:
 	$(DOCKER_RUN) make amiga fixtures

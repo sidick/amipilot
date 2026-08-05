@@ -28,3 +28,7 @@ __pycache__/
 # Machine-specific Copperline config (absolute local paths) -- see
 # tests/copperline/copperline.example.toml and README.md
 /tests/copperline/*.local.toml
+
+# Ad hoc smoke-test script picked up by the User-Startup dev-test hook --
+# see tests/copperline/README.md. Regenerated per test run, not committed.
+/tests/copperline/smoke.script
