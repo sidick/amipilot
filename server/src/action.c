@@ -5,6 +5,7 @@
 #include <devices/input.h>
 #include <devices/inputevent.h>
 #include <intuition/intuition.h>
+#include <intuition/gadgetclass.h>
 #include <proto/exec.h>
 #include <proto/intuition.h>
 #include <proto/dos.h>
@@ -331,17 +332,37 @@ BOOL AmipTypeString(CONST_STRPTR text)
     return TRUE;
 }
 
-/* TODO: BOOPSI CUSTOMGADGET position isn't necessarily mirrored into the
- * classic LeftEdge/TopEdge/Width/Height fields -- intuition-model's
- * walk.c already had to learn this the hard way for GA_Text/GA_ID
- * (confirmed against fixtures/classact-app: its layout.gadget entry read
- * back with a nonsensical negative width/height via the classic fields).
- * This function hasn't been verified against a BOOPSI gadget yet; only
- * trust it for classic/GadTools gadgets (GTYP_BOOLGADGET/STRGADGET/
- * PROPGADGET) until GA_Left/GA_Top/GA_Width/GA_Height are read via
- * GetAttr() for GTYP_CUSTOMGADGET the same way. */
+/* GFLG_RELWIDTH/RELHEIGHT/RELRIGHT/RELBOTTOM (intuition.h): a classic,
+ * pre-BOOPSI Intuition convention where the corresponding Width/Height/
+ * LeftEdge/TopEdge is stored as a NEGATIVE offset from the window's own
+ * dimension, not an absolute value. Confirmed against
+ * fixtures/classact-app: its root layout.gadget (the only child a
+ * window.class window attaches to window->FirstGadget -- see CLAUDE.md's
+ * "Confirmed limit") answers GA_Width/GA_Height via GetAttr with exactly
+ * this negative-relative encoding (GFLG_RELWIDTH|GFLG_RELHEIGHT both
+ * set), not a broken value. Same resolution as intuition-model/walk.c's
+ * ResolveGadgetGeometry -- duplicated rather than shared since server/
+ * doesn't link intuition-model. */
+static void ResolveGadgetGeometry(struct Window *window, UWORD flags,
+                                   WORD *left, WORD *top, WORD *width, WORD *height)
+{
+    if (flags & GFLG_RELWIDTH) {
+        *width = (WORD)(window->Width + *width);
+    }
+    if (flags & GFLG_RELHEIGHT) {
+        *height = (WORD)(window->Height + *height);
+    }
+    if (flags & GFLG_RELRIGHT) {
+        *left = (WORD)(window->Width + *left);
+    }
+    if (flags & GFLG_RELBOTTOM) {
+        *top = (WORD)(window->Height + *top);
+    }
+}
+
 BOOL AmipClickGadget(struct Window *window, struct Gadget *gadget)
 {
+    WORD gadLeft, gadTop, gadWidth, gadHeight;
     WORD centerX, centerY;
 
     if (window == NULL || gadget == NULL) {
@@ -358,6 +379,35 @@ BOOL AmipClickGadget(struct Window *window, struct Gadget *gadget)
     WindowToFront(window);
     ActivateWindow(window);
 
+    /* BOOPSI CUSTOMGADGET position isn't necessarily mirrored into the
+     * classic LeftEdge/TopEdge/Width/Height fields -- intuition-model's
+     * walk.c already had to learn this the hard way for GA_Text/GA_ID
+     * (confirmed against fixtures/classact-app: its layout.gadget entry
+     * read back with a nonsensical negative width/height via the classic
+     * fields). GA_Left/GA_Top/GA_Width/GA_Height (gadgetclass.h, all
+     * LONG) are window-relative the same as the classic fields -- GA_Left
+     * is documented as "relative to the left edge of the window" -- so
+     * this doesn't change the coordinate convention below, only where the
+     * numbers come from. Same GetAttr()-only-if-CUSTOMGADGET safety walk.c
+     * relies on: calling it on a classic gadget would read garbage since
+     * there's no real _Object/class header there. Falls back to the
+     * classic fields per-attribute if a particular one isn't answered. */
+    if ((gadget->GadgetType & GTYP_GTYPEMASK) == GTYP_CUSTOMGADGET) {
+        ULONG left = 0, top = 0, width = 0, height = 0;
+
+        gadLeft   = GetAttr(GA_Left, gadget, &left)     ? (WORD)left   : gadget->LeftEdge;
+        gadTop    = GetAttr(GA_Top, gadget, &top)       ? (WORD)top    : gadget->TopEdge;
+        gadWidth  = GetAttr(GA_Width, gadget, &width)   ? (WORD)width  : gadget->Width;
+        gadHeight = GetAttr(GA_Height, gadget, &height) ? (WORD)height : gadget->Height;
+    } else {
+        gadLeft   = gadget->LeftEdge;
+        gadTop    = gadget->TopEdge;
+        gadWidth  = gadget->Width;
+        gadHeight = gadget->Height;
+    }
+
+    ResolveGadgetGeometry(window, gadget->Flags, &gadLeft, &gadTop, &gadWidth, &gadHeight);
+
     /* Gadget LeftEdge/TopEdge are relative to the window's own top-left
      * corner INCLUDING the border/title-bar area -- do NOT also add
      * BorderLeft/BorderTop. Proven via the fixture's IDCMP_MOUSEBUTTONS
@@ -368,8 +418,8 @@ BOOL AmipClickGadget(struct Window *window, struct Gadget *gadget)
      *
      * IEPointerPixel coordinates are screen-relative; window LeftEdge/
      * TopEdge are also screen-relative, so no screen offset needed. */
-    centerX = window->LeftEdge + gadget->LeftEdge + gadget->Width / 2;
-    centerY = window->TopEdge + gadget->TopEdge + gadget->Height / 2;
+    centerX = window->LeftEdge + gadLeft + gadWidth / 2;
+    centerY = window->TopEdge + gadTop + gadHeight / 2;
 
     return AmipClickAt(window->WScreen, centerX, centerY, AMIP_BUTTON_LEFT);
 }
