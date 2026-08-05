@@ -116,6 +116,27 @@ bitmaps are invisible to tiers 1–3; games are out of scope; MUI coverage
 depends on what each app's port exposes. The docs will carry a table saying
 which tier each common toolkit lands in and why.
 
+**Confirmed limit (phase 0.1, against fixtures/classact-app): a
+window.class window's `layout.gadget` children are invisible to
+structural walking.** `NewObject(WINDOW_GetClass(), ...)`-based ReAction
+windows attach exactly one gadget to the classic `window->FirstGadget`
+chain — the top-level `layout.gadget` object itself — not its individual
+button/string/checkbox children. There is no documented, public API to
+enumerate a `layout.gadget`'s children on classic AmigaOS 3.x:
+`LM_ADDCHILD`/`LM_REMOVECHILD`/`LM_MODIFYCHILD` are OS4-only in the NDK;
+on 3.x, children can only be *added* via the `LAYOUT_AddChild` tag, never
+*listed* back out. The only way to see them would be reading
+`layout.gadget`'s private, undocumented instance-data layout directly —
+exactly the kind of hack this project rules out (see "Design
+principles": patch-free, no `SetFunction`, no guessed internals over a
+documented contract). AmiPilot correctly identifies the layout object
+itself (`class="layout.gadget"`) via `OCLASS()` (a real, documented NDK
+mechanism — see `intuition-model/src/walk.c`), but its children stay
+out of reach for tier-1/tier-2 locators until Hyperion (or a future OS
+release) ships a supported enumeration method. A per-app quirk profile
+recording known `GA_ID`s by convention is the practical workaround for
+any specific application affected by this, not a general fix.
+
 ## Protocol and client
 
 - One verb set, three surfaces: an ARexx port (the first transport shipped,

@@ -98,7 +98,19 @@ static AmipRole ClassifyGadget(struct Gadget *gadget, struct Window *window)
  * they carry no _Object header, so the caller must have already
  * confirmed GTYP_CUSTOMGADGET first. cl_ID is the class's registration
  * name ("button.gadget", "window.class", ...), confirmed by reading
- * intuition/classusr.h + classes.h rather than guessing. */
+ * intuition/classusr.h + classes.h rather than guessing.
+ *
+ * CONFIRMED LIMIT: this only sees gadgets actually linked onto
+ * window->FirstGadget. A window.class window attaches exactly one
+ * gadget there -- its top-level layout.gadget object -- not that
+ * layout's individual button/string/checkbox children. There is no
+ * documented, public API to enumerate a layout.gadget's children on
+ * classic AmigaOS 3.x (LM_ADDCHILD/LM_REMOVECHILD/LM_MODIFYCHILD are
+ * OS4-only in the NDK; on 3.x, LAYOUT_AddChild only ever adds, never
+ * lists back out). Seeing those children would require reading
+ * layout.gadget's private, undocumented instance data -- the kind of
+ * hack this project rules out. See docs/implementation-plan.md's
+ * "Honest limits" section. */
 static AmipRole ClassifyByClassID(CONST_STRPTR classID)
 {
     const char *id = (const char *)classID;

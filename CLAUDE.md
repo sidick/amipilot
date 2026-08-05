@@ -121,10 +121,18 @@ the lock; nothing hands out live Intuition pointers, and nothing patches
 anything (no `SetFunction` anywhere in this codebase — see "Design
 principles" in the implementation plan). `AmipRole` is an AT-SPI-style
 classification independent of which toolkit produced the gadget
-(GadTools, BOOPSI/ReAction, MUI). Role classification currently covers
-plain GadTools kinds only (`ClassifyGadget`/`ClassifyBoolGadget` in
-`walk.c`); BOOPSI/ReAction class-specific readers are a later phase 0.1
-TODO.
+(GadTools, BOOPSI/ReAction, MUI). Role classification covers plain
+GadTools kinds (`ClassifyGadget`/`ClassifyBoolGadget`) and BOOPSI/
+ReAction classes via `OCLASS()` (`ClassifyByClassID`) — a documented NDK
+mechanism for reading a live BOOPSI object's class name from outside,
+not a hack. **Confirmed limit:** a `window.class` window attaches only
+its single top-level `layout.gadget` to `window->FirstGadget` — the
+layout's own button/string/checkbox children aren't individually
+walkable there, and there's no public API to enumerate them on classic
+OS 3.x (see the implementation plan's "Honest limits" section and the
+comment at `ClassifyByClassID` in `walk.c`). Don't try to "fix" this
+with a reverse-engineered private struct — it's a stated, permanent
+constraint, not an oversight.
 
 Library-base convention: functions that need `gadtools.library` (the
 `CHECKBOX_KIND` discriminator) consume the global `GadToolsBase` via
