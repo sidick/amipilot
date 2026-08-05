@@ -8,11 +8,15 @@
 #include <proto/exec.h>
 #include <proto/intuition.h>
 #include <proto/dos.h>
+#include <proto/keymap.h>
 #include <string.h>
 
 #include "action_engine.h"
 
 extern struct IntuitionBase *IntuitionBase;
+/* Caller-owned, same convention as intuition-model's GadToolsBase: the
+ * program using AmipTypeString() opens/closes keymap.library. */
+extern struct Library *KeymapBase;
 
 static struct MsgPort *g_inputPort;
 static struct IOStdReq *g_inputReq;
@@ -184,6 +188,147 @@ BOOL AmipClickAt(struct Screen *screen, WORD x, WORD y, AmipMouseButton button)
     /* A real click has non-zero press duration. */
     Delay(3);
     return SendRawMouseButton(0, (UWORD)(downCode | IECODE_UP_PREFIX));
+}
+
+/* --- keyboard: AmipTypeString -------------------------------------------
+ *
+ * Technique from ../amirfb's proven keyboard injection: each printable
+ * character goes through keymap.library's MapANSI(), which inverts it
+ * into up to AMIP_MAX_PAIRS_PER_CHAR (rawkey, qualifier) pairs under the
+ * ACTIVE keymap (dead-key prefixes included) -- self-adapting where a
+ * fixed US-layout table would silently type the wrong characters.
+ *
+ * Qualifier handling, confirmed the hard way in amirfb: the modifier's
+ * own rawkey press is NOT enough. Every injected event -- including the
+ * main key's -- must carry the currently-held modifiers in ie_Qualifier,
+ * because that field is how the OS knows Shift was down at the moment of
+ * THIS keypress (console/keymap translation reads it); Shift-down then
+ * 'e'-down with ie_Qualifier=0 types 'e', not 'E'. */
+
+#define AMIP_MAX_PAIRS_PER_CHAR 3   /* MapANSI: 2 dead-key prefixes + final */
+
+/* Keymap-independent rawkeys (devices/keymap.h layout, same values
+ * amirfb verified against the NDK headers). */
+#define AMIP_RAWKEY_RETURN 0x44
+#define AMIP_RAWKEY_LSHIFT 0x60
+#define AMIP_RAWKEY_RSHIFT 0x61
+#define AMIP_RAWKEY_CTRL   0x63
+#define AMIP_RAWKEY_LALT   0x64
+#define AMIP_RAWKEY_RALT   0x65
+#define AMIP_RAWKEY_LAMIGA 0x66
+#define AMIP_RAWKEY_RAMIGA 0x67
+
+/* Human-approximate pacing, in 1/50s ticks. ~2 ticks of key-down before
+ * release and ~6 ticks between characters is roughly 6 characters/second
+ * -- brisk-but-human typing. Deliberately not machine-speed: the input
+ * regime every shipped Amiga program was actually tested against is a
+ * human at a keyboard, and Simon asked for this explicitly. */
+#define AMIP_TYPE_HOLD_TICKS  2
+#define AMIP_TYPE_INTER_TICKS 6
+
+static const struct {
+    UWORD bit;
+    UBYTE rawkey;
+} g_qualifierKeys[] = {
+    { IEQUALIFIER_LSHIFT,   AMIP_RAWKEY_LSHIFT },
+    { IEQUALIFIER_RSHIFT,   AMIP_RAWKEY_RSHIFT },
+    { IEQUALIFIER_CONTROL,  AMIP_RAWKEY_CTRL   },
+    { IEQUALIFIER_LALT,     AMIP_RAWKEY_LALT   },
+    { IEQUALIFIER_RALT,     AMIP_RAWKEY_RALT   },
+    { IEQUALIFIER_LCOMMAND, AMIP_RAWKEY_LAMIGA },
+    { IEQUALIFIER_RCOMMAND, AMIP_RAWKEY_RAMIGA },
+};
+#define AMIP_NUM_QUALIFIER_KEYS \
+    (sizeof(g_qualifierKeys) / sizeof(g_qualifierKeys[0]))
+
+static BOOL SendRawKey(UBYTE code, BOOL up, UWORD heldQualifiers)
+{
+    struct InputEvent ie;
+
+    memset(&ie, 0, sizeof(ie));
+    ie.ie_Class     = IECLASS_RAWKEY;
+    ie.ie_Code      = up ? (UWORD)(code | IECODE_UP_PREFIX) : code;
+    ie.ie_Qualifier = heldQualifiers;
+
+    return WriteInputEvent(&ie);
+}
+
+/* One full keystroke: press the needed modifier keys, press+release the
+ * main key (with the modifiers reflected in its ie_Qualifier), release
+ * the modifiers again. Synchronous and self-contained per keystroke --
+ * unlike amirfb there's no concurrent client holding keys across calls,
+ * so no refcounting is needed. */
+static BOOL StrikeKey(UBYTE code, UWORD qualifier)
+{
+    UWORD held = 0;
+    size_t i;
+    BOOL ok = TRUE;
+
+    for (i = 0; i < AMIP_NUM_QUALIFIER_KEYS; i++) {
+        if (qualifier & g_qualifierKeys[i].bit) {
+            held |= g_qualifierKeys[i].bit;
+            if (!SendRawKey(g_qualifierKeys[i].rawkey, FALSE, held)) {
+                ok = FALSE;
+            }
+        }
+    }
+
+    if (ok) {
+        ok = SendRawKey(code, FALSE, held);
+        Delay(AMIP_TYPE_HOLD_TICKS);
+        if (!SendRawKey(code, TRUE, held)) {
+            ok = FALSE;
+        }
+    }
+
+    for (i = AMIP_NUM_QUALIFIER_KEYS; i-- > 0;) {
+        if (qualifier & g_qualifierKeys[i].bit) {
+            held &= (UWORD)~g_qualifierKeys[i].bit;
+            if (!SendRawKey(g_qualifierKeys[i].rawkey, TRUE, held)) {
+                ok = FALSE;
+            }
+        }
+    }
+
+    return ok;
+}
+
+BOOL AmipTypeString(CONST_STRPTR text)
+{
+    const UBYTE *ch;
+
+    if (text == NULL || g_inputReq == NULL || KeymapBase == NULL) {
+        return FALSE;
+    }
+
+    for (ch = (const UBYTE *)text; *ch != '\0'; ch++) {
+        if (*ch == '\n') {
+            if (!StrikeKey(AMIP_RAWKEY_RETURN, 0)) {
+                return FALSE;
+            }
+        } else {
+            UBYTE pairs[AMIP_MAX_PAIRS_PER_CHAR * 2];
+            LONG n, p;
+
+            n = MapANSI((CONST_STRPTR)ch, 1, (STRPTR)pairs, sizeof(pairs) / 2, NULL);
+            if (n <= 0) {
+                /* Not generatable under the active keymap -- fail loudly
+                 * rather than silently typing a truncated string. */
+                return FALSE;
+            }
+            if (n > AMIP_MAX_PAIRS_PER_CHAR) {
+                n = AMIP_MAX_PAIRS_PER_CHAR;
+            }
+            for (p = 0; p < n; p++) {
+                if (!StrikeKey(pairs[p * 2], pairs[p * 2 + 1])) {
+                    return FALSE;
+                }
+            }
+        }
+        Delay(AMIP_TYPE_INTER_TICKS);
+    }
+
+    return TRUE;
 }
 
 /* TODO: BOOPSI CUSTOMGADGET position isn't necessarily mirrored into the

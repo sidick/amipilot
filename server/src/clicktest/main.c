@@ -6,7 +6,9 @@
  * delivers a real click through input.device, verified end-to-end under
  * Copperline. See docs/implementation-plan.md phase 0.2.
  *
- * Template: WINDOW/A,ID/N/A -- window title substring, gadget ID.
+ * Template: WINDOW/A,ID/N/A,TEXT/K -- window title substring, gadget ID,
+ * and optionally text to type (AmipTypeString) after the click lands --
+ * click a string gadget then TEXT fills it, the same way a human would.
  * Finds the LIVE gadget by walking window->FirstGadget directly (not
  * through intuition-model's copied-out AmipWindowModel): a click target
  * must resolve against the current structure at action time, per the
@@ -28,12 +30,17 @@
 #include "action_engine.h"
 
 struct IntuitionBase *IntuitionBase = NULL;
+/* Consumed by AmipTypeString() (MapANSI); explicitly initialized -- an
+ * uninitialized library-base global is a COMMON symbol and pulls in
+ * libnix's auto-open constructor, see CLAUDE.md. */
+struct Library *KeymapBase = NULL;
 
-#define TEMPLATE "WINDOW/A,ID/N/A"
+#define TEMPLATE "WINDOW/A,ID/N/A,TEXT/K"
 
 struct ClickTestArgs {
     STRPTR windowTitle;
     LONG *gadgetId;
+    STRPTR text;
 };
 
 static struct Window *FindWindow(CONST_STRPTR titleSubstring)
@@ -114,6 +121,10 @@ int main(void)
         return RETURN_FAIL;
     }
 
+    /* Optional -- only TEXT typing needs it; AmipTypeString() reports
+     * failure itself if it's absent. */
+    KeymapBase = OpenLibrary((CONST_STRPTR)"keymap.library", 37);
+
     rdargs = ReadArgs((CONST_STRPTR)TEMPLATE, (LONG *)&args, NULL);
     if (rdargs == NULL) {
         PrintFault(IoErr(), (CONST_STRPTR)"AmiClickTest");
@@ -150,12 +161,23 @@ int main(void)
                 rc = RETURN_FAIL;
             } else {
                 printf("AmiClickTest: click delivered\n");
+                if (args.text != NULL) {
+                    if (!AmipTypeString((CONST_STRPTR)args.text)) {
+                        fprintf(stderr, "AmiClickTest: typing failed\n");
+                        rc = RETURN_FAIL;
+                    } else {
+                        printf("AmiClickTest: typed \"%s\"\n", (const char *)args.text);
+                    }
+                }
             }
         }
     }
 
     AmipActionShutdown();
     FreeArgs(rdargs);
+    if (KeymapBase != NULL) {
+        CloseLibrary(KeymapBase);
+    }
     CloseLibrary((struct Library *)IntuitionBase);
     return rc;
 }

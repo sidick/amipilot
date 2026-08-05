@@ -218,6 +218,19 @@ static AmipGadgetModel *WalkGadgetList(struct Gadget *gadget, struct Window *win
             node->label = (gadget->GadgetText != NULL && gadget->GadgetText->IText != NULL)
                               ? CopyString(gadget->GadgetText->IText)
                               : NULL;
+
+            /* A classic string gadget's live contents: SpecialInfo points
+             * at its StringInfo, whose Buffer is the null-terminated
+             * current text (intuition/sgadgets.h -- both STRING_KIND and
+             * INTEGER_KIND go through the same structure). Copied out
+             * under the same LockIBase() hold as everything else. */
+            if ((gadget->GadgetType & GTYP_GTYPEMASK) == GTYP_STRGADGET
+                && gadget->SpecialInfo != NULL) {
+                struct StringInfo *si = (struct StringInfo *)gadget->SpecialInfo;
+                if (si->Buffer != NULL) {
+                    node->value = CopyString((CONST_STRPTR)si->Buffer);
+                }
+            }
         }
 
         node->left = gadget->LeftEdge;
@@ -316,6 +329,9 @@ void AmipFreeWindowModel(AmipWindowModel *model)
             }
             if (gadget->className != NULL) {
                 FreeVec(gadget->className);
+            }
+            if (gadget->value != NULL) {
+                FreeVec(gadget->value);
             }
             FreeVec(gadget);
             gadget = nextGadget;

@@ -42,6 +42,9 @@ typedef struct AmipGadgetModel {
     AmipRole role;
     STRPTR  label;         /* copied out, caller-owned; NULL if none */
     STRPTR  className;     /* e.g. "button.gadget", NULL for plain GadTools */
+    STRPTR  value;         /* current contents for string/integer gadgets
+                            * (StringInfo->Buffer, copied out); NULL for
+                            * roles with no textual value */
     WORD    left, top, width, height; /* resolved at walk time */
     ULONG   state;         /* opaque bitfield, meaning is role-specific */
 } AmipGadgetModel;
