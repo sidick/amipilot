@@ -334,9 +334,85 @@ EOF
 	fi
 }
 
+# --- manifest locator check (phase 0.3, manifest/SPEC.md) -----------------
+# Same shape as the ARexx check above, but every gadget reference in
+# tests/copperline/arexx-manifest-test.rexx is a logical name from
+# fixtures/gadtools-app/GTApp.manifest -- no GA_ID, window title, or
+# position appears in the script at all. Asserts the load report, that
+# an unknown name is a clean RC=10 (not a crash or a silent no-op), the
+# typed-text round trip, and the click-then-window-gone sequence.
+run_manifest_check() {
+	echo "run.sh: manifest locators"
+
+	rm -f "$BUILD/manifest-result.txt" "$BUILD/marker-manifest.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+Run >NIL: SRC:build/fixtures/GTApp
+Wait 5
+Run SRC:build/AmiPilotServer
+Wait 5
+rx SRC:tests/copperline/arexx-manifest-test.rexx >SRC:build/manifest-result.txt
+Wait 2
+Echo "DONE" >SRC:build/marker-manifest.txt
+EOF
+
+	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
+	rm -f "$info"
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
+		--fast 8M --noaudio --control :0 --control-info "$info" \
+		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
+	COPPERLINE_PID=$!
+
+	tries=0
+	while [ ! -f "$info" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 100 ]; then
+			echo "run.sh: FAIL (manifest): copperline never wrote $info"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			return
+		fi
+		sleep 0.1
+	done
+
+	"$COPPERLINE_CTL" --info "$info" run_until "{\"seconds\": $RUN_SECONDS}" > /dev/null
+	kill "$COPPERLINE_PID" 2>/dev/null || true
+	COPPERLINE_PID=""
+	rm -f "$info"
+
+	if [ ! -f "$BUILD/marker-manifest.txt" ]; then
+		echo "run.sh: FAIL (manifest): marker-manifest.txt never appeared -- crash or hang"
+		FAILED=1
+		return
+	fi
+
+	ok=1
+	for pattern in \
+		'LOAD RC=0 RESULT=loaded GTApp: 1 windows, 3 gadgets' \
+		'BADNAME RC=10' \
+		'GETTEXT-HOST RC=0 RESULT=aminet.net' \
+		'CLICK-CONNECT RC=0' \
+		'GONE RC=5' \
+		'QUIT RC=0'; do
+		if ! grep -qF "$pattern" "$BUILD/manifest-result.txt" 2>/dev/null; then
+			echo "run.sh: FAIL (manifest): expected line not found: $pattern"
+			ok=0
+		fi
+	done
+
+	if [ "$ok" -eq 1 ]; then
+		echo "run.sh: PASS (manifest locators)"
+	else
+		echo "run.sh:   --- actual output ---"
+		sed 's/^/run.sh:   /' "$BUILD/manifest-result.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+	fi
+}
+
 run_click_check
 run_type_check
 run_arexx_check
+run_manifest_check
 
 if [ "$FAILED" -eq 0 ]; then
 	rm -f "$BUILD"/.copperline-ctl-info-*.json "$BUILD"/.copperline-log-*.txt \
@@ -346,7 +422,8 @@ if [ "$FAILED" -eq 0 ]; then
 		"$BUILD"/marker-click.txt \
 		"$BUILD"/type-result.txt "$BUILD"/inspect-after-type.txt \
 		"$BUILD"/marker-type.txt \
-		"$BUILD"/arexx-result.txt "$BUILD"/marker-arexx.txt
+		"$BUILD"/arexx-result.txt "$BUILD"/marker-arexx.txt \
+		"$BUILD"/manifest-result.txt "$BUILD"/marker-manifest.txt
 	echo "run.sh: all fixtures PASS"
 	exit 0
 else

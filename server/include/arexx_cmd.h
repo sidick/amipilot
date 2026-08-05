@@ -17,9 +17,10 @@
 typedef enum {
     AMIP_AREXX_CMD_UNKNOWN = 0,
     AMIP_AREXX_CMD_TREE,     /* TREE <window-pattern> */
-    AMIP_AREXX_CMD_CLICK,    /* CLICK <window-pattern> <gadget-id> */
-    AMIP_AREXX_CMD_TYPE,     /* TYPE <window-pattern> <gadget-id> <text...> */
-    AMIP_AREXX_CMD_GETTEXT,  /* GETTEXT <window-pattern> <gadget-id> */
+    AMIP_AREXX_CMD_CLICK,    /* CLICK <window-pattern> <gadget-id> | CLICK @<name> */
+    AMIP_AREXX_CMD_TYPE,     /* TYPE <window-pattern> <gadget-id> <text...> | TYPE @<name> <text...> */
+    AMIP_AREXX_CMD_GETTEXT,  /* GETTEXT <window-pattern> <gadget-id> | GETTEXT @<name> */
+    AMIP_AREXX_CMD_MANIFEST, /* MANIFEST <file-path> */
     AMIP_AREXX_CMD_QUIT      /* QUIT */
 } AmipArexxCmdType;
 
@@ -38,22 +39,35 @@ enum {
 
 #define AMIP_AREXX_MAX_WINDOW 128
 #define AMIP_AREXX_MAX_TEXT   256
+#define AMIP_AREXX_MAX_NAME   32   /* manifest logical names ("@name") */
+#define AMIP_AREXX_MAX_PATH   256  /* MANIFEST file path */
 
 typedef struct {
     AmipArexxCmdType type;
-    char windowPattern[AMIP_AREXX_MAX_WINDOW]; /* TREE/CLICK/TYPE/GETTEXT */
-    long gadgetId;                             /* CLICK/TYPE/GETTEXT */
+    char windowPattern[AMIP_AREXX_MAX_WINDOW]; /* TREE/CLICK/TYPE/GETTEXT (classic form) */
+    long gadgetId;                             /* CLICK/TYPE/GETTEXT (classic form) */
+    char manifestName[AMIP_AREXX_MAX_NAME];    /* CLICK/TYPE/GETTEXT "@name" form;
+                                                * empty = classic form was used */
     char text[AMIP_AREXX_MAX_TEXT];             /* TYPE */
+    char path[AMIP_AREXX_MAX_PATH];             /* MANIFEST */
 } AmipArexxParsed;
 
 /* Parses one ARexx command line into `out`. Case-insensitive command
  * keyword; window-pattern accepts a double-quoted form for patterns
  * containing spaces; TYPE's text argument is everything after the
- * gadget ID, unquoted-verbatim (so "TYPE GadTools 2 hello world" types
- * "hello world" without needing to quote it) or the quoted form if it
- * starts with '"'. Returns 0 on success, -1 on an unknown command or a
- * missing required argument (map to AMIP_AREXX_RC_ERROR) --
- * out->type is AMIP_AREXX_CMD_UNKNOWN on failure. */
+ * gadget ID (or "@name"), unquoted-verbatim (so "TYPE GadTools 2 hello
+ * world" types "hello world" without needing to quote it) or the quoted
+ * form if it starts with '"'.
+ *
+ * CLICK/TYPE/GETTEXT accept "@<logical-name>" in place of the
+ * <window-pattern> <gadget-id> pair -- resolved by the caller against
+ * the currently-loaded manifest (manifest.h). The '@' prefix is what
+ * disambiguates the two forms; a bare name would be ambiguous with a
+ * window pattern.
+ *
+ * Returns 0 on success, -1 on an unknown command or a missing required
+ * argument (map to AMIP_AREXX_RC_ERROR) -- out->type is
+ * AMIP_AREXX_CMD_UNKNOWN on failure. */
 int AmipArexxParse(const char *cmdline, AmipArexxParsed *out);
 
 #endif /* AMIPILOT_AREXX_CMD_H */

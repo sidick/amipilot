@@ -107,6 +107,26 @@ Three components:
    marked in the API as the fragile tier — for genuinely custom-rendered
    corners nothing structural can see, and nothing else.
 
+**Future tier between 1 and 2 — the cooperative geometry port (design
+note, not yet scheduled):** the layout.gadget child-enumeration limit
+(see "Honest limits") blocks *external* discovery, but the application's
+own code holds a live object pointer to every gadget it created — it
+needs them for its own event dispatch. An app (or a GUI generator
+emitting the app's boilerplate) can therefore expose a tiny optional
+ARexx port answering `WHERE <logical-name>`: it calls
+`GetAttr(GA_Left/GA_Top/GA_Width/GA_Height)` on its own object pointers
+and returns the live window-relative geometry. AmiPilot then acts on
+that answer with a genuine input.device click at those coordinates —
+discovery is cooperative, but **actuation stays real input through the
+real event path**, unlike the MUI tier where the port does the acting
+too. No coordinates ever appear in a script (they're resolved live at
+action time by the app itself), so relayout and font changes can't
+break anything — the same immunity the manifest tier has, extended to
+the one place structural walking can't reach. The manifest format would
+gain a record declaring the port's name so consumers can discover it.
+This is the designated escape hatch for ReAction/window.class UIs whose
+gadgets are otherwise permanently invisible to tiers 1–2.
+
 Per-application **quirk profiles** (a small config layer) capture
 app-specific mappings and known oddities, so community knowledge about
 driving a particular program accumulates as shareable data.

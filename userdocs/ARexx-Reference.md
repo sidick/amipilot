@@ -36,7 +36,32 @@ match wins. Quote it if it contains spaces.
 | `CLICK` | `<window-pattern> <gadget-id>` | Clicks the gadget with that `GA_ID` — a genuine `input.device` click, not a shortcut. |
 | `TYPE` | `<window-pattern> <gadget-id> <text...>` | Clicks the gadget (to focus it), then types `text` into it via real `IECLASS_RAWKEY` events, human-paced. Everything after the gadget ID is taken verbatim as the text — no quoting needed unless the text itself starts with `"`. |
 | `GETTEXT` | `<window-pattern> <gadget-id>` | Returns that gadget's current text: a string/integer gadget's live value if it has one, otherwise its label. |
+| `MANIFEST` | `<file-path>` | Loads an application's manifest (see below). Replaces any previously loaded one. `RESULT` reports what loaded (`loaded GTApp: 1 windows, 3 gadgets`); a rejected manifest returns `RC=10` with the reason (including line number) in `RESULT`. |
 | `QUIT` | (none) | Shuts the commodity down cleanly. |
+
+## Manifest locators
+
+If the application you're driving ships an
+[AmiPilot manifest](https://github.com/sidick/amipilot/blob/main/manifest/SPEC.md)
+— a small text file mapping stable logical names to its window titles
+and `GA_ID`s — load it with `MANIFEST`, and `CLICK`/`TYPE`/`GETTEXT`
+then accept `@<logical-name>` in place of the
+`<window-pattern> <gadget-id>` pair:
+
+```rexx
+'MANIFEST Prog:MyApp.manifest'
+'TYPE @host_field aminet.net'
+'CLICK @connect_button'
+```
+
+No `GA_ID`, window title, or position appears in the script at all —
+the manifest pins the *identity* of each target, and the actual window
+and gadget are still located live at action time. Relayout, relabelling,
+and translation can't break the script; only a `GA_ID` change would
+touch anything, and then only the manifest.
+
+Using `@name` with no manifest loaded, or with a name the manifest
+doesn't define, is `RC=10` with the reason in `RESULT`.
 
 ## Example
 
