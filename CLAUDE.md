@@ -134,6 +134,23 @@ lifecycle, same pattern as `IntuitionBase`. If `GadToolsBase` is `NULL`
 (library not opened, or genuinely unavailable), classification degrades
 gracefully rather than failing.
 
+**Always initialize library-base globals** (`struct Library *FooBase =
+NULL;`, never `struct Library *FooBase;`). An uninitialized base is a
+COMMON symbol, which doesn't stop the linker from pulling libnix's own
+same-named archive member — and that member carries a pre-`main()`
+auto-open constructor that derives the library name from the base name
+and aborts the whole program if the open fails (for `WindowBase` it
+tries the nonexistent `"window.library"`, printing "window.library
+failed to load" and exiting with rc 20 before any of your code runs).
+This cost a full debugging session on 2026-08-05; see the header comment
+in `fixtures/classact-app/src/main.c`. Two related ReAction findings
+from the same session: BOOPSI gadget objects need `-lamiga`
+(`DoMethod`/`NewObject` varargs marshaling), and `string.gadget`/
+`checkbox.gadget` don't register public class names — use
+`STRING_GetClass()`/`CHECKBOX_GetClass()`, not
+`NewObject(NULL, "string.gadget", ...)` (which works for
+`button.gadget` but returns NULL for these).
+
 **`amiinspect/`** — standalone Shell command (`ReadArgs` template
 `WINDOW/K`), the platform's first UIA-Inspect-equivalent. Finds a window
 by title substring (or defaults to the active window), walks it via
