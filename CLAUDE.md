@@ -13,11 +13,13 @@ protocol, and phase sequencing live in `docs/implementation-plan.md` —
 read that before making architectural decisions; this file only covers
 what's needed to build and navigate the code day to day.
 
-**Current state:** early scaffolding, phase 0.1. Only `intuition-model/`
-(the walker library) and `amiinspect/` (the Shell command) are real and
-building. `server/`, `host/`, `manifest/`, and `tests/` are stub
-directories with a `README.md` each pointing at their phase — don't assume
-code exists there.
+**Current state:** v0.1 released. `intuition-model/` (the walker library)
+and `amiinspect/` (the Shell command) are real, building, and verified
+on-target. `server/`, `host/`, and `manifest/` are stub directories with a
+`README.md` each pointing at their phase — don't assume code exists there.
+User-facing documentation lives in `userdocs/` (built as a MkDocs site,
+`mkdocs.yml`) and mirrored to AmigaGuide via `make guide`
+(`tools/docs2guide.py`) — see `userdocs/Building-and-Testing.md`.
 
 ## Build commands
 

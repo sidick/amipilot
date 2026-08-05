@@ -1,0 +1,36 @@
+name: Docs
+
+# Publishes the versioned user-docs site via sidick/amiga-workflows' docs.yml
+# (MkDocs Material + mike -> GitHub Pages, each release tag deploys as a
+# named version plus the floating `latest` alias). Day-to-day docs edits on
+# main do NOT deploy -- the site is refreshed at release time (PRs get a
+# strict build check in ci.yml's docs-build job).
+#
+# workflow_dispatch exists for re-publishing a version after a docs-only
+# fix, or for a first publish ahead of the next release tag.
+#
+# One-time repo setup: Settings -> Pages -> Source: "Deploy from a branch" /
+# gh-pages / root -- mike commits the built site to gh-pages itself, it
+# does not use the "GitHub Actions" Pages source.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (e.g. v0.1)'
+        required: true
+
+# A reusable workflow's own `permissions:` block can only narrow, never
+# widen, what the calling job already has - so this repo's own contents:
+# write grant (mike pushes to gh-pages) has to be declared here too, not
+# just relied on inside amiga-workflows/docs.yml.
+permissions:
+  contents: write
+
+jobs:
+  docs:
+    uses: sidick/amiga-workflows/.github/workflows/docs.yml@v1
+    with:
+      version: ${{ inputs.version || github.ref_name }}

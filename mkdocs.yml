@@ -1,0 +1,59 @@
+# User documentation site (MkDocs Material), published to GitHub Pages via
+# .github/workflows/docs.yml (mike-based versioned deploy, matching sibling
+# projects amiauth/sana2loop's own docs.yml -- each release tag deploys
+# under its own version plus a floating "latest" alias). PRs/pushes to main
+# only get a strict build check (ci.yml's docs-build job) so the site can't
+# silently rot between real publishes -- day-to-day doc edits don't
+# redeploy until the next release tag or a manual dispatch. Developer
+# design notes stay in docs/ and CLAUDE.md, and are not part of this site.
+
+site_name: AmiPilot
+site_description: Object-level GUI automation for classic AmigaOS
+site_url: https://sidick.github.io/amipilot/
+repo_url: https://github.com/sidick/amipilot
+repo_name: sidick/amipilot
+edit_uri: edit/main/userdocs/
+copyright: AmiPilot — object-level GUI automation for classic AmigaOS. BSD 2-Clause.
+
+docs_dir: userdocs
+
+theme:
+  name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.sections
+    - navigation.footer
+    - content.action.edit
+
+markdown_extensions:
+  - toc:
+      permalink: true
+
+# Enables the mike-based version picker in the theme header -- matches
+# the mike-versioned deploy in .github/workflows/docs.yml.
+extra:
+  version:
+    provider: mike
+
+nav:
+  - Home: index.md
+  - Getting going:
+      - Installation: Installation.md
+      - Getting Started: Getting-Started.md
+  - Using AmiInspect:
+      - AmiInspect Reference: AmiInspect-Reference.md
+      - Locator Tiers and Limits: Locator-Tiers-and-Limits.md
+  - Help:
+      - Troubleshooting and FAQ: Troubleshooting-and-FAQ.md
+      - Building and Testing: Building-and-Testing.md
+      - Changelog: Changelog.md

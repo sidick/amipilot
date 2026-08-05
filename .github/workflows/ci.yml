@@ -7,6 +7,13 @@
 # five-verb contract (build/test-host/test-target/lint/dist all resolve to
 # Makefile targets of the same name -- see this repo's Makefile "Verb
 # contract" section).
+#
+# docs-build stays a local job, not folded into build-test.yml: it's a
+# rot-prevention check (strict MkDocs build + AmigaGuide conversion) that
+# doesn't fit any of the five verbs cleanly, and the shared workflow has no
+# hook for an extra per-project job. The real docs publish (docs.yml,
+# mike-based) only runs on a release tag or manual dispatch; this job's job
+# is purely to keep the site from silently rotting in between.
 
 name: CI
 
@@ -23,3 +30,18 @@ concurrency:
 jobs:
   ci:
     uses: sidick/amiga-workflows/.github/workflows/build-test.yml@v1
+
+  docs-build:
+    name: Docs site + AmigaGuide build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: '3.14'
+      - name: Install docs toolchain
+        run: pip install -r tools/docs-requirements.txt
+      - name: Strict MkDocs build
+        run: mkdocs build --strict
+      - name: AmigaGuide conversion
+        run: make guide

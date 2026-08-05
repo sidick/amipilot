@@ -59,7 +59,7 @@ IMAGE      ?= ghcr.io/sidick/amiga-dev:1
 # container-private volume) is host-owned, not root-owned.
 DOCKER_RUN := docker run --rm --user "$$(id -u):$$(id -g)" -v "$(CURDIR)":/work -w /work $(IMAGE)
 
-.PHONY: all amiga fixtures docker clean version build test-host test-target lint dist
+.PHONY: all amiga fixtures docker clean version build test-host test-target lint dist guide
 
 all: amiga
 
@@ -122,6 +122,17 @@ lint:
 
 version:
 	@echo "$(VERSION).$(REVISION)"
+
+# --- guide: AmigaGuide user documentation, generated from userdocs/ -------
+# userdocs/ is the single source of truth for user docs (built as the
+# MkDocs site, see mkdocs.yml); this converts it for on-Amiga reading
+# (MultiView/AmigaGuide). @mkdir's own recipe line, not a `| $(BUILD)`
+# order-only prerequisite on a separate $(BUILD): rule -- BUILD's value is
+# literally the string "build", so a target named $(BUILD) would collide
+# with this Makefile's own build: verb-contract target above.
+guide:
+	@mkdir -p $(BUILD)
+	python3 tools/docs2guide.py userdocs $(BUILD)/amipilot.guide
 
 clean:
 	rm -rf $(BUILD)
