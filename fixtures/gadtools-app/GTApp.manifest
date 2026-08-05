@@ -1,0 +1,10 @@
+; AmiPilot manifest for the GadTools conformance fixture -- see
+; manifest/SPEC.md for the format. Ships/stages next to the GTApp
+; binary; the GA_IDs here are the GID_* constants in src/main.c and
+; change in the same commit if those ever do.
+MANIFEST 1
+APP GTApp
+WINDOW main "AmiPilot GadTools Fixture"
+GADGET connect_button main 1
+GADGET host_field main 2
+GADGET enabled_checkbox main 3

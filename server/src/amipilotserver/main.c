@@ -32,6 +32,7 @@
 #include "action_engine.h"
 #include "arexx.h"
 #include "intuition_model.h"
+#include "manifest.h"
 
 #define STR(s)  #s
 #define XSTR(s) STR(s)
@@ -63,6 +64,47 @@ struct Library *KeymapBase = NULL;
 
 #define AMIP_TREE_BUF_SIZE 4096
 #define AMIP_RESULT_BUF_SIZE 320
+#define AMIP_MANIFEST_FILE_MAX 8192
+
+/* The currently-loaded manifest (MANIFEST command). One at a time --
+ * loading a new one replaces the old, matching how a test session
+ * actually works (one application under test at a time); driving two
+ * manifest-carrying apps at once is 0.3+ scope if it's ever needed. */
+static AmipManifest g_manifest;
+static BOOL g_manifestLoaded = FALSE;
+
+/* Reads path into a static buffer and parses it into g_manifest.
+ * Returns an AMIP_AREXX_RC_* code; on any failure the previously-loaded
+ * manifest is forgotten rather than left half-replaced, and errOut
+ * (cap errCap) gets a one-line reason. */
+static int LoadManifest(const char *path, char *errOut, int errCap)
+{
+    static char fileBuf[AMIP_MANIFEST_FILE_MAX];
+    FILE *f;
+    size_t n;
+
+    g_manifestLoaded = FALSE;
+
+    f = fopen(path, "r");
+    if (f == NULL) {
+        snprintf(errOut, errCap, "cannot open %s", path);
+        return AMIP_AREXX_RC_FAIL;
+    }
+    n = fread(fileBuf, 1, sizeof(fileBuf) - 1, f);
+    fclose(f);
+    if (n >= sizeof(fileBuf) - 1) {
+        snprintf(errOut, errCap, "manifest larger than %d bytes", AMIP_MANIFEST_FILE_MAX);
+        return AMIP_AREXX_RC_FAIL;
+    }
+    fileBuf[n] = '\0';
+
+    if (AmipManifestParse(fileBuf, &g_manifest, errOut, errCap) != 0) {
+        return AMIP_AREXX_RC_ERROR;
+    }
+
+    g_manifestLoaded = TRUE;
+    return AMIP_AREXX_RC_OK;
+}
 
 /* Appends one gadget's line to buf in the same shape AmiInspect's
  * PrintModel prints it, tracking remaining space so a window with more
@@ -203,7 +245,44 @@ static int RealMain(void)
 
                 resultBuf[0] = '\0';
 
+                /* "@name" locator: resolve against the loaded manifest
+                 * into the same windowPattern/gadgetId fields the
+                 * classic form fills, so the verb handlers below run
+                 * identically for both. Unknown name / no manifest
+                 * loaded are both script errors (RC 10), same class as
+                 * a bad argument. */
+                if (cmd.manifestName[0] != '\0') {
+                    const char *title;
+                    long id;
+
+                    if (!g_manifestLoaded) {
+                        strncpy(resultBuf, "no manifest loaded", sizeof(resultBuf) - 1);
+                        AmipArexxReply(handle, AMIP_AREXX_RC_ERROR, resultBuf);
+                        continue;
+                    }
+                    if (AmipManifestResolve(&g_manifest, cmd.manifestName, &title, &id) != 0) {
+                        snprintf(resultBuf, sizeof(resultBuf), "no such name in manifest: %s",
+                                 cmd.manifestName);
+                        AmipArexxReply(handle, AMIP_AREXX_RC_ERROR, resultBuf);
+                        continue;
+                    }
+                    strncpy(cmd.windowPattern, title, sizeof(cmd.windowPattern) - 1);
+                    cmd.windowPattern[sizeof(cmd.windowPattern) - 1] = '\0';
+                    cmd.gadgetId = id;
+                }
+
                 switch (cmd.type) {
+                    case AMIP_AREXX_CMD_MANIFEST:
+                        rc = LoadManifest(cmd.path, resultBuf, sizeof(resultBuf));
+                        if (rc == AMIP_AREXX_RC_OK) {
+                            snprintf(resultBuf, sizeof(resultBuf),
+                                     "loaded %s: %d windows, %d gadgets",
+                                     g_manifest.appName, g_manifest.windowCount,
+                                     g_manifest.gadgetCount);
+                        }
+                        result = resultBuf;
+                        break;
+
                     case AMIP_AREXX_CMD_TREE: {
                         struct Window *w = AmipFindWindow((CONST_STRPTR)cmd.windowPattern);
                         AmipWindowModel *model;

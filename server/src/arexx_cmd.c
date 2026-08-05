@@ -64,31 +64,53 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
     p = skip_ws(cmdline);
     p = read_token(p, kw, sizeof(kw));
 
-    if      (ci_streq(kw, "TREE"))    out->type = AMIP_AREXX_CMD_TREE;
-    else if (ci_streq(kw, "CLICK"))   out->type = AMIP_AREXX_CMD_CLICK;
-    else if (ci_streq(kw, "TYPE"))    out->type = AMIP_AREXX_CMD_TYPE;
-    else if (ci_streq(kw, "GETTEXT")) out->type = AMIP_AREXX_CMD_GETTEXT;
-    else if (ci_streq(kw, "QUIT"))    out->type = AMIP_AREXX_CMD_QUIT;
+    if      (ci_streq(kw, "TREE"))     out->type = AMIP_AREXX_CMD_TREE;
+    else if (ci_streq(kw, "CLICK"))    out->type = AMIP_AREXX_CMD_CLICK;
+    else if (ci_streq(kw, "TYPE"))     out->type = AMIP_AREXX_CMD_TYPE;
+    else if (ci_streq(kw, "GETTEXT"))  out->type = AMIP_AREXX_CMD_GETTEXT;
+    else if (ci_streq(kw, "MANIFEST")) out->type = AMIP_AREXX_CMD_MANIFEST;
+    else if (ci_streq(kw, "QUIT"))     out->type = AMIP_AREXX_CMD_QUIT;
     else { out->type = AMIP_AREXX_CMD_UNKNOWN; return -1; }
 
     if (out->type == AMIP_AREXX_CMD_QUIT) {
         return 0;
     }
 
-    /* Every other command starts with a window-pattern argument. */
+    if (out->type == AMIP_AREXX_CMD_MANIFEST) {
+        p = skip_ws(p);
+        if (*p == '\0') {
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+        read_token(p, out->path, sizeof(out->path));
+        return 0;
+    }
+
+    /* Every other command starts with either a window-pattern argument
+     * or a "@<logical-name>" manifest locator (see arexx_cmd.h). */
     p = skip_ws(p);
     if (*p == '\0') {
         out->type = AMIP_AREXX_CMD_UNKNOWN;
         return -1;
     }
-    p = read_token(p, out->windowPattern, sizeof(out->windowPattern));
+    if (*p == '@' && out->type != AMIP_AREXX_CMD_TREE) {
+        p++;
+        p = read_token(p, out->manifestName, sizeof(out->manifestName));
+        if (out->manifestName[0] == '\0') {
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+    } else {
+        p = read_token(p, out->windowPattern, sizeof(out->windowPattern));
+    }
 
     if (out->type == AMIP_AREXX_CMD_TREE) {
         return 0;
     }
 
-    /* CLICK/TYPE/GETTEXT all take a gadget ID next. */
-    {
+    /* Classic form: CLICK/TYPE/GETTEXT take a gadget ID next. The
+     * "@name" form already carries the whole locator. */
+    if (out->manifestName[0] == '\0') {
         char idbuf[16];
         p = skip_ws(p);
         if (*p == '\0') {

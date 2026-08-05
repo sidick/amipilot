@@ -28,8 +28,11 @@ Lands in phase 0.2 onward -- see
   (`"AMIPILOT.<n>"`), plus `src/arexx.c`/`arexx_cmd.c` (the RexxMsg glue
   and portable command parser, split the same way `../amiauth`'s
   `arexx.c`/`arexx_cmd.c` are). Verb set: `TREE`/`CLICK`/`TYPE`/
-  `GETTEXT`/`QUIT` -- a small, real subset of the plan's full v1 verb
-  list (wire protocol, launch, fs, menu/drag verbs are 0.3/0.4 scope).
+  `GETTEXT`/`MANIFEST`/`QUIT` -- a small, real subset of the plan's
+  full v1 verb list (wire protocol, launch, fs, menu/drag verbs are
+  0.3/0.4 scope). `src/manifest.c` (portable, like `arexx_cmd.c`)
+  parses the manifest contract (`../manifest/SPEC.md`) behind the
+  `MANIFEST` verb and the `@<logical-name>` locator form.
   Verified against a real resident `RexxMast` (`rx`, not a hand-rolled
   RexxMsg -- `rexxsyslib.library`'s `IsRexxMsg()` only validates
   messages whose `rm_TaskBlock` came from a live ARexx task) by
