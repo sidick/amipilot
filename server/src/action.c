@@ -423,3 +423,69 @@ BOOL AmipClickGadget(struct Window *window, struct Gadget *gadget)
 
     return AmipClickAt(window->WScreen, centerX, centerY, AMIP_BUTTON_LEFT);
 }
+
+/* See action_engine.h's "locators" section for the design rationale --
+ * moved here from server/src/clicktest/main.c once the ARexx commodity
+ * needed the exact same lookups. */
+
+struct Window *AmipFindWindow(CONST_STRPTR titleSubstring)
+{
+    struct Screen *screen;
+    struct Window *window;
+
+    if (IntuitionBase == NULL) {
+        return NULL;
+    }
+
+    for (screen = IntuitionBase->FirstScreen; screen != NULL; screen = screen->NextScreen) {
+        for (window = screen->FirstWindow; window != NULL; window = window->NextWindow) {
+            if (window->Title != NULL
+                && strstr((const char *)window->Title, (const char *)titleSubstring) != NULL) {
+                return window;
+            }
+        }
+    }
+
+    return NULL;
+}
+
+struct Gadget *AmipFindGadgetById(struct Window *window, ULONG id)
+{
+    struct Gadget *gadget;
+
+    if (window == NULL) {
+        return NULL;
+    }
+
+    for (gadget = window->FirstGadget; gadget != NULL; gadget = gadget->NextGadget) {
+        if (gadget->GadgetID == id) {
+            return gadget;
+        }
+    }
+
+    return NULL;
+}
+
+BOOL AmipIsWindowOpen(struct Window *target)
+{
+    struct Screen *screen;
+    struct Window *window;
+    BOOL found = FALSE;
+
+    if (IntuitionBase == NULL || target == NULL) {
+        return FALSE;
+    }
+
+    LockIBase(0);
+    for (screen = IntuitionBase->FirstScreen; screen != NULL && !found; screen = screen->NextScreen) {
+        for (window = screen->FirstWindow; window != NULL; window = window->NextWindow) {
+            if (window == target) {
+                found = TRUE;
+                break;
+            }
+        }
+    }
+    UnlockIBase(0);
+
+    return found;
+}

@@ -9,11 +9,9 @@
  * Template: WINDOW/A,ID/N/A,TEXT/K -- window title substring, gadget ID,
  * and optionally text to type (AmipTypeString) after the click lands --
  * click a string gadget then TEXT fills it, the same way a human would.
- * Finds the LIVE gadget by walking window->FirstGadget directly (not
- * through intuition-model's copied-out AmipWindowModel): a click target
- * must resolve against the current structure at action time, per the
- * plan's "Act with real input, not shortcuts" design principle -- a
- * stale copy could be clicking where a gadget used to be.
+ * Locator lookups (AmipFindWindow/AmipFindGadgetById/AmipIsWindowOpen)
+ * live in action_engine.h now -- see its "locators" section for why they
+ * walk live structure rather than intuition-model's copied-out model.
  */
 
 #include <exec/types.h>
@@ -42,68 +40,6 @@ struct ClickTestArgs {
     LONG *gadgetId;
     STRPTR text;
 };
-
-static struct Window *FindWindow(CONST_STRPTR titleSubstring)
-{
-    struct Screen *screen = IntuitionBase->FirstScreen;
-    struct Window *window;
-
-    for (; screen != NULL; screen = screen->NextScreen) {
-        for (window = screen->FirstWindow; window != NULL; window = window->NextWindow) {
-            if (window->Title != NULL && strstr((const char *)window->Title, (const char *)titleSubstring) != NULL) {
-                return window;
-            }
-        }
-    }
-
-    return NULL;
-}
-
-static struct Gadget *FindGadgetById(struct Window *window, ULONG id)
-{
-    struct Gadget *gadget = window->FirstGadget;
-
-    for (; gadget != NULL; gadget = gadget->NextGadget) {
-        if (gadget->GadgetID == id) {
-            return gadget;
-        }
-    }
-
-    return NULL;
-}
-
-/* Locate-then-act has a real gap between the two: `target` and `gadget`
- * are raw pointers with no generation counter or safe-invalidation on
- * AmigaOS, so if the window closed (or the gadget list changed) in the
- * meantime, acting on them is a dangling dereference. Re-walking the
- * live screen/window list under a brief LockIBase() hold immediately
- * before the click, checking pointer identity, doesn't close the gap
- * entirely (the window could still close in the instant after this
- * check returns and before AmipClickGadget's own DoIO() call), but it
- * does shrink it from "however long FindWindow to here took" to
- * "essentially zero" -- the real, general fix (a locate-and-act
- * verb that's atomic with respect to the target closing) is the
- * "action-scoped expectations" primitive phase 0.2 already plans to
- * build, not something this dev-only scoping tool should invent. */
-static BOOL IsWindowStillOpen(struct Window *target)
-{
-    struct Screen *screen;
-    struct Window *window;
-    BOOL found = FALSE;
-
-    LockIBase(0);
-    for (screen = IntuitionBase->FirstScreen; screen != NULL && !found; screen = screen->NextScreen) {
-        for (window = screen->FirstWindow; window != NULL; window = window->NextWindow) {
-            if (window == target) {
-                found = TRUE;
-                break;
-            }
-        }
-    }
-    UnlockIBase(0);
-
-    return found;
-}
 
 int main(void)
 {
@@ -139,12 +75,12 @@ int main(void)
         return RETURN_FAIL;
     }
 
-    target = FindWindow(args.windowTitle);
+    target = AmipFindWindow((CONST_STRPTR)args.windowTitle);
     if (target == NULL) {
         fprintf(stderr, "AmiClickTest: no matching window found\n");
         rc = RETURN_WARN;
     } else {
-        gadget = FindGadgetById(target, (ULONG)*args.gadgetId);
+        gadget = AmipFindGadgetById(target, (ULONG)*args.gadgetId);
         if (gadget == NULL) {
             fprintf(stderr, "AmiClickTest: no gadget with id=%ld in that window\n", (long)*args.gadgetId);
             rc = RETURN_WARN;
@@ -153,7 +89,7 @@ int main(void)
                    (long)*args.gadgetId, gadget->LeftEdge, gadget->TopEdge, gadget->Width, gadget->Height,
                    target->LeftEdge, target->TopEdge);
 
-            if (!IsWindowStillOpen(target)) {
+            if (!AmipIsWindowOpen(target)) {
                 fprintf(stderr, "AmiClickTest: window closed between locate and click, aborting\n");
                 rc = RETURN_WARN;
             } else if (!AmipClickGadget(target, gadget)) {

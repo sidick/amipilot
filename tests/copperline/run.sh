@@ -255,8 +255,88 @@ EOF
 	echo "run.sh: PASS (action-engine type)"
 }
 
+# --- server commodity / ARexx port check (phase 0.2 release gate) --------
+# The actual phase 0.2 release gate (docs/implementation-plan.md): "an
+# ARexx script clicks a button on the test app and asserts [state]
+# changed" -- with no host involved. Boots the fixture and AmiPilotServer,
+# then runs tests/copperline/arexx-test.rexx via the resident RexxMast
+# (`rx`, so RC/RESULT populate exactly as a real script would see --
+# rexxsyslib.library's IsRexxMsg() only validates messages whose
+# rm_TaskBlock came from a live ARexx task, so this exercises the real
+# interpreter, not a simulation of one). The script TYPEs into the Host
+# string gadget and reads it back over the port (RC=0, RESULT="hello
+# amipilot"), then CLICKs Connect and confirms the window is gone
+# afterward (RC=5, "not found") -- state genuinely changed, observed
+# entirely through ARexx.
+run_arexx_check() {
+	echo "run.sh: server commodity / ARexx port"
+
+	rm -f "$BUILD/arexx-result.txt" "$BUILD/marker-arexx.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+Run >NIL: SRC:build/fixtures/GTApp
+Wait 5
+Run SRC:build/AmiPilotServer
+Wait 5
+rx SRC:tests/copperline/arexx-test.rexx >SRC:build/arexx-result.txt
+Wait 2
+Echo "DONE" >SRC:build/marker-arexx.txt
+EOF
+
+	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
+	rm -f "$info"
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
+		--fast 8M --noaudio --control :0 --control-info "$info" \
+		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
+	COPPERLINE_PID=$!
+
+	tries=0
+	while [ ! -f "$info" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 100 ]; then
+			echo "run.sh: FAIL (arexx): copperline never wrote $info"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			return
+		fi
+		sleep 0.1
+	done
+
+	"$COPPERLINE_CTL" --info "$info" run_until "{\"seconds\": $RUN_SECONDS}" > /dev/null
+	kill "$COPPERLINE_PID" 2>/dev/null || true
+	COPPERLINE_PID=""
+	rm -f "$info"
+
+	if [ ! -f "$BUILD/marker-arexx.txt" ]; then
+		echo "run.sh: FAIL (arexx): marker-arexx.txt never appeared -- crash or hang"
+		FAILED=1
+		return
+	fi
+
+	ok=1
+	for pattern in \
+		'GETTEXT-HOST RC=0 RESULT=hello amipilot' \
+		'CLICK-CONNECT RC=0' \
+		'TREE-AFTER RC=5' \
+		'QUIT RC=0'; do
+		if ! grep -qF "$pattern" "$BUILD/arexx-result.txt" 2>/dev/null; then
+			echo "run.sh: FAIL (arexx): expected line not found: $pattern"
+			ok=0
+		fi
+	done
+
+	if [ "$ok" -eq 1 ]; then
+		echo "run.sh: PASS (server commodity / ARexx port)"
+	else
+		echo "run.sh:   --- actual output ---"
+		sed 's/^/run.sh:   /' "$BUILD/arexx-result.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+	fi
+}
+
 run_click_check
 run_type_check
+run_arexx_check
 
 if [ "$FAILED" -eq 0 ]; then
 	rm -f "$BUILD"/.copperline-ctl-info-*.json "$BUILD"/.copperline-log-*.txt \
@@ -265,7 +345,8 @@ if [ "$FAILED" -eq 0 ]; then
 		"$BUILD"/click-result.txt "$BUILD"/inspect-after-click.txt \
 		"$BUILD"/marker-click.txt \
 		"$BUILD"/type-result.txt "$BUILD"/inspect-after-type.txt \
-		"$BUILD"/marker-type.txt
+		"$BUILD"/marker-type.txt \
+		"$BUILD"/arexx-result.txt "$BUILD"/marker-arexx.txt
 	echo "run.sh: all fixtures PASS"
 	exit 0
 else
