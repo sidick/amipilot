@@ -13,11 +13,17 @@ protocol, and phase sequencing live in `docs/implementation-plan.md` —
 read that before making architectural decisions; this file only covers
 what's needed to build and navigate the code day to day.
 
-**Current state:** v0.1 released. `intuition-model/` (the walker library)
+**Current state:** v0.1 released; phase 0.2 (the server commodity, ARexx
+transport) in progress on main. `intuition-model/` (the walker library)
 and `amiinspect/` (the Shell command) are real, building, and verified
-on-target. `server/`, `host/`, and `manifest/` are stub directories with a
-`README.md` each pointing at their phase — don't assume code exists there.
-User-facing documentation lives in `userdocs/` (built as a MkDocs site,
+on-target. `server/` is real too now: the action engine
+(`server/src/action.c`, click/type/geometry) and `AmiPilotServer`
+(`server/src/amipilotserver/`), a commodity hosting both behind a
+genuine public ARexx port — see `server/README.md` for the verb set and
+what's verified. `host/` and `manifest/` are still stub directories with
+just a `README.md` each pointing at their phase (0.3+) — don't assume
+code exists there. User-facing documentation lives in `userdocs/` (built
+as a MkDocs site,
 `mkdocs.yml`) and mirrored to AmigaGuide via `make guide`
 (`tools/docs2guide.py`) — see `userdocs/Building-and-Testing.md`.
 

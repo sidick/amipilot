@@ -64,11 +64,11 @@ BOOL AmipClickAt(struct Screen *screen, WORD x, WORD y, AmipMouseButton button);
 
 /* Resolves gadget's current on-screen center from window's position plus
  * the gadget's own LeftEdge/TopEdge/Width/Height, then calls
- * AmipClickAt() with AMIP_BUTTON_LEFT. Only correct for classic/GadTools
- * gadgets so far (GTYP_BOOLGADGET/STRGADGET/PROPGADGET) -- BOOPSI
- * CUSTOMGADGET position needs GetAttr(GA_Left/GA_Top/...) the same way
- * intuition-model's walk.c learned GA_Text/GA_ID do, not yet implemented
- * here (see the TODO at this function's definition). */
+ * AmipClickAt() with AMIP_BUTTON_LEFT. Correct for classic/GadTools
+ * gadgets and BOOPSI CUSTOMGADGET alike -- the latter via
+ * GetAttr(GA_Left/GA_Top/GA_Width/GA_Height), with GFLG_RELWIDTH/
+ * RELHEIGHT/RELRIGHT/RELBOTTOM resolved against the window's own size
+ * (see this function's definition in action.c). */
 BOOL AmipClickGadget(struct Window *window, struct Gadget *gadget);
 
 /* Types text as genuine IECLASS_RAWKEY press/release events into
@@ -91,5 +91,38 @@ BOOL AmipClickGadget(struct Window *window, struct Gadget *gadget);
  * is NULL, a character can't be generated under the active keymap, or
  * event injection fails. */
 BOOL AmipTypeString(CONST_STRPTR text);
+
+/* --- locators: resolving live structure at action time -----------------
+ *
+ * Deliberately walk window->FirstGadget / IntuitionBase->FirstScreen
+ * directly rather than through intuition-model's copied-out
+ * AmipWindowModel: an action target must resolve against the CURRENT
+ * structure at the moment of the action, per the implementation plan's
+ * "Act with real input, not shortcuts" design principle -- a stale copy
+ * could click where a gadget used to be. Originally scoped to
+ * server/src/clicktest/main.c; promoted here once the ARexx commodity
+ * needed the exact same lookups, to avoid a second copy drifting.
+ */
+
+/* First window (any screen) whose title contains titleSubstring. NULL if
+ * none matches. */
+struct Window *AmipFindWindow(CONST_STRPTR titleSubstring);
+
+/* First gadget in window's own list (window->FirstGadget) with a
+ * matching GadgetID. NULL if none matches -- note this walks the classic
+ * chain, so a BOOPSI window.class window only exposes its single
+ * top-level layout.gadget here, not that layout's individual children
+ * (see CLAUDE.md's "Confirmed limit"). */
+struct Gadget *AmipFindGadgetById(struct Window *window, ULONG id);
+
+/* Re-walks the live screen/window list under a brief LockIBase() hold,
+ * checking pointer identity against target -- for the gap between
+ * locating a window and acting on it (the window could have closed in
+ * between). Doesn't close the gap entirely (it could still close in the
+ * instant after this check returns), but shrinks it to essentially zero.
+ * The real, general fix is "action-scoped expectations" (locate-and-act
+ * atomic with respect to the target closing), planned but not yet
+ * built -- see docs/implementation-plan.md. */
+BOOL AmipIsWindowOpen(struct Window *target);
 
 #endif /* AMIPILOT_ACTION_ENGINE_H */

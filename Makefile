@@ -72,6 +72,15 @@ CLICKTEST_BIN    := $(BUILD)/AmiClickTest
 SETMOUSE_SRCDIR := server/src/setmouse
 SETMOUSE_BIN    := $(BUILD)/AmiSetMouse
 
+# AmiPilotServer: the actual phase 0.2 deliverable -- a commodity hosting
+# the action engine + intuition-model behind a genuine ARexx port
+# ("AMIPILOT.<n>"). Unlike AmiClickTest/AmiSetMouse above, this one IS
+# meant to ship; kept under `server` rather than `amiga`/`build` for now
+# because phase 0.2 isn't tagged yet, not because it's a throwaway tool.
+AREXX_SRC       := $(ACTION_SRCDIR)/arexx.c $(ACTION_SRCDIR)/arexx_cmd.c
+AMIPILOTD_SRCDIR := server/src/amipilotserver
+AMIPILOTD_BIN    := $(BUILD)/AmiPilotServer
+
 # --- Docker (shared toolchain image, see sidick/amiga-dev) ---
 IMAGE      ?= ghcr.io/sidick/amiga-dev:1
 # --user matches the container process's UID/GID to the host caller's, so
@@ -87,7 +96,7 @@ amiga: $(INSPECT_BIN)
 
 fixtures: $(GADTOOLS_APP_BIN) $(CLASSACT_APP_BIN)
 
-server: $(CLICKTEST_BIN) $(SETMOUSE_BIN)
+server: $(CLICKTEST_BIN) $(SETMOUSE_BIN) $(AMIPILOTD_BIN)
 
 $(MODEL_LIB): $(MODEL_SRC) $(MODEL_INCDIR)/intuition_model.h
 	@mkdir -p $(BUILD)
@@ -124,6 +133,11 @@ $(CLICKTEST_BIN): $(CLICKTEST_SRCDIR)/main.c $(ACTION_LIB)
 $(SETMOUSE_BIN): $(SETMOUSE_SRCDIR)/main.c
 	@mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) -o $@ $(SETMOUSE_SRCDIR)/main.c
+
+$(AMIPILOTD_BIN): $(AMIPILOTD_SRCDIR)/main.c $(AREXX_SRC) $(ACTION_LIB) $(MODEL_LIB)
+	@mkdir -p $(BUILD)
+	$(CC) $(CFLAGS) -I$(ACTION_INCDIR) -I$(MODEL_INCDIR) \
+	  -o $@ $(AMIPILOTD_SRCDIR)/main.c $(AREXX_SRC) $(ACTION_LIB) $(MODEL_LIB)
 
 docker:
 	$(DOCKER_RUN) make amiga fixtures
