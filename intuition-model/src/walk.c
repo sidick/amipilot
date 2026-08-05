@@ -41,6 +41,14 @@ AmipRole AmipClassifyGadget(struct Gadget *gadget)
 
     switch (gadget->GadgetType & GTYP_GTYPEMASK) {
         case GTYP_BOOLGADGET:
+            /* TODO(confirmed against fixtures/gadtools-app under real
+             * Workbench 3.2.3): GadTools' BUTTON_KIND and CHECKBOX_KIND
+             * both create a plain GTYP_BOOLGADGET -- nothing in the bare
+             * struct Gadget distinguishes them post-creation, so a real
+             * checkbox currently misclassifies as AMIP_ROLE_BUTTON. Needs
+             * research into recovering the GadTools "kind" after the
+             * fact (there is no public field for it) before this can be
+             * split into BUTTON vs CHECKBOX correctly. */
             return AMIP_ROLE_BUTTON;
         case GTYP_STRGADGET:
             return AMIP_ROLE_STRING;
@@ -73,6 +81,13 @@ static AmipGadgetModel *WalkGadgetList(struct Gadget *gadget)
 
         node->gadgetId = gadget->GadgetID;
         node->role = AmipClassifyGadget(gadget);
+        /* TODO(confirmed against fixtures/gadtools-app): this reads
+         * gadget->GadgetText, which GadTools only populates for
+         * PLACETEXT_LEFT/RIGHT/ABOVE/BELOW. A PLACETEXT_IN button (the
+         * common case for BUTTON_KIND) bakes its label into the
+         * rendered imagery instead, so GadgetText stays NULL and the
+         * label reads as empty here -- not a copy bug, a real gap in
+         * what this tier can see for that layout. */
         node->label = (gadget->GadgetText != NULL && gadget->GadgetText->IText != NULL)
                           ? CopyString(gadget->GadgetText->IText)
                           : NULL;

@@ -46,6 +46,9 @@ MODEL_LIB    := $(BUILD)/libintuitionmodel.a
 INSPECT_SRCDIR := amiinspect/src
 INSPECT_BIN    := $(BUILD)/AmiInspect
 
+GADTOOLS_APP_SRC := fixtures/gadtools-app/src/main.c
+GADTOOLS_APP_BIN := $(BUILD)/fixtures/GTApp
+
 # --- Docker (shared toolchain image, see sidick/amiga-dev) ---
 IMAGE      ?= ghcr.io/sidick/amiga-dev:1
 # --user matches the container process's UID/GID to the host caller's, so
@@ -53,11 +56,13 @@ IMAGE      ?= ghcr.io/sidick/amiga-dev:1
 # container-private volume) is host-owned, not root-owned.
 DOCKER_RUN := docker run --rm --user "$$(id -u):$$(id -g)" -v "$(CURDIR)":/work -w /work $(IMAGE)
 
-.PHONY: all amiga docker clean version build test-host test-target lint dist
+.PHONY: all amiga fixtures docker clean version build test-host test-target lint dist
 
 all: amiga
 
 amiga: $(INSPECT_BIN)
+
+fixtures: $(GADTOOLS_APP_BIN)
 
 $(MODEL_LIB): $(MODEL_SRC) $(MODEL_INCDIR)/intuition_model.h
 	@mkdir -p $(BUILD)
@@ -68,30 +73,39 @@ $(INSPECT_BIN): $(INSPECT_SRCDIR)/main.c $(MODEL_LIB)
 	@mkdir -p $(BUILD)
 	$(CC) $(CFLAGS) -I$(MODEL_INCDIR) -o $@ $(INSPECT_SRCDIR)/main.c $(MODEL_LIB)
 
+# Fixture apps link against system libraries only (intuition/gadtools/
+# graphics), not intuition-model -- they are the thing being inspected,
+# not a consumer of the walker.
+$(GADTOOLS_APP_BIN): $(GADTOOLS_APP_SRC)
+	@mkdir -p $(BUILD)/fixtures
+	$(CC) $(CFLAGS) -o $@ $(GADTOOLS_APP_SRC)
+
 docker:
-	$(DOCKER_RUN) make amiga
+	$(DOCKER_RUN) make amiga fixtures
 
 # --- Verb contract (sidick/amiga-workflows' build-test.yml) ---------------
 # Each build-test.yml job is independent (no artifact-passing between
 # them), so test-target/dist below pull in `build` themselves rather than
 # assuming a prior job already ran it.
-build: amiga
+build: amiga fixtures
 
 # No host-side Python package exists yet (phase 0.3) -- a real no-op per
 # the verb contract's own allowance, not a disabled/skipped job.
 test-host:
 	@echo "test-host: no host-side tests yet (lands in phase 0.3, see docs/implementation-plan.md)"
 
-# No on-target test harness exists yet -- AmiInspect has no emulator smoke
-# test until the conformance fixtures (fixtures/) land alongside it.
+# No automated on-target harness exists yet (that's phase 0.3/0.4 --
+# scripted Amiberry/Copperline boot + assert). The gadtools-app fixture
+# has been smoke-tested manually via the amiberry MCP tools, but nothing
+# here drives that automatically yet.
 test-target:
-	@echo "test-target: no on-target test harness yet (lands with phase 0.1's fixtures)"
+	@echo "test-target: no automated on-target harness yet (lands in phase 0.3/0.4, see docs/implementation-plan.md)"
 
 lint:
 	pip install --quiet semgrep
 	semgrep --config auto --error \
 	  --include='*.c' --include='*.h' \
-	  intuition-model/ amiinspect/ server/
+	  intuition-model/ amiinspect/ server/ fixtures/
 
 version:
 	@echo "$(VERSION).$(REVISION)"
