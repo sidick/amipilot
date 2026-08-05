@@ -8,6 +8,7 @@
 #include <exec/types.h>
 #include <exec/memory.h>
 #include <intuition/intuition.h>
+#include <intuition/classes.h>
 #include <libraries/gadtools.h>
 #include <proto/exec.h>
 #include <proto/intuition.h>
@@ -81,17 +82,63 @@ static AmipRole ClassifyGadget(struct Gadget *gadget, struct Window *window)
         case GTYP_PROPGADGET:
             return AMIP_ROLE_SLIDER;
         default:
-            break;
+            return AMIP_ROLE_UNKNOWN;
     }
+}
 
-    /* BOOPSI/custom-class gadgets need their class name read via
-     * OM_CLASS / GA_ID GetAttr calls -- deferred to the class-reader
-     * work in phase 0.1 once the plain GadTools path is proven. */
-    if (gadget->GadgetType & GTYP_CUSTOMGADGET) {
+/* BOOPSI/ReAction gadgets (GTYP_CUSTOMGADGET) are true class instances:
+ * NewObject() allocates a private struct _Object header (a class pointer
+ * plus a MinNode) immediately before the pointer it returns, precisely
+ * so that "Gadget objects are Gadget pointers" (intuition/classes.h's
+ * own comment). OCLASS() reads that header back -- Hyperion documents it
+ * as "white box" access "for class implementors", but it is a stable,
+ * shipped NDK mechanism, not an undocumented hack, and it is the only
+ * way to identify a live BOOPSI object's class from outside. This is
+ * unsafe to call on classic/GadTools gadgets (GTYP_BOOLGADGET etc.):
+ * they carry no _Object header, so the caller must have already
+ * confirmed GTYP_CUSTOMGADGET first. cl_ID is the class's registration
+ * name ("button.gadget", "window.class", ...), confirmed by reading
+ * intuition/classusr.h + classes.h rather than guessing. */
+static AmipRole ClassifyByClassID(CONST_STRPTR classID)
+{
+    const char *id = (const char *)classID;
+
+    if (id == NULL) {
         return AMIP_ROLE_CUSTOM;
     }
+    if (strcmp(id, "button.gadget") == 0) {
+        return AMIP_ROLE_BUTTON;
+    }
+    if (strcmp(id, "checkbox.gadget") == 0) {
+        return AMIP_ROLE_CHECKBOX;
+    }
+    if (strcmp(id, "string.gadget") == 0 || strcmp(id, "getstring.gadget") == 0) {
+        return AMIP_ROLE_STRING;
+    }
+    if (strcmp(id, "integer.gadget") == 0) {
+        return AMIP_ROLE_INTEGER;
+    }
+    if (strcmp(id, "radiobutton.gadget") == 0) {
+        return AMIP_ROLE_RADIO_BUTTON;
+    }
+    if (strcmp(id, "chooser.gadget") == 0) {
+        return AMIP_ROLE_CYCLE;
+    }
+    if (strcmp(id, "scroller.gadget") == 0) {
+        return AMIP_ROLE_SCROLLER;
+    }
+    if (strcmp(id, "slider.gadget") == 0) {
+        return AMIP_ROLE_SLIDER;
+    }
+    if (strcmp(id, "listbrowser.gadget") == 0) {
+        return AMIP_ROLE_LISTBROWSER;
+    }
 
-    return AMIP_ROLE_UNKNOWN;
+    /* Genuinely unrecognised class (a third-party subclass, or a
+     * ReAction class this tier hasn't been taught yet) -- className is
+     * still captured for the caller, so the tree says exactly what it
+     * is even when the role can't be mapped. */
+    return AMIP_ROLE_CUSTOM;
 }
 
 static AmipGadgetModel *WalkGadgetList(struct Gadget *gadget, struct Window *window)
@@ -106,18 +153,61 @@ static AmipGadgetModel *WalkGadgetList(struct Gadget *gadget, struct Window *win
         }
 
         node->gadgetId = gadget->GadgetID;
-        node->role = ClassifyGadget(gadget, window);
-        /* TODO(confirmed against fixtures/gadtools-app): this reads
-         * gadget->GadgetText, which GadTools only populates for
-         * PLACETEXT_LEFT/RIGHT/ABOVE/BELOW. A PLACETEXT_IN button (the
-         * common case for BUTTON_KIND) bakes its label into the
-         * rendered imagery instead, so GadgetText stays NULL and the
-         * label reads as empty here -- not a copy bug, a real gap in
-         * what this tier can see for that layout. */
-        node->label = (gadget->GadgetText != NULL && gadget->GadgetText->IText != NULL)
-                          ? CopyString(gadget->GadgetText->IText)
-                          : NULL;
-        node->className = NULL; /* filled in once class readers exist */
+
+        /* GTYP_CUSTOMGADGET (0x0005) is a VALUE inside the 3-bit
+         * GTYP_GTYPEMASK field (0x0007), not a standalone flag bit --
+         * mask first, then compare equality. A bare `& GTYP_CUSTOMGADGET`
+         * also matches GTYP_BOOLGADGET (0x0001, since 0x0001 & 0x0005 ==
+         * 0x0001), which routed classic GadTools boolean gadgets into
+         * OCLASS() below and crashed: they carry no _Object header, so
+         * reading "before" them is a wild pointer dereference. Confirmed
+         * via Copperline's debugger (disasm at the crash PC showed the
+         * CPU chewing through zeroed memory -- a classic wild-jump
+         * signature) against fixtures/gadtools-app. */
+        if ((gadget->GadgetType & GTYP_GTYPEMASK) == GTYP_CUSTOMGADGET) {
+            Class *cls = OCLASS(gadget);
+            CONST_STRPTR classID = (cls != NULL) ? cls->cl_ID : NULL;
+            ULONG text = 0;
+            ULONG id = 0;
+
+            node->role = ClassifyByClassID(classID);
+            node->className = CopyString(classID);
+
+            /* Same story as GA_Text: confirmed against fixtures/classact-
+             * app that BOOPSI gadgetclass descendants don't mirror GA_ID
+             * into the classic gadget->GadgetID field either -- every
+             * child of a layout.gadget read back as id=0 until this was
+             * read via GetAttr instead. */
+            if (GetAttr(GA_ID, gadget, &id)) {
+                node->gadgetId = (ULONG)id;
+            }
+
+            /* GA_Text (a plain STRPTR), not gadget->GadgetText (an
+             * IntuiText*): confirmed against fixtures/classact-app that
+             * BOOPSI gadgetclass descendants only answer their label
+             * through GetAttr, leaving GadgetText NULL. GetAttr is only
+             * safe here because we've already confirmed this gadget
+             * carries a real _Object/class header (GTYP_CUSTOMGADGET);
+             * calling it on a classic gadget below would read garbage. */
+            if (GetAttr(GA_Text, gadget, &text) && text != 0) {
+                node->label = CopyString((CONST_STRPTR)text);
+            } else {
+                node->label = NULL;
+            }
+        } else {
+            node->role = ClassifyGadget(gadget, window);
+            node->className = NULL;
+            /* GadTools only populates gadget->GadgetText for
+             * PLACETEXT_LEFT/RIGHT/ABOVE/BELOW; a PLACETEXT_IN button
+             * (confirmed against fixtures/gadtools-app) bakes its label
+             * into the rendered imagery instead, so this reads empty for
+             * that layout -- a real gap in what this tier can see, not a
+             * copy bug. */
+            node->label = (gadget->GadgetText != NULL && gadget->GadgetText->IText != NULL)
+                              ? CopyString(gadget->GadgetText->IText)
+                              : NULL;
+        }
+
         node->left = gadget->LeftEdge;
         node->top = gadget->TopEdge;
         node->width = gadget->Width;

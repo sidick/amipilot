@@ -63,9 +63,10 @@ static void PrintModel(const AmipWindowModel *model)
            model->left, model->top, model->width, model->height);
 
     for (gadget = model->gadgets; gadget != NULL; gadget = gadget->next) {
-        printf("  gadget id=%lu role=%s label=\"%s\" [%d,%d %dx%d]\n",
+        printf("  gadget id=%lu role=%s class=\"%s\" label=\"%s\" [%d,%d %dx%d]\n",
                (unsigned long)gadget->gadgetId,
                AmipRoleName(gadget->role),
+               gadget->className != NULL ? (const char *)gadget->className : "",
                gadget->label != NULL ? (const char *)gadget->label : "",
                gadget->left, gadget->top, gadget->width, gadget->height);
     }
