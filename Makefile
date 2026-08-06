@@ -78,7 +78,7 @@ SETMOUSE_BIN    := $(BUILD)/AmiSetMouse
 # meant to ship; kept under `server` rather than `amiga`/`build` for now
 # because phase 0.2 isn't tagged yet, not because it's a throwaway tool.
 AREXX_SRC       := $(ACTION_SRCDIR)/arexx.c $(ACTION_SRCDIR)/arexx_cmd.c \
-                   $(ACTION_SRCDIR)/manifest.c
+                   $(ACTION_SRCDIR)/manifest.c $(ACTION_SRCDIR)/serial.c
 AMIPILOTD_SRCDIR := server/src/amipilotserver
 AMIPILOTD_BIN    := $(BUILD)/AmiPilotServer
 
@@ -149,10 +149,12 @@ docker:
 # assuming a prior job already ran it.
 build: amiga fixtures
 
-# No host-side Python package exists yet (phase 0.3) -- a real no-op per
-# the verb contract's own allowance, not a disabled/skipped job.
+# Host-side unit tests: the wire client's framing/handshake against
+# server/WIRE.md, pure stdlib unittest (no emulator, no dependencies) --
+# the first real test-host content (phase 0.3). The pytest plugin will
+# sit on top of, not replace, these.
 test-host:
-	@echo "test-host: no host-side tests yet (lands in phase 0.3, see docs/implementation-plan.md)"
+	python3 -m unittest discover -s host/tests -v
 
 # tests/copperline/run.sh boots both fixtures headlessly under Copperline
 # and asserts AmiInspect's classification output -- but it needs

@@ -69,10 +69,11 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
     else if (ci_streq(kw, "TYPE"))     out->type = AMIP_AREXX_CMD_TYPE;
     else if (ci_streq(kw, "GETTEXT"))  out->type = AMIP_AREXX_CMD_GETTEXT;
     else if (ci_streq(kw, "MANIFEST")) out->type = AMIP_AREXX_CMD_MANIFEST;
+    else if (ci_streq(kw, "VERSION"))  out->type = AMIP_AREXX_CMD_VERSION;
     else if (ci_streq(kw, "QUIT"))     out->type = AMIP_AREXX_CMD_QUIT;
     else { out->type = AMIP_AREXX_CMD_UNKNOWN; return -1; }
 
-    if (out->type == AMIP_AREXX_CMD_QUIT) {
+    if (out->type == AMIP_AREXX_CMD_QUIT || out->type == AMIP_AREXX_CMD_VERSION) {
         return 0;
     }
 

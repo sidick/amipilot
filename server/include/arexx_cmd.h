@@ -21,6 +21,8 @@ typedef enum {
     AMIP_AREXX_CMD_TYPE,     /* TYPE <window-pattern> <gadget-id> <text...> | TYPE @<name> <text...> */
     AMIP_AREXX_CMD_GETTEXT,  /* GETTEXT <window-pattern> <gadget-id> | GETTEXT @<name> */
     AMIP_AREXX_CMD_MANIFEST, /* MANIFEST <file-path> */
+    AMIP_AREXX_CMD_VERSION,  /* VERSION -- the wire handshake (server/WIRE.md),
+                              * also answerable over ARexx for feature tests */
     AMIP_AREXX_CMD_QUIT      /* QUIT */
 } AmipArexxCmdType;
 

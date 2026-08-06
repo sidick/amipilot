@@ -409,10 +409,100 @@ EOF
 	fi
 }
 
+# --- wire protocol check (phase 0.3, server/WIRE.md) ----------------------
+# The host half of the phase 0.3 loop: AmiPilotServer's SERIAL transport
+# carried over Copperline's serial TCP bridge (--serial tcp, guest
+# serial.device <-> host 127.0.0.1:1234), driven by the real host client
+# (host/amipilot/wire.py) via tests/copperline/wire-test.py. Differs
+# structurally from the checks above: the host must talk WHILE the
+# machine runs, so run_until is issued in the background as a free-run
+# and the assertions happen on the host's own wall clock.
+run_wire_check() {
+	echo "run.sh: wire protocol (serial)"
+
+	rm -f "$BUILD/wire-result.txt" "$BUILD/marker-wire-ready.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+Run >NIL: SRC:build/fixtures/GTApp
+Wait 5
+Run >NIL: SRC:build/AmiPilotServer SERIAL
+Wait 5
+Echo "READY" >SRC:build/marker-wire-ready.txt
+EOF
+
+	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
+	rm -f "$info"
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
+		--fast 8M --noaudio --serial tcp --control :0 --control-info "$info" \
+		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
+	COPPERLINE_PID=$!
+
+	tries=0
+	while [ ! -f "$info" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 100 ]; then
+			echo "run.sh: FAIL (wire): copperline never wrote $info"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			return
+		fi
+		sleep 0.1
+	done
+
+	# Free-run in the background: the ctl call blocks until the (large)
+	# target is reached or the emulator dies, and the guest boots, runs
+	# the server, and answers the wire meanwhile.
+	"$COPPERLINE_CTL" --info "$info" run_until '{"seconds": 600}' > /dev/null 2>&1 &
+
+	tries=0
+	while [ ! -f "$BUILD/marker-wire-ready.txt" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 120 ]; then
+			echo "run.sh: FAIL (wire): guest never became ready -- crash or hang"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			rm -f "$info"
+			return
+		fi
+		sleep 0.5
+	done
+
+	python3 "$REPO_ROOT/tests/copperline/wire-test.py" 127.0.0.1:1234 \
+		> "$BUILD/wire-result.txt" 2>&1 || true
+
+	kill "$COPPERLINE_PID" 2>/dev/null || true
+	COPPERLINE_PID=""
+	rm -f "$info"
+
+	ok=1
+	for pattern in \
+		'HANDSHAKE SERVER=0.2 PROTOCOL=1 STABLE=VERSION' \
+		'BADVERB RC=10' \
+		'GETTEXT-HOST RC=0 RESULT=hello wire' \
+		'CLICK-CONNECT RC=0' \
+		'TREE-AFTER RC=5' \
+		'QUIT RC=0'; do
+		if ! grep -qF "$pattern" "$BUILD/wire-result.txt" 2>/dev/null; then
+			echo "run.sh: FAIL (wire): expected line not found: $pattern"
+			ok=0
+		fi
+	done
+
+	if [ "$ok" -eq 1 ]; then
+		echo "run.sh: PASS (wire protocol / serial)"
+	else
+		echo "run.sh:   --- actual output ---"
+		sed 's/^/run.sh:   /' "$BUILD/wire-result.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+	fi
+}
+
 run_click_check
 run_type_check
 run_arexx_check
 run_manifest_check
+run_wire_check
 
 if [ "$FAILED" -eq 0 ]; then
 	rm -f "$BUILD"/.copperline-ctl-info-*.json "$BUILD"/.copperline-log-*.txt \
@@ -423,7 +513,8 @@ if [ "$FAILED" -eq 0 ]; then
 		"$BUILD"/type-result.txt "$BUILD"/inspect-after-type.txt \
 		"$BUILD"/marker-type.txt \
 		"$BUILD"/arexx-result.txt "$BUILD"/marker-arexx.txt \
-		"$BUILD"/manifest-result.txt "$BUILD"/marker-manifest.txt
+		"$BUILD"/manifest-result.txt "$BUILD"/marker-manifest.txt \
+		"$BUILD"/wire-result.txt "$BUILD"/marker-wire-ready.txt
 	echo "run.sh: all fixtures PASS"
 	exit 0
 else

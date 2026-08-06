@@ -7,9 +7,15 @@
  * docs/implementation-plan.md's phase 0.2 release gate: "an ARexx script
  * clicks a button on the test app and asserts [state] changed."
  *
- * Verb set (arexx_cmd.h): TREE/CLICK/TYPE/GETTEXT/QUIT -- a small, real
- * subset of the plan's full v1 verb list; wire protocol, launch, fs, and
- * menu/drag verbs are 0.3/0.4 scope, not invented here ahead of need.
+ * Verb set (arexx_cmd.h): TREE/CLICK/TYPE/GETTEXT/MANIFEST/VERSION/QUIT
+ * -- a small, real subset of the plan's full v1 verb list; launch, fs,
+ * and menu/drag verbs are 0.4 scope, not invented here ahead of need.
+ *
+ * Phase 0.3 adds the wire: the same verb grammar over serial.device
+ * (SERIAL switch), framed per server/WIRE.md -- LF-terminated request
+ * lines in, "RC <code> <byte-count>\n" + payload out. One parser
+ * (arexx_cmd.c) and one dispatch (HandleCommand below) serve both
+ * transports; the serial layer (serial.c) only moves bytes and lines.
  *
  * Runs as an ordinary CLI/Shell process, not (yet) a commodities.library
  * broker -- AmipClickGadget() already brings its own target window/
@@ -33,6 +39,7 @@
 #include "arexx.h"
 #include "intuition_model.h"
 #include "manifest.h"
+#include "serial.h"
 
 #define STR(s)  #s
 #define XSTR(s) STR(s)
@@ -50,7 +57,7 @@
  * never-read-in-program array). version.mk is the single source of
  * truth for VERSION/REVISION. */
 static volatile char version[] =
-    "$VER: AmiPilotServer " XSTR(VERSION) "." XSTR(REVISION) " (05.08.2026)";
+    "$VER: AmiPilotServer " XSTR(VERSION) "." XSTR(REVISION) " (06.08.2026)";
 
 struct IntuitionBase *IntuitionBase = NULL;
 /* Consumed by intuition-model/walk.c's BUTTON_KIND/CHECKBOX_KIND
@@ -170,11 +177,188 @@ static BOOL FindGadgetText(struct Window *window, ULONG gadgetId, char *buf, siz
     return found;
 }
 
+/* static, not stack-allocated: a Shell-launched process's default stack
+ * is small and treeBuf+resultBuf approach 4.5KB -- confirmed the hard
+ * way, 2026-08-05: as locals they silently overflowed the default
+ * stack, corrupting state such that the FIRST ARexx command handled
+ * fine but the process took an illegal-instruction exception (Guru
+ * #80000004) before the second -- `rx` then reported a confusing "Host
+ * environment not found" for every later command, since the crashed
+ * task was never servicing the port again. Only one command is ever
+ * dispatched at a time (single-threaded event loop, both transports),
+ * so file-static is exactly as safe as per-message allocation, at zero
+ * cost. Don't move these back into a function. */
+static char g_resultBuf[AMIP_RESULT_BUF_SIZE];
+static char g_treeBuf[AMIP_TREE_BUF_SIZE];
+
+/* Executes one parsed command -- the single dispatch both transports
+ * share (ARexx RESULT string and wire payload are the same bytes; see
+ * server/WIRE.md). Returns the AMIP_AREXX_RC_* code, points *resultOut
+ * at the payload (NULL/empty for none; valid until the next call --
+ * file-static buffers above), and clears *runningOut on QUIT. */
+static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
+                         BOOL *runningOut)
+{
+    int rc = AMIP_AREXX_RC_OK;
+    const char *result = NULL;
+
+    g_resultBuf[0] = '\0';
+
+    /* "@name" locator: resolve against the loaded manifest into the
+     * same windowPattern/gadgetId fields the classic form fills, so the
+     * verb handlers below run identically for both. Unknown name / no
+     * manifest loaded are both script errors (RC 10), same class as a
+     * bad argument. */
+    if (cmd->manifestName[0] != '\0') {
+        const char *title;
+        long id;
+
+        if (!g_manifestLoaded) {
+            strncpy(g_resultBuf, "no manifest loaded", sizeof(g_resultBuf) - 1);
+            *resultOut = g_resultBuf;
+            return AMIP_AREXX_RC_ERROR;
+        }
+        if (AmipManifestResolve(&g_manifest, cmd->manifestName, &title, &id) != 0) {
+            snprintf(g_resultBuf, sizeof(g_resultBuf),
+                     "no such name in manifest: %s", cmd->manifestName);
+            *resultOut = g_resultBuf;
+            return AMIP_AREXX_RC_ERROR;
+        }
+        strncpy(cmd->windowPattern, title, sizeof(cmd->windowPattern) - 1);
+        cmd->windowPattern[sizeof(cmd->windowPattern) - 1] = '\0';
+        cmd->gadgetId = id;
+    }
+
+    switch (cmd->type) {
+        case AMIP_AREXX_CMD_MANIFEST:
+            rc = LoadManifest(cmd->path, g_resultBuf, sizeof(g_resultBuf));
+            if (rc == AMIP_AREXX_RC_OK) {
+                snprintf(g_resultBuf, sizeof(g_resultBuf),
+                         "loaded %s: %d windows, %d gadgets",
+                         g_manifest.appName, g_manifest.windowCount,
+                         g_manifest.gadgetCount);
+            }
+            result = g_resultBuf;
+            break;
+
+        case AMIP_AREXX_CMD_VERSION:
+            /* The handshake payload, byte-identical on both transports
+             * -- shape and stable/experimental split per server/WIRE.md
+             * (everything but VERSION itself is experimental until the
+             * 1.0 promotion pass). */
+            snprintf(g_resultBuf, sizeof(g_resultBuf),
+                     "AMIPILOT " XSTR(VERSION) "." XSTR(REVISION) " PROTOCOL 1\n"
+                     "STABLE VERSION\n"
+                     "EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST QUIT\n");
+            result = g_resultBuf;
+            break;
+
+        case AMIP_AREXX_CMD_TREE: {
+            struct Window *w = AmipFindWindow((CONST_STRPTR)cmd->windowPattern);
+            AmipWindowModel *model;
+
+            if (w == NULL) {
+                rc = AMIP_AREXX_RC_WARN;
+                break;
+            }
+            model = AmipWalkWindow(w);
+            if (model == NULL) {
+                rc = AMIP_AREXX_RC_FAIL;
+                break;
+            }
+            BuildTreeResult(model, g_treeBuf, sizeof(g_treeBuf));
+            AmipFreeWindowModel(model);
+            result = g_treeBuf;
+            break;
+        }
+
+        case AMIP_AREXX_CMD_CLICK: {
+            struct Window *w = AmipFindWindow((CONST_STRPTR)cmd->windowPattern);
+            struct Gadget *g;
+
+            if (w == NULL) {
+                rc = AMIP_AREXX_RC_WARN;
+                break;
+            }
+            g = AmipFindGadgetById(w, (ULONG)cmd->gadgetId);
+            if (g == NULL || !AmipIsWindowOpen(w)) {
+                rc = AMIP_AREXX_RC_WARN;
+                break;
+            }
+            if (!AmipClickGadget(w, g)) {
+                rc = AMIP_AREXX_RC_FAIL;
+            }
+            break;
+        }
+
+        case AMIP_AREXX_CMD_TYPE: {
+            struct Window *w = AmipFindWindow((CONST_STRPTR)cmd->windowPattern);
+            struct Gadget *g;
+
+            if (w == NULL) {
+                rc = AMIP_AREXX_RC_WARN;
+                break;
+            }
+            g = AmipFindGadgetById(w, (ULONG)cmd->gadgetId);
+            if (g == NULL || !AmipIsWindowOpen(w)) {
+                rc = AMIP_AREXX_RC_WARN;
+                break;
+            }
+            if (!AmipClickGadget(w, g) || !AmipTypeString((CONST_STRPTR)cmd->text)) {
+                rc = AMIP_AREXX_RC_FAIL;
+            }
+            break;
+        }
+
+        case AMIP_AREXX_CMD_GETTEXT: {
+            struct Window *w = AmipFindWindow((CONST_STRPTR)cmd->windowPattern);
+
+            if (w == NULL) {
+                rc = AMIP_AREXX_RC_WARN;
+                break;
+            }
+            if (!FindGadgetText(w, (ULONG)cmd->gadgetId, g_resultBuf, sizeof(g_resultBuf))) {
+                rc = AMIP_AREXX_RC_WARN;
+                break;
+            }
+            result = g_resultBuf;
+            break;
+        }
+
+        case AMIP_AREXX_CMD_QUIT:
+            *runningOut = FALSE;
+            break;
+
+        case AMIP_AREXX_CMD_UNKNOWN:
+        default:
+            strncpy(g_resultBuf, "unknown command or bad arguments",
+                    sizeof(g_resultBuf) - 1);
+            result = g_resultBuf;
+            rc = AMIP_AREXX_RC_ERROR;
+            break;
+    }
+
+    *resultOut = result;
+    return rc;
+}
+
+/* ReadArgs template: SERIAL fits the wire transport (server/WIRE.md)
+ * alongside the always-on ARexx port; SERDEVICE/SERUNIT pick the device
+ * (default serial.device unit 0 -- a multi-port card's driver slots in
+ * by name), BAUD the line rate (default 19200: conservative for the
+ * plain-68000 floor; both ends must simply agree, and under an
+ * emulator's TCP bridge the guest-side number is inert anyway). */
+#define AMIP_ARG_TEMPLATE "SERIAL/S,SERDEVICE/K,SERUNIT/K/N,BAUD/K/N"
+enum { ARG_SERIAL, ARG_SERDEVICE, ARG_SERUNIT, ARG_BAUD, ARG_COUNT };
+
 static int RealMain(void)
 {
     struct MsgPort *arexxPort;
+    struct RDArgs *rdargs;
+    LONG argArray[ARG_COUNT] = { 0, 0, 0, 0 };
+    AmipSerial *serial = NULL;
     char portName[32];
-    ULONG rexxSig;
+    ULONG rexxSig, serialSig = 0;
     BOOL running = TRUE;
 
     IntuitionBase = (struct IntuitionBase *)OpenLibrary((CONST_STRPTR)"intuition.library", 37);
@@ -201,13 +385,48 @@ static int RealMain(void)
         AmipActionShutdown();
         goto cleanup;
     }
+
+    /* SERIAL requested but unopenable is fatal, not a degraded start: a
+     * host-driven test session must never silently run without its
+     * transport (same never-substitute philosophy as the emulator's own
+     * bridge failures). */
+    rdargs = ReadArgs((CONST_STRPTR)AMIP_ARG_TEMPLATE, argArray, NULL);
+    if (rdargs == NULL) {
+        PrintFault(IoErr(), (CONST_STRPTR)"AmiPilotServer");
+        AmipArexxClose(arexxPort);
+        AmipActionShutdown();
+        goto cleanup;
+    }
+    if (argArray[ARG_SERIAL]) {
+        const char *device = argArray[ARG_SERDEVICE] != 0
+            ? (const char *)argArray[ARG_SERDEVICE] : "serial.device";
+        LONG unit = argArray[ARG_SERUNIT] != 0
+            ? *(LONG *)argArray[ARG_SERUNIT] : 0;
+        LONG baud = argArray[ARG_BAUD] != 0
+            ? *(LONG *)argArray[ARG_BAUD] : 19200;
+        char serErr[80];
+
+        serial = AmipSerialOpen(device, unit, baud, serErr, sizeof(serErr));
+        if (serial == NULL) {
+            fprintf(stderr, "AmiPilotServer: wire transport failed: %s\n", serErr);
+            if (rdargs != NULL) {
+                FreeArgs(rdargs);
+            }
+            AmipArexxClose(arexxPort);
+            AmipActionShutdown();
+            goto cleanup;
+        }
+        serialSig = AmipSerialSigMask(serial);
+        printf("AmiPilotServer: wire on %s unit %ld at %ld baud\n",
+               device, (long)unit, (long)baud);
+    }
     printf("AmiPilotServer: ARexx port %s ready\n", portName);
     fflush(stdout);
 
     rexxSig = 1UL << arexxPort->mp_SigBit;
 
     while (running) {
-        ULONG sigs = Wait(rexxSig | SIGBREAKF_CTRL_C);
+        ULONG sigs = Wait(rexxSig | serialSig | SIGBREAKF_CTRL_C);
 
         if (sigs & SIGBREAKF_CTRL_C) {
             running = FALSE;
@@ -218,158 +437,50 @@ static int RealMain(void)
             AmipArexxParsed cmd;
 
             while ((handle = AmipArexxReceive(arexxPort, &cmd)) != NULL) {
-                int rc = AMIP_AREXX_RC_OK;
-                /* static, not stack-allocated: a Shell-launched process's
-                 * default stack is small (the classic AmigaDOS "STACK="
-                 * you'd otherwise have to remember to set on every launch
-                 * of this commodity), and treeBuf+resultBuf alone
-                 * approach 4.5KB -- confirmed the hard way, 2026-08-05:
-                 * silently overflowed the default stack, corrupting
-                 * something past the crash's own frame such that the
-                 * FIRST ARexx command handled fine (its own reply went
-                 * out correctly) but the process took an illegal-
-                 * instruction exception (Guru #80000004) before the
-                 * second could be processed -- `rx` then reported "Host
-                 * environment not found" for every later command, since
-                 * the crashed task was never servicing the port again,
-                 * a confusing downstream symptom of a stack overflow
-                 * that had nothing to do with ARexx port lookup itself.
-                 * Only one message is ever in flight at a time (this is
-                 * a single-threaded, one-message-processed-at-once event
-                 * loop), so `static` here is exactly as safe as
-                 * dynamically allocating and freeing per message, at
-                 * zero cost. */
-                static char resultBuf[AMIP_RESULT_BUF_SIZE];
-                static char treeBuf[AMIP_TREE_BUF_SIZE];
                 const char *result = NULL;
-
-                resultBuf[0] = '\0';
-
-                /* "@name" locator: resolve against the loaded manifest
-                 * into the same windowPattern/gadgetId fields the
-                 * classic form fills, so the verb handlers below run
-                 * identically for both. Unknown name / no manifest
-                 * loaded are both script errors (RC 10), same class as
-                 * a bad argument. */
-                if (cmd.manifestName[0] != '\0') {
-                    const char *title;
-                    long id;
-
-                    if (!g_manifestLoaded) {
-                        strncpy(resultBuf, "no manifest loaded", sizeof(resultBuf) - 1);
-                        AmipArexxReply(handle, AMIP_AREXX_RC_ERROR, resultBuf);
-                        continue;
-                    }
-                    if (AmipManifestResolve(&g_manifest, cmd.manifestName, &title, &id) != 0) {
-                        snprintf(resultBuf, sizeof(resultBuf), "no such name in manifest: %s",
-                                 cmd.manifestName);
-                        AmipArexxReply(handle, AMIP_AREXX_RC_ERROR, resultBuf);
-                        continue;
-                    }
-                    strncpy(cmd.windowPattern, title, sizeof(cmd.windowPattern) - 1);
-                    cmd.windowPattern[sizeof(cmd.windowPattern) - 1] = '\0';
-                    cmd.gadgetId = id;
-                }
-
-                switch (cmd.type) {
-                    case AMIP_AREXX_CMD_MANIFEST:
-                        rc = LoadManifest(cmd.path, resultBuf, sizeof(resultBuf));
-                        if (rc == AMIP_AREXX_RC_OK) {
-                            snprintf(resultBuf, sizeof(resultBuf),
-                                     "loaded %s: %d windows, %d gadgets",
-                                     g_manifest.appName, g_manifest.windowCount,
-                                     g_manifest.gadgetCount);
-                        }
-                        result = resultBuf;
-                        break;
-
-                    case AMIP_AREXX_CMD_TREE: {
-                        struct Window *w = AmipFindWindow((CONST_STRPTR)cmd.windowPattern);
-                        AmipWindowModel *model;
-
-                        if (w == NULL) {
-                            rc = AMIP_AREXX_RC_WARN;
-                            break;
-                        }
-                        model = AmipWalkWindow(w);
-                        if (model == NULL) {
-                            rc = AMIP_AREXX_RC_FAIL;
-                            break;
-                        }
-                        BuildTreeResult(model, treeBuf, sizeof(treeBuf));
-                        AmipFreeWindowModel(model);
-                        result = treeBuf;
-                        break;
-                    }
-
-                    case AMIP_AREXX_CMD_CLICK: {
-                        struct Window *w = AmipFindWindow((CONST_STRPTR)cmd.windowPattern);
-                        struct Gadget *g;
-
-                        if (w == NULL) {
-                            rc = AMIP_AREXX_RC_WARN;
-                            break;
-                        }
-                        g = AmipFindGadgetById(w, (ULONG)cmd.gadgetId);
-                        if (g == NULL || !AmipIsWindowOpen(w)) {
-                            rc = AMIP_AREXX_RC_WARN;
-                            break;
-                        }
-                        if (!AmipClickGadget(w, g)) {
-                            rc = AMIP_AREXX_RC_FAIL;
-                        }
-                        break;
-                    }
-
-                    case AMIP_AREXX_CMD_TYPE: {
-                        struct Window *w = AmipFindWindow((CONST_STRPTR)cmd.windowPattern);
-                        struct Gadget *g;
-
-                        if (w == NULL) {
-                            rc = AMIP_AREXX_RC_WARN;
-                            break;
-                        }
-                        g = AmipFindGadgetById(w, (ULONG)cmd.gadgetId);
-                        if (g == NULL || !AmipIsWindowOpen(w)) {
-                            rc = AMIP_AREXX_RC_WARN;
-                            break;
-                        }
-                        if (!AmipClickGadget(w, g) || !AmipTypeString((CONST_STRPTR)cmd.text)) {
-                            rc = AMIP_AREXX_RC_FAIL;
-                        }
-                        break;
-                    }
-
-                    case AMIP_AREXX_CMD_GETTEXT: {
-                        struct Window *w = AmipFindWindow((CONST_STRPTR)cmd.windowPattern);
-
-                        if (w == NULL) {
-                            rc = AMIP_AREXX_RC_WARN;
-                            break;
-                        }
-                        if (!FindGadgetText(w, (ULONG)cmd.gadgetId, resultBuf, sizeof(resultBuf))) {
-                            rc = AMIP_AREXX_RC_WARN;
-                            break;
-                        }
-                        result = resultBuf;
-                        break;
-                    }
-
-                    case AMIP_AREXX_CMD_QUIT:
-                        running = FALSE;
-                        break;
-
-                    case AMIP_AREXX_CMD_UNKNOWN:
-                    default:
-                        rc = AMIP_AREXX_RC_ERROR;
-                        break;
-                }
+                int rc = HandleCommand(&cmd, &result, &running);
 
                 AmipArexxReply(handle, rc, result);
             }
         }
+
+        /* The wire (server/WIRE.md): parse each complete request line
+         * with the same parser the ARexx port uses, dispatch through
+         * the same HandleCommand, frame the reply as
+         * "RC <code> <byte-count>\n" + exactly that many payload
+         * bytes. A parse failure isn't special-cased: AmipArexxParse
+         * leaves cmd.type at UNKNOWN and the dispatch maps that to
+         * RC 10 with a one-line reason, as the spec requires. QUIT
+         * replies before running goes FALSE, satisfying the spec's
+         * reply-then-exit order. */
+        if (serial != NULL && (sigs & serialSig)) {
+            const char *lineIn;
+
+            while ((lineIn = AmipSerialNextLine(serial)) != NULL) {
+                AmipArexxParsed cmd;
+                const char *result = NULL;
+                char header[32];
+                int rc;
+                ULONG payloadLen;
+
+                AmipArexxParse(lineIn, &cmd);
+                rc = HandleCommand(&cmd, &result, &running);
+
+                payloadLen = result != NULL ? strlen(result) : 0;
+                snprintf(header, sizeof(header), "RC %d %lu\n",
+                         rc, (unsigned long)payloadLen);
+                if (!AmipSerialWrite(serial, header, strlen(header)) ||
+                    !AmipSerialWrite(serial, result, payloadLen)) {
+                    fprintf(stderr, "AmiPilotServer: serial write failed\n");
+                }
+            }
+        }
     }
 
+    AmipSerialClose(serial);
+    if (rdargs != NULL) {
+        FreeArgs(rdargs);
+    }
     AmipArexxClose(arexxPort);
     AmipActionShutdown();
 
