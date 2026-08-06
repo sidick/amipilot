@@ -27,14 +27,12 @@ from __future__ import annotations
 import json
 import os
 import shlex
-import socket
 import subprocess
 import time
 
 import pytest
 
 from .client import Amipilot
-from .wire import WireClient
 
 _DEFAULT_COPPERLINE_ARGS = (
     "--model A1200 --chipset AGA --chip 2M --fast 8M --noaudio --serial tcp"
@@ -177,64 +175,16 @@ def _boot_copperline(request: "pytest.FixtureRequest", tmp_path_factory) -> _Boo
 
 
 def _connect_with_retry(host: str, port: int, deadline: float) -> Amipilot:
-    """Connects to the wire transport, tolerating the real boot delay
-    between Copperline listening and the guest's AmiPilotServer
-    actually answering.
-
-    Two real-hardware behaviours, both confirmed live against Copperline
-    rather than assumed, shape this function:
-
-    1. Copperline's serial-TCP bridge models a real serial port -- a
-       single consumer, like a physical cable. Opening a fresh TCP
-       connection per attempt (the first version of this function)
-       hung for 90+ seconds against a guest that answers within ~5s
-       when driven by hand, because each abandoned connection could
-       strand the guest's eventual reply on a socket nothing was
-       reading from anymore. So the TCP connect itself is retried
-       (cheap, and the right thing to retry -- the bridge may not be
-       listening in the first instant after the process starts), but
-       once connected, that ONE socket is held for the rest of this
-       function.
-    2. A `VERSION` sent before the guest's `AmiPilotServer` has actually
-       opened serial.device is silently dropped, not buffered --
-       confirmed live: on a held connection, the first several resends
-       got no reply at all, and the one sent right after the guest
-       caught up got a reply within the same second. So holding the
-       connection and just blocking on one long read (the second
-       version of this function) ALSO hung, because the single `VERSION`
-       it ever sent could just as easily be one of the dropped ones.
-       The fix is to keep re-sending `VERSION` on the same held
-       connection until one lands after the guest is actually reading.
-    """
-    sock: socket.socket | None = None
-    last_error: Exception | None = None
-    while time.monotonic() < deadline:
-        try:
-            sock = socket.create_connection((host, port), timeout=5)
-            break
-        except OSError as e:
-            last_error = e
-            time.sleep(0.5)
-    if sock is None:
-        raise TimeoutError(
-            f"could not reach the wire transport at {host}:{port} "
-            f"within the boot timeout"
-        ) from last_error
-
-    client = Amipilot(WireClient(sock))
-    while time.monotonic() < deadline:
-        sock.settimeout(min(max(deadline - time.monotonic(), 0.1), 3.0))
-        try:
-            client.handshake()
-            return client
-        except OSError as e:
-            last_error = e
-
-    sock.close()
-    raise TimeoutError(
-        f"connected to {host}:{port} but the VERSION handshake "
-        f"never completed within the boot timeout"
-    ) from last_error
+    """Thin wrapper over `Amipilot.connect_with_retry()` -- the same
+    connect/handshake-retry logic generalized onto the client itself
+    (see its own docstring for the two real, confirmed-live failure
+    modes it tolerates) so every caller gets it, not just this plugin.
+    Only the deadline shape differs: this plugin computes an absolute
+    monotonic deadline up front (shared with the boot-timeout wait
+    above it), while the client's own public method takes a duration."""
+    return Amipilot.connect_with_retry(
+        host, port, deadline_seconds=max(deadline - time.monotonic(), 0.0)
+    )
 
 
 @pytest.fixture(scope="session")

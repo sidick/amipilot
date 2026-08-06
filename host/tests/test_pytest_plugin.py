@@ -10,12 +10,12 @@ emulator, matching every other file in host/tests.
 """
 
 import os
-import socket
 import subprocess
 import time
 
 import pytest
 
+from amipilot.client import Amipilot  # noqa: E402
 from amipilot.pytest_plugin import (  # noqa: E402
     _DEFAULT_COPPERLINE_ARGS,
     _boot_copperline,
@@ -119,108 +119,34 @@ class TestBootCopperline:
             _boot_copperline(request, FakeTmpPathFactory(tmp_path))
 
 
-class FakeSocket:
-    """A connected-socket stand-in exercising the real path
-    _connect_with_retry uses post-connect: settimeout/sendall/recv/
-    close, no TCP involved. `response` is what a VERSION command gets
-    back, fed to recv() in the chunks listed in `chunks` (default: all
-    at once)."""
-
-    def __init__(self, response: bytes, chunks=None):
-        self._response = response
-        self._chunks = list(chunks) if chunks is not None else [response]
-        self.closed = False
-
-    def settimeout(self, _t):
-        pass
-
-    def sendall(self, _data):
-        pass
-
-    def recv(self, _n):
-        if not self._chunks:
-            # Matches real socket.settimeout() expiry (a TimeoutError,
-            # an OSError subclass) -- the actual failure mode when the
-            # guest hasn't answered yet, not a closed-connection EOF.
-            raise TimeoutError("timed out")
-        return self._chunks.pop(0)
-
-    def close(self):
-        self.closed = True
-
-
-VERSION_PAYLOAD = (
-    b"AMIPILOT 0.3 PROTOCOL 1\n"
-    b"STABLE VERSION\n"
-    b"EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST QUIT\n"
-)
-
-
 class TestConnectWithRetry:
-    """Covers the real shape: retry only the TCP connect (cheap, and
-    the only step that's expected to transiently fail before Copperline
-    is listening), then hold that ONE connection for the handshake --
-    see _connect_with_retry's own docstring for why reconnecting per
-    attempt is wrong (it can strand the guest's reply on an abandoned
-    socket, confirmed against a real Copperline boot)."""
+    """_connect_with_retry() is a thin wrapper over
+    Amipilot.connect_with_retry() (host/amipilot/client.py), which
+    carries the real logic and its own thorough test coverage
+    (host/tests/test_client.py) -- this just confirms the wrapper
+    converts its absolute deadline into the shared method's duration
+    correctly and returns a working client, not a duplicate of that
+    coverage."""
 
-    def test_succeeds_after_transient_connect_refusals(self, monkeypatch):
-        attempts = {"n": 0}
-        fake_sock = FakeSocket(b"RC 0 %d\n%s" % (len(VERSION_PAYLOAD), VERSION_PAYLOAD))
+    def test_delegates_to_amipilot_connect_with_retry(self, monkeypatch):
+        received = {}
 
-        def fake_create_connection(addr, timeout=10.0):
-            attempts["n"] += 1
-            if attempts["n"] < 3:
-                raise OSError("connection refused")
-            return fake_sock
+        def fake_connect_with_retry(host, port, deadline_seconds=60.0, **kw):
+            received["host"] = host
+            received["port"] = port
+            received["deadline_seconds"] = deadline_seconds
+            return "CLIENT-STUB"
 
-        monkeypatch.setattr(socket, "create_connection", fake_create_connection)
-        monkeypatch.setattr(time, "sleep", lambda _s: None)
+        monkeypatch.setattr(Amipilot, "connect_with_retry",
+                             classmethod(lambda cls, *a, **kw: fake_connect_with_retry(*a, **kw)))
 
-        client = _connect_with_retry("127.0.0.1", 1234, time.monotonic() + 5)
-        assert attempts["n"] == 3
-        assert client.info.protocol == 1
-        assert not fake_sock.closed  # the handshake connection is kept, not torn down
+        deadline = time.monotonic() + 5
+        result = _connect_with_retry("127.0.0.1", 1234, deadline)
 
-    def test_reuses_the_same_socket_for_the_handshake_not_a_new_one(self, monkeypatch):
-        """The bug this guards: an earlier version reconnected on every
-        attempt, including after a successful TCP connect whose
-        handshake just hadn't arrived yet -- which can abandon the
-        socket the guest's reply actually lands on. create_connection
-        must be called exactly once here, not once per handshake
-        timeout."""
-        calls = {"n": 0}
-        fake_sock = FakeSocket(b"RC 0 %d\n%s" % (len(VERSION_PAYLOAD), VERSION_PAYLOAD))
-
-        def fake_create_connection(addr, timeout=10.0):
-            calls["n"] += 1
-            return fake_sock
-
-        monkeypatch.setattr(socket, "create_connection", fake_create_connection)
-        monkeypatch.setattr(time, "sleep", lambda _s: None)
-
-        _connect_with_retry("127.0.0.1", 1234, time.monotonic() + 5)
-        assert calls["n"] == 1
-
-    def test_raises_timeout_when_connect_never_succeeds(self, monkeypatch):
-        def always_refuses(addr, timeout=10.0):
-            raise OSError("connection refused")
-
-        monkeypatch.setattr(socket, "create_connection", always_refuses)
-        monkeypatch.setattr(time, "sleep", lambda _s: None)
-
-        with pytest.raises(TimeoutError, match="could not reach the wire transport"):
-            _connect_with_retry("127.0.0.1", 1234, time.monotonic() - 1)
-
-    def test_raises_timeout_when_handshake_never_completes(self, monkeypatch):
-        fake_sock = FakeSocket(b"", chunks=[])  # recv() always returns b"" (EOF-like)
-
-        monkeypatch.setattr(socket, "create_connection", lambda addr, timeout=10.0: fake_sock)
-        monkeypatch.setattr(time, "sleep", lambda _s: None)
-
-        with pytest.raises(TimeoutError, match="handshake never completed"):
-            _connect_with_retry("127.0.0.1", 1234, time.monotonic() + 0.1)
-        assert fake_sock.closed  # the abandoned connection is cleaned up on this path
+        assert result == "CLIENT-STUB"
+        assert received["host"] == "127.0.0.1"
+        assert received["port"] == 1234
+        assert 4.0 < received["deadline_seconds"] <= 5.0
 
 
 class TestFixtureWiring:

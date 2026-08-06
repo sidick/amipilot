@@ -3,8 +3,11 @@
 to-exception mapping per server/WIRE.md's RC policy. No emulator."""
 
 import os
+import socket
 import sys
+import time
 import unittest
+from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
@@ -118,6 +121,100 @@ class Verbs(unittest.TestCase):
     def test_quit_does_not_raise_on_ok(self):
         c = client_with(b"RC 0 0\n")
         c.quit()
+
+
+class FakeSocket:
+    """A connected-socket stand-in for connect_with_retry's post-
+    connect path: settimeout/sendall/recv/close, no real TCP. `chunks`
+    are handed out one per recv() call; once exhausted, recv() raises
+    a TimeoutError (matching real socket.settimeout() expiry -- the
+    actual failure mode when the far end hasn't answered yet, not a
+    closed-connection EOF)."""
+
+    def __init__(self, chunks=()):
+        self._chunks = list(chunks)
+        self.closed = False
+
+    def settimeout(self, _t):
+        pass
+
+    def sendall(self, _data):
+        pass
+
+    def recv(self, _n):
+        if not self._chunks:
+            raise TimeoutError("timed out")
+        return self._chunks.pop(0)
+
+    def close(self):
+        self.closed = True
+
+
+VERSION_PAYLOAD = (
+    b"AMIPILOT 0.3 PROTOCOL 1\n"
+    b"STABLE VERSION\n"
+    b"EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST QUIT\n"
+)
+
+
+class ConnectWithRetry(unittest.TestCase):
+    """Covers the two real, confirmed-live failure modes
+    connect_with_retry() tolerates (see its own docstring): transient
+    connect refusals, and a held connection needing VERSION resent
+    until the far end is truly ready -- not a fresh reconnect per
+    attempt, which risks stranding a genuine reply. No real sockets;
+    socket.create_connection is patched directly."""
+
+    def test_succeeds_after_transient_connect_refusals(self):
+        attempts = {"n": 0}
+        fake_sock = FakeSocket([b"RC 0 %d\n%s" % (len(VERSION_PAYLOAD), VERSION_PAYLOAD)])
+
+        def fake_create_connection(addr, timeout=10.0):
+            attempts["n"] += 1
+            if attempts["n"] < 3:
+                raise OSError("connection refused")
+            return fake_sock
+
+        with mock.patch.object(socket, "create_connection", fake_create_connection), \
+             mock.patch.object(time, "sleep", lambda _s: None):
+            client = Amipilot.connect_with_retry("127.0.0.1", 1234, deadline_seconds=5)
+
+        self.assertEqual(attempts["n"], 3)
+        self.assertEqual(client.info.protocol, 1)
+        self.assertFalse(fake_sock.closed)
+
+    def test_reuses_the_same_socket_not_a_new_one_per_attempt(self):
+        calls = {"n": 0}
+        fake_sock = FakeSocket([b"RC 0 %d\n%s" % (len(VERSION_PAYLOAD), VERSION_PAYLOAD)])
+
+        def fake_create_connection(addr, timeout=10.0):
+            calls["n"] += 1
+            return fake_sock
+
+        with mock.patch.object(socket, "create_connection", fake_create_connection), \
+             mock.patch.object(time, "sleep", lambda _s: None):
+            Amipilot.connect_with_retry("127.0.0.1", 1234, deadline_seconds=5)
+
+        self.assertEqual(calls["n"], 1)
+
+    def test_raises_timeout_when_connect_never_succeeds(self):
+        def always_refuses(addr, timeout=10.0):
+            raise OSError("connection refused")
+
+        with mock.patch.object(socket, "create_connection", always_refuses), \
+             mock.patch.object(time, "sleep", lambda _s: None):
+            with self.assertRaisesRegex(TimeoutError, "could not reach the wire transport"):
+                Amipilot.connect_with_retry("127.0.0.1", 1234, deadline_seconds=0)
+
+    def test_raises_timeout_when_handshake_never_completes(self):
+        fake_sock = FakeSocket([])  # recv() always times out
+
+        with mock.patch.object(socket, "create_connection",
+                                lambda addr, timeout=10.0: fake_sock), \
+             mock.patch.object(time, "sleep", lambda _s: None):
+            with self.assertRaisesRegex(TimeoutError, "never answered VERSION"):
+                Amipilot.connect_with_retry("127.0.0.1", 1234, deadline_seconds=0.1)
+        self.assertTrue(fake_sock.closed)
 
 
 if __name__ == "__main__":

@@ -1,10 +1,11 @@
-# Wire Protocol (serial)
+# Wire Protocol
 
-From 0.3, `AmiPilotServer` can carry its whole command set over
-serial.device as well as ARexx — same verbs, same arguments, same
-`@name` manifest locators — so a **host machine** (or anything else on
-the far end of a serial cable) can drive Amiga GUIs. This page is the
-practical guide; the formal contract is
+From 0.3, `AmiPilotServer` can carry its whole command set over a byte
+stream as well as ARexx — same verbs, same arguments, same `@name`
+manifest locators — so a **host machine** can drive Amiga GUIs. Two
+transports carry it: serial.device (0.3) and, from 0.4, TCP via
+bsdsocket.library. This page is the practical guide; the formal
+contract is
 [`server/WIRE.md`](https://github.com/sidick/amipilot/blob/main/server/WIRE.md)
 in the repository.
 
@@ -12,26 +13,39 @@ in the repository.
 
 ```
 > Run AmiPilotServer SERIAL
+> Run AmiPilotServer TCP TCPPORT=6800
+> Run AmiPilotServer SERIAL TCP TCPPORT=6800
 ```
 
-Options (ReadArgs template `SERIAL/S,SERDEVICE/K,SERUNIT/K/N,BAUD/K/N`):
+`SERIAL` and `TCP` are independent — enable either or both. Options
+(ReadArgs template `SERIAL/S,SERDEVICE/K,SERUNIT/K/N,BAUD/K/N,TCP/S,
+TCPPORT/K/N`):
 
 | Argument | Default | Meaning |
 |----------|---------|---------|
-| `SERIAL` | off | Enable the wire transport (the ARexx port is always on) |
+| `SERIAL` | off | Enable the serial.device transport (the ARexx port is always on) |
 | `SERDEVICE` | `serial.device` | Device driver — name a multi-port card's driver here |
 | `SERUNIT` | `0` | Device unit |
 | `BAUD` | `19200` | Line rate; both ends must agree. 19200 is a safe floor for a plain 68000; faster CPUs handle more |
+| `TCP` | off | Enable the TCP transport (bsdsocket.library) |
+| `TCPPORT` | *(required with `TCP`)* | Listen port |
 
-The line is 8N1 with xon/xoff **disabled** (responses are binary-safe;
-software flow control would corrupt them). If the serial device can't be
-opened, the server exits with an error rather than silently running
-without its transport.
+The serial line is 8N1 with xon/xoff **disabled** (responses are
+binary-safe; software flow control would corrupt them). TCP is
+listen-mode only today — the server binds and listens, the host
+connects in, and only one connection is treated as active at a time (a
+new one replaces the old). If a requested transport can't be opened,
+the server exits with an error rather than silently running without
+it.
 
-Under an emulator you usually don't need a real cable: Copperline's
-`[serial] mode = "tcp"` (or `--serial tcp`) bridges the guest's serial
-port to a host TCP socket (default `127.0.0.1:1234`), which is exactly
-what the host test harness uses.
+Under an emulator you usually don't need a real cable or a network
+bridge for the *serial* transport: Copperline's `[serial] mode = "tcp"`
+(or `--serial tcp`) bridges the guest's serial port to a host TCP
+socket (default `127.0.0.1:1234`), which is exactly what the host test
+harness uses. Reaching the *TCP* transport instead needs the guest's
+own network reachable from the host — Copperline's `[hostsocket]`
+board bridged to a real or virtual adapter, or a real Amiga with
+TCP/IP on the LAN.
 
 ## Talking to it
 

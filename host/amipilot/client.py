@@ -13,6 +13,9 @@ has no escaping) -- same limitation, not a new one.
 
 from __future__ import annotations
 
+import socket
+import time
+
 from .model import Window, parse_tree
 from .wire import RC_ERROR, RC_FAIL, RC_OK, RC_WARN, Reply, ServerInfo, WireClient
 
@@ -60,9 +63,79 @@ class Amipilot:
 
     @classmethod
     def connect(cls, host: str, port: int, timeout: float = 10.0) -> "Amipilot":
+        """A single connection attempt -- raises immediately on
+        failure. Use `connect_with_retry()` instead for a link that
+        may still be settling (a guest mid-boot, a fresh emulator
+        bridge, a real cable with noise): raw connect/recv errors
+        there are common and expected, not exceptional."""
         client = cls(WireClient.connect(host, port, timeout=timeout))
         client.handshake()
         return client
+
+    @classmethod
+    def connect_with_retry(
+        cls,
+        host: str,
+        port: int,
+        deadline_seconds: float = 60.0,
+        connect_timeout: float = 5.0,
+    ) -> "Amipilot":
+        """Tolerates two real, confirmed-live failure modes a fresh
+        or flaky link can show (server/WIRE.md's transport is young
+        enough that callers still hit these by hand rather than
+        through a purpose-built retry path -- this is that path):
+
+        1. The TCP connect itself may be transiently refused or reset
+           while the far end is still starting up (a guest mid-boot,
+           an emulator bridge settling). Retried with a short pause
+           between attempts.
+        2. Once connected, the first command sent may go unanswered
+           -- if the far end's own transport wasn't fully ready the
+           instant the socket connected, the bytes can be silently
+           dropped rather than buffered (confirmed against a real
+           Copperline hostsocket bridge, 2026-08-06). The fix is to
+           keep re-sending VERSION on the SAME held connection rather
+           than reconnecting: reconnecting risks a genuine in-flight
+           reply landing on a socket nothing is reading from anymore.
+
+        Raises TimeoutError with a clear, single-line reason once
+        `deadline_seconds` elapses -- never a raw socket traceback --
+        chained from the last underlying error via `__cause__` for
+        anyone who wants the detail.
+        """
+        deadline = time.monotonic() + deadline_seconds
+        sock: socket.socket | None = None
+        last_error: Exception | None = None
+
+        while time.monotonic() < deadline:
+            try:
+                sock = socket.create_connection((host, port), timeout=connect_timeout)
+                break
+            except OSError as e:
+                last_error = e
+                time.sleep(0.5)
+        if sock is None:
+            raise TimeoutError(
+                f"could not reach the wire transport at {host}:{port} "
+                f"within {deadline_seconds:.0f}s -- is the server running "
+                f"and the address/port correct?"
+            ) from last_error
+
+        client = cls(WireClient(sock))
+        while time.monotonic() < deadline:
+            sock.settimeout(min(max(deadline - time.monotonic(), 0.1), 3.0))
+            try:
+                client.handshake()
+                return client
+            except OSError as e:
+                last_error = e
+
+        sock.close()
+        raise TimeoutError(
+            f"connected to {host}:{port} but the server never answered "
+            f"VERSION within {deadline_seconds:.0f}s -- it may still be "
+            f"starting up, or something upstream is dropping traffic"
+        ) from last_error
 
     def close(self) -> None:
         self._wire.close()

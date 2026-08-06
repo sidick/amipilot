@@ -17,6 +17,11 @@
  * (arexx_cmd.c) and one dispatch (HandleCommand below) serve both
  * transports; the serial layer (serial.c) only moves bytes and lines.
  *
+ * Phase 0.4 adds a second wire carrier: TCP (TCP/TCPPORT switches,
+ * bsdsocket.library, tcp.c) -- same framing, same dispatch, so
+ * real-hardware Amigas with TCP/IP and emulators without a serial
+ * bridge (e.g. NAT-only networking) both reach the wire.
+ *
  * Runs as an ordinary CLI/Shell process, not (yet) a commodities.library
  * broker -- AmipClickGadget() already brings its own target window/
  * screen forward, so there's no icon-in-the-Exchange-list requirement
@@ -32,6 +37,7 @@
 #include <proto/dos.h>
 #include <proto/intuition.h>
 #include <proto/rexxsyslib.h>
+#include <proto/bsdsocket.h>
 #include <stdio.h>
 #include <string.h>
 
@@ -40,6 +46,7 @@
 #include "intuition_model.h"
 #include "manifest.h"
 #include "serial.h"
+#include "tcp.h"
 
 #define STR(s)  #s
 #define XSTR(s) STR(s)
@@ -68,6 +75,14 @@ struct Library *GadToolsBase = NULL;
 /* Consumed by AmipTypeString() (MapANSI). Optional -- TYPE just fails
  * (AMIP_AREXX_RC_FAIL) if it's absent; TREE/CLICK/GETTEXT don't need it. */
 struct Library *KeymapBase = NULL;
+/* Consumed by tcp.c's socket calls -- proto/bsdsocket.h's own extern
+ * declaration expects exactly this name. Only opened when TCP is
+ * requested (see RealMain); always initialized regardless, per this
+ * project's own hard-won rule about library-base globals (CLAUDE.md,
+ * "Always initialize library-base globals") -- an uninitialized
+ * `struct Library *FooBase;` is a COMMON symbol libnix's own archive
+ * can silently pull in an auto-open constructor for. */
+struct Library *SocketBase = NULL;
 
 #define AMIP_TREE_BUF_SIZE 4096
 #define AMIP_RESULT_BUF_SIZE 320
@@ -347,16 +362,26 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
  * (default serial.device unit 0 -- a multi-port card's driver slots in
  * by name), BAUD the line rate (default 19200: conservative for the
  * plain-68000 floor; both ends must simply agree, and under an
- * emulator's TCP bridge the guest-side number is inert anyway). */
-#define AMIP_ARG_TEMPLATE "SERIAL/S,SERDEVICE/K,SERUNIT/K/N,BAUD/K/N"
-enum { ARG_SERIAL, ARG_SERDEVICE, ARG_SERUNIT, ARG_BAUD, ARG_COUNT };
+ * emulator's TCP bridge the guest-side number is inert anyway). TCP
+ * fits the same wire over bsdsocket.library instead; TCPPORT picks the
+ * listen port (no canonical default port is claimed for this project
+ * yet, so one must be given explicitly -- see server/README.md). SERIAL
+ * and TCP are independent and either or both may be given at once. */
+#define AMIP_ARG_TEMPLATE \
+    "SERIAL/S,SERDEVICE/K,SERUNIT/K/N,BAUD/K/N,TCP/S,TCPPORT/K/N"
+enum {
+    ARG_SERIAL, ARG_SERDEVICE, ARG_SERUNIT, ARG_BAUD,
+    ARG_TCP, ARG_TCPPORT,
+    ARG_COUNT
+};
 
 static int RealMain(void)
 {
     struct MsgPort *arexxPort;
     struct RDArgs *rdargs;
-    LONG argArray[ARG_COUNT] = { 0, 0, 0, 0 };
+    LONG argArray[ARG_COUNT] = { 0, 0, 0, 0, 0, 0 };
     AmipSerial *serial = NULL;
+    AmipTcp *tcp = NULL;
     char portName[32];
     ULONG rexxSig, serialSig = 0;
     BOOL running = TRUE;
@@ -420,13 +445,58 @@ static int RealMain(void)
         printf("AmiPilotServer: wire on %s unit %ld at %ld baud\n",
                device, (long)unit, (long)baud);
     }
+    /* TCP requested but unopenable is fatal too, same rationale as
+     * SERIAL above -- both are genuine requests for the wire, not
+     * best-effort extras. */
+    if (argArray[ARG_TCP]) {
+        LONG port = argArray[ARG_TCPPORT] != 0 ? *(LONG *)argArray[ARG_TCPPORT] : 0;
+        char tcpErr[80];
+
+        if (port == 0) {
+            fprintf(stderr, "AmiPilotServer: TCP requires TCPPORT\n");
+            AmipSerialClose(serial);
+            FreeArgs(rdargs);
+            AmipArexxClose(arexxPort);
+            AmipActionShutdown();
+            goto cleanup;
+        }
+
+        SocketBase = OpenLibrary((CONST_STRPTR)"bsdsocket.library", 0);
+        if (SocketBase == NULL) {
+            fprintf(stderr, "AmiPilotServer: TCP requires bsdsocket.library\n");
+            AmipSerialClose(serial);
+            FreeArgs(rdargs);
+            AmipArexxClose(arexxPort);
+            AmipActionShutdown();
+            goto cleanup;
+        }
+
+        tcp = AmipTcpOpen(port, tcpErr, sizeof(tcpErr));
+        if (tcp == NULL) {
+            fprintf(stderr, "AmiPilotServer: wire transport failed: %s\n", tcpErr);
+            AmipSerialClose(serial);
+            FreeArgs(rdargs);
+            AmipArexxClose(arexxPort);
+            AmipActionShutdown();
+            goto cleanup;
+        }
+        printf("AmiPilotServer: wire on TCP port %ld\n", (long)port);
+    }
     printf("AmiPilotServer: ARexx port %s ready\n", portName);
     fflush(stdout);
 
     rexxSig = 1UL << arexxPort->mp_SigBit;
 
     while (running) {
-        ULONG sigs = Wait(rexxSig | serialSig | SIGBREAKF_CTRL_C);
+        /* TCP's readiness is driven by WaitSelect() (tcp.c's own header
+         * comment has the full story: the more obvious SBTC_SIGEVENTMASK
+         * async-signal mechanism reported success but never actually
+         * delivered a signal when tested live), which is itself the
+         * blocking call -- when TCP is active it replaces this plain
+         * Wait() outright rather than contributing a signal bit to it. */
+        ULONG sigs = tcp != NULL
+            ? AmipTcpWait(tcp, rexxSig | serialSig | SIGBREAKF_CTRL_C)
+            : Wait(rexxSig | serialSig | SIGBREAKF_CTRL_C);
 
         if (sigs & SIGBREAKF_CTRL_C) {
             running = FALSE;
@@ -475,8 +545,41 @@ static int RealMain(void)
                 }
             }
         }
+
+        /* Same wire, same dispatch, TCP carrier -- see the serial
+         * block above for the shared framing rationale. Unconditional
+         * on `tcp != NULL`, not gated on a signal bit: AmipTcpWait()
+         * above already did the actual accept()/recv() work (its own
+         * blocking call replaces Wait() outright when TCP is active --
+         * see tcp.h), so any newly available lines are already
+         * buffered here regardless of what `sigs` reports; draining
+         * with nothing buffered is just an immediate NULL, not a
+         * wasted blocking call. */
+        if (tcp != NULL) {
+            const char *lineIn;
+
+            while ((lineIn = AmipTcpNextLine(tcp)) != NULL) {
+                AmipArexxParsed cmd;
+                const char *result = NULL;
+                char header[32];
+                int rc;
+                ULONG payloadLen;
+
+                AmipArexxParse(lineIn, &cmd);
+                rc = HandleCommand(&cmd, &result, &running);
+
+                payloadLen = result != NULL ? strlen(result) : 0;
+                snprintf(header, sizeof(header), "RC %d %lu\n",
+                         rc, (unsigned long)payloadLen);
+                if (!AmipTcpWrite(tcp, header, strlen(header)) ||
+                    !AmipTcpWrite(tcp, result, payloadLen)) {
+                    fprintf(stderr, "AmiPilotServer: TCP write failed\n");
+                }
+            }
+        }
     }
 
+    AmipTcpClose(tcp);
     AmipSerialClose(serial);
     if (rdargs != NULL) {
         FreeArgs(rdargs);
@@ -485,6 +588,9 @@ static int RealMain(void)
     AmipActionShutdown();
 
 cleanup:
+    if (SocketBase != NULL) {
+        CloseLibrary(SocketBase);
+    }
     if (RexxSysBase != NULL) {
         CloseLibrary((struct Library *)RexxSysBase);
     }

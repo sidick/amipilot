@@ -78,7 +78,8 @@ SETMOUSE_BIN    := $(BUILD)/AmiSetMouse
 # meant to ship; kept under `server` rather than `amiga`/`build` for now
 # because phase 0.2 isn't tagged yet, not because it's a throwaway tool.
 AREXX_SRC       := $(ACTION_SRCDIR)/arexx.c $(ACTION_SRCDIR)/arexx_cmd.c \
-                   $(ACTION_SRCDIR)/manifest.c $(ACTION_SRCDIR)/serial.c
+                   $(ACTION_SRCDIR)/manifest.c $(ACTION_SRCDIR)/serial.c \
+                   $(ACTION_SRCDIR)/tcp.c
 AMIPILOTD_SRCDIR := server/src/amipilotserver
 AMIPILOTD_BIN    := $(BUILD)/AmiPilotServer
 
