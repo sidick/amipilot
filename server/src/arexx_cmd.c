@@ -19,6 +19,18 @@ static int ci_streq(const char *a, const char *b)
     return *a == '\0' && *b == '\0';
 }
 
+/* ASCII case-insensitive prefix compare: does `s` start with `prefix`? */
+static int ci_streq_prefix(const char *s, const char *prefix)
+{
+    for (; *prefix; s++, prefix++) {
+        int cs = *s, cp = *prefix;
+        if (cs >= 'a' && cs <= 'z') cs -= 32;
+        if (cp >= 'a' && cp <= 'z') cp -= 32;
+        if (cs != cp) return 0;
+    }
+    return 1;
+}
+
 static const char *skip_ws(const char *p)
 {
     while (*p == ' ' || *p == '\t') p++;
@@ -70,6 +82,7 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
     else if (ci_streq(kw, "GETTEXT"))  out->type = AMIP_AREXX_CMD_GETTEXT;
     else if (ci_streq(kw, "MANIFEST")) out->type = AMIP_AREXX_CMD_MANIFEST;
     else if (ci_streq(kw, "VERSION"))  out->type = AMIP_AREXX_CMD_VERSION;
+    else if (ci_streq(kw, "LAUNCH"))   out->type = AMIP_AREXX_CMD_LAUNCH;
     else if (ci_streq(kw, "QUIT"))     out->type = AMIP_AREXX_CMD_QUIT;
     else { out->type = AMIP_AREXX_CMD_UNKNOWN; return -1; }
 
@@ -84,6 +97,38 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
             return -1;
         }
         read_token(p, out->path, sizeof(out->path));
+        return 0;
+    }
+
+    if (out->type == AMIP_AREXX_CMD_LAUNCH) {
+        p = skip_ws(p);
+        if (*p == '\0') {
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+        if (ci_streq_prefix(p, "STACK=")) {
+            char numbuf[16];
+            const char *numStart = p + 6; /* strlen("STACK=") */
+            const char *numEnd = numStart;
+            while (*numEnd && *numEnd != ' ' && *numEnd != '\t') numEnd++;
+            if (numEnd == numStart || (size_t)(numEnd - numStart) >= sizeof(numbuf)) {
+                out->type = AMIP_AREXX_CMD_UNKNOWN;
+                return -1;
+            }
+            memcpy(numbuf, numStart, (size_t)(numEnd - numStart));
+            numbuf[numEnd - numStart] = '\0';
+            out->stackSize = strtol(numbuf, NULL, 10);
+            p = skip_ws(numEnd);
+        }
+        if (*p == '\0') {
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+        /* Verbatim rest-of-line, same as TYPE's text -- the command
+         * line is Shell syntax handed to SystemTagList() as-is, not
+         * re-tokenized by this parser. */
+        strncpy(out->command, p, sizeof(out->command) - 1);
+        out->command[sizeof(out->command) - 1] = '\0';
         return 0;
     }
 

@@ -33,6 +33,7 @@
 #include <exec/tasks.h>
 #include <intuition/intuition.h>
 #include <dos/dos.h>
+#include <dos/dostags.h>
 #include <proto/exec.h>
 #include <proto/dos.h>
 #include <proto/intuition.h>
@@ -264,7 +265,7 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
             snprintf(g_resultBuf, sizeof(g_resultBuf),
                      "AMIPILOT " XSTR(VERSION) "." XSTR(REVISION) " PROTOCOL 1\n"
                      "STABLE VERSION\n"
-                     "EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST QUIT\n");
+                     "EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH QUIT\n");
             result = g_resultBuf;
             break;
 
@@ -337,6 +338,66 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                 break;
             }
             result = g_resultBuf;
+            break;
+        }
+
+        case AMIP_AREXX_CMD_LAUNCH: {
+            BPTR input, output;
+            struct TagItem tags[5];
+            int nTags = 0;
+            LONG sysResult;
+
+            /* Explicit NIL: handles, not defaulted: SystemTagList()'s
+             * own docs say an async launch closes the caller's
+             * Input()/Output() on completion "even if these were your
+             * Input() and Output()!" -- leaving SYS_Input/SYS_Output
+             * unset would eventually close AmiPilotServer's own
+             * stdio. No output capture yet (phase 0.4 follow-up, see
+             * server/README.md); the child's output goes to NIL:. */
+            input = Open((CONST_STRPTR)"NIL:", MODE_OLDFILE);
+            if (input == 0) {
+                rc = AMIP_AREXX_RC_FAIL;
+                strncpy(g_resultBuf, "could not open NIL: for input",
+                        sizeof(g_resultBuf) - 1);
+                result = g_resultBuf;
+                break;
+            }
+            output = Open((CONST_STRPTR)"NIL:", MODE_NEWFILE);
+            if (output == 0) {
+                Close(input);
+                rc = AMIP_AREXX_RC_FAIL;
+                strncpy(g_resultBuf, "could not open NIL: for output",
+                        sizeof(g_resultBuf) - 1);
+                result = g_resultBuf;
+                break;
+            }
+
+            tags[nTags].ti_Tag = SYS_Input;  tags[nTags++].ti_Data = (ULONG)input;
+            tags[nTags].ti_Tag = SYS_Output; tags[nTags++].ti_Data = (ULONG)output;
+            tags[nTags].ti_Tag = SYS_Asynch; tags[nTags++].ti_Data = TRUE;
+            if (cmd->stackSize > 0) {
+                tags[nTags].ti_Tag = NP_StackSize;
+                tags[nTags++].ti_Data = (ULONG)cmd->stackSize;
+            }
+            tags[nTags].ti_Tag = TAG_DONE; tags[nTags++].ti_Data = 0;
+
+            /* Asynchronous launch: SystemTagList() returns as soon as
+             * the shell process itself is created, 0 for success or
+             * -1 if dos couldn't create it at all (out of memory, no
+             * process slot) -- NOT the eventual exit code, and NOT
+             * proof the command was found. A bad command name still
+             * returns 0 here; the spawned shell reports that failure
+             * on its own (discarded) output stream. Real command-
+             * found verification and exit-code retrieval need the
+             * proc-wait verb this phase's own plan section calls for
+             * separately -- not invented here ahead of it. */
+            sysResult = SystemTagList((CONST_STRPTR)cmd->command, tags);
+            if (sysResult != 0) {
+                rc = AMIP_AREXX_RC_FAIL;
+                strncpy(g_resultBuf, "launch failed (out of memory or no process slot)",
+                        sizeof(g_resultBuf) - 1);
+                result = g_resultBuf;
+            }
             break;
         }
 
