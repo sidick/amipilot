@@ -17,9 +17,20 @@ sides stay binary-safe with zero escaping and a 68000-friendly parser.
   framing makes the stream binary-safe; software flow control would eat
   XON/XOFF bytes out of payloads). Baud is a deployment choice
   (`AmiPilotServer BAUD=n`, default 19200); both ends must simply agree.
+- Phase 0.4: TCP via bsdsocket.library (`AmiPilotServer TCP
+  TCPPORT=n`), listen-mode only — the server binds and listens,
+  the host connects in. One connection is treated as active at a
+  time (a new one replaces the old); see `server/README.md` for the
+  full option set and what's verified. A guest-initiated (dial-out)
+  mode — the Amiga connecting out to a configured host, useful for
+  real hardware or an emulator behind NAT with no inbound path — is
+  a proposed future addition, not yet built (tracked as
+  [amipilot#12](https://github.com/sidick/amipilot/issues/12)); the
+  framing and dispatch below apply unchanged either way, only the
+  connection's *direction* would differ.
 - The protocol itself is transport-agnostic: anything that carries a
   byte stream in each direction (Copperline's `[serial] mode = "tcp"`
-  bridge, a null-modem cable, later a TCP socket) carries it unchanged.
+  bridge, a null-modem cable, a TCP socket) carries it unchanged.
 
 ## Requests
 
@@ -84,9 +95,12 @@ string) so on-Amiga scripts can feature-test too.
 ## Sessions and lifecycle
 
 Serial has no connection concept: the server services whatever arrives,
-whenever it arrives, and a client can attach mid-run. State on the
-server (the loaded manifest) is global, not per-connection — one test
-session at a time is the model, same as the ARexx port.
+whenever it arrives, and a client can attach mid-run. TCP does have a
+connection concept, but the policy is the same shape: only one
+connection is active at a time (a new one replaces whatever was
+connected before, closing it first). State on the server (the loaded
+manifest) is global, not per-connection either way — one test session
+at a time is the model, same as the ARexx port.
 
 `QUIT` replies (`RC 0 0`) before the server exits.
 
