@@ -37,7 +37,11 @@ match wins. Quote it if it contains spaces.
 | `TYPE` | `<window-pattern> <gadget-id> <text...>` | Clicks the gadget (to focus it), then types `text` into it via real `IECLASS_RAWKEY` events, human-paced. Everything after the gadget ID is taken verbatim as the text — no quoting needed unless the text itself starts with `"`. |
 | `GETTEXT` | `<window-pattern> <gadget-id>` | Returns that gadget's current text: a string/integer gadget's live value if it has one, otherwise its label. |
 | `MANIFEST` | `<file-path>` | Loads an application's manifest (see below). Replaces any previously loaded one. `RESULT` reports what loaded (`loaded GTApp: 1 windows, 3 gadgets`); a rejected manifest returns `RC=10` with the reason (including line number) in `RESULT`. |
+| `VERSION` | (none) | Returns the server version, wire-protocol number, and the stable/experimental verb lists (multi-line, same payload the [wire handshake](Wire-Protocol.md) uses) — for feature-testing from a script. |
 | `QUIT` | (none) | Shuts the commodity down cleanly. |
+
+The same command set is also reachable from a host machine over
+serial.device — see [Wire Protocol](Wire-Protocol.md).
 
 ## Manifest locators
 

@@ -55,6 +55,7 @@ nav:
       - Locator Tiers and Limits: Locator-Tiers-and-Limits.md
   - Driving GUIs:
       - ARexx Reference: ARexx-Reference.md
+      - Wire Protocol: Wire-Protocol.md
   - Help:
       - Troubleshooting and FAQ: Troubleshooting-and-FAQ.md
       - Building and Testing: Building-and-Testing.md

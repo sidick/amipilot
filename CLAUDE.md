@@ -13,16 +13,20 @@ protocol, and phase sequencing live in `docs/implementation-plan.md` —
 read that before making architectural decisions; this file only covers
 what's needed to build and navigate the code day to day.
 
-**Current state:** v0.1 released; phase 0.2 (the server commodity, ARexx
-transport) in progress on main. `intuition-model/` (the walker library)
-and `amiinspect/` (the Shell command) are real, building, and verified
-on-target. `server/` is real too now: the action engine
-(`server/src/action.c`, click/type/geometry) and `AmiPilotServer`
+**Current state:** v0.2 released; phase 0.3 (the wire, the host client)
+in progress on main. `intuition-model/` (the walker library) and
+`amiinspect/` (the Shell command) are real, building, and verified
+on-target. `server/` is real: the action engine (`server/src/action.c`,
+click/type/geometry) and `AmiPilotServer`
 (`server/src/amipilotserver/`), a commodity hosting both behind a
-genuine public ARexx port — see `server/README.md` for the verb set and
-what's verified. `host/` and `manifest/` are still stub directories with
-just a `README.md` each pointing at their phase (0.3+) — don't assume
-code exists there. User-facing documentation lives in `userdocs/` (built
+genuine public ARexx port **and** (0.3) the serial wire transport
+(`server/src/serial.c`, framing contract in `server/WIRE.md`) — see
+`server/README.md` for the verb set and what's verified. `manifest/`
+carries the manifest contract (`manifest/SPEC.md`, parsed by
+`server/src/manifest.c`). `host/` has its first real code: the wire
+client (`host/amipilot/wire.py`) with stdlib-unittest coverage
+(`make test-host` is a real check now); the object API and pytest
+plugin are still to come. User-facing documentation lives in `userdocs/` (built
 as a MkDocs site,
 `mkdocs.yml`) and mirrored to AmigaGuide via `make guide`
 (`tools/docs2guide.py`) — see `userdocs/Building-and-Testing.md`.
@@ -45,7 +49,7 @@ calls them by name, not because they're the primary local entry points:
 
 ```sh
 make build           # = amiga + fixtures
-make test-host        # currently a real no-op (no host/ code yet, phase 0.3)
+make test-host        # host-side unit tests (host/tests, stdlib unittest, no deps)
 make test-target      # boots both fixtures under Copperline, asserts AmiInspect's output
 make lint             # semgrep --config auto over intuition-model/ amiinspect/ server/ fixtures/
 ```
@@ -188,12 +192,12 @@ against the library. When adding a fixture, remember `GT_Underscore` in
 every `CreateGadget` tag list, or the `_` shortcut markers in labels
 render as literal underscores instead of underlined shortcuts.
 
-**`server/`, `host/`, `manifest/`, `tests/`** — not yet implemented.
-Phase 0.2 (server, ARexx-driven), phase 0.3 (wire protocol, host Python
-client + pytest plugin, manifest-ID contract), phase 0.4 (TCP, program
-launch, file API). Read the corresponding `README.md` and the
-implementation plan's "Phases" section before starting work in any of
-these.
+**`server/`, `host/`, `manifest/`, `tests/`** — see "Current state"
+above for what's real in each. Still to come: the pytest plugin and
+object API on the host side (rest of 0.3), then phase 0.4 (TCP
+transport, program launch, file API, menus/drag). Read the
+corresponding `README.md`, `server/WIRE.md`, and the implementation
+plan's "Phases" section before starting work in any of these.
 
 ## House conventions (this repo and its siblings)
 

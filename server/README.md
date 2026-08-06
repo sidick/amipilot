@@ -7,7 +7,24 @@ first, then serial.device, then TCP).
 Lands in phase 0.2 onward -- see
 [`docs/implementation-plan.md`](../docs/implementation-plan.md).
 
-## Current state (phase 0.2, in progress)
+## Current state (phase 0.3, in progress)
+
+- **The wire (phase 0.3):** the same verb grammar over serial.device,
+  framed per [`WIRE.md`](WIRE.md) (this directory) -- LF-terminated
+  request lines in, `RC <code> <byte-count>` + payload out, `VERSION`
+  as the handshake. `src/serial.c` is the transport (standing async
+  1-byte read + SDCMD_QUERY chunk drain, xon/xoff disabled); one parser
+  (`arexx_cmd.c`) and one dispatch (`HandleCommand` in
+  `amipilotserver/main.c`) serve both transports, so ARexx RESULT
+  strings and wire payloads are the same bytes. Enable with
+  `AmiPilotServer SERIAL` (`SERDEVICE`/`SERUNIT`/`BAUD` to taste).
+  Verified end-to-end by `make test-target`'s wire check: the real host
+  client (`host/amipilot/wire.py`) connects through Copperline's
+  `--serial tcp` bridge, handshakes, TYPEs into the fixture's string
+  gadget, reads the value back, clicks Connect, and confirms the
+  window died -- the phase 0.3 loop minus pytest, host-driven.
+
+## Phase 0.2 (shipped)
 
 - `src/action.c` + `include/action_engine.h` -- the action engine's
   first real verbs: absolute pointer positioning (documented
