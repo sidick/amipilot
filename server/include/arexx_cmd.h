@@ -24,6 +24,11 @@ typedef enum {
     AMIP_AREXX_CMD_VERSION,  /* VERSION -- the wire handshake (server/WIRE.md),
                               * also answerable over ARexx for feature tests */
     AMIP_AREXX_CMD_LAUNCH,   /* LAUNCH [STACK=n] <command-line...> */
+    AMIP_AREXX_CMD_FSLIST,   /* FSLIST <path> */
+    AMIP_AREXX_CMD_FSSTAT,   /* FSSTAT <path> */
+    AMIP_AREXX_CMD_FSMKDIR,  /* FSMKDIR <path> */
+    AMIP_AREXX_CMD_FSDELETE, /* FSDELETE <path> */
+    AMIP_AREXX_CMD_FSGET,    /* FSGET <path> */
     AMIP_AREXX_CMD_QUIT      /* QUIT */
 } AmipArexxCmdType;
 
@@ -71,6 +76,12 @@ typedef struct {
  * the currently-loaded manifest (manifest.h). The '@' prefix is what
  * disambiguates the two forms; a bare name would be ambiguous with a
  * window pattern.
+ *
+ * FSLIST/FSSTAT/FSMKDIR/FSDELETE/FSGET all take a single <path>
+ * argument, parsed exactly like MANIFEST's (into the same `path`
+ * field) -- see server/include/fs.h for the allowlist enforcement and
+ * per-verb semantics; this parser doesn't know or care about roots,
+ * only that a path token follows the keyword.
  *
  * LAUNCH's command line is everything after the keyword and an
  * optional leading "STACK=<n>" token (not an AmigaDOS Shell

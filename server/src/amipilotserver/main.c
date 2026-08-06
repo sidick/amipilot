@@ -44,6 +44,7 @@
 
 #include "action_engine.h"
 #include "arexx.h"
+#include "fs.h"
 #include "intuition_model.h"
 #include "manifest.h"
 #include "serial.h"
@@ -211,12 +212,22 @@ static char g_treeBuf[AMIP_TREE_BUF_SIZE];
  * share (ARexx RESULT string and wire payload are the same bytes; see
  * server/WIRE.md). Returns the AMIP_AREXX_RC_* code, points *resultOut
  * at the payload (NULL/empty for none; valid until the next call --
- * file-static buffers above), and clears *runningOut on QUIT. */
+ * file-static buffers above), writes its length to *resultLenOut, and
+ * clears *runningOut on QUIT.
+ *
+ * *resultLenOut exists because FSGET's payload is raw file bytes and
+ * may contain embedded NULs -- strlen() would truncate it. Every verb
+ * except FSGET leaves *resultLenOut at its initial 0, in which case
+ * the caller falls back to strlen(result): safe even for a genuinely
+ * empty FSGET result, since a buffer that starts with a NUL byte
+ * strlen()s to 0 either way. */
 static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
-                         BOOL *runningOut)
+                         ULONG *resultLenOut, BOOL *runningOut)
 {
     int rc = AMIP_AREXX_RC_OK;
     const char *result = NULL;
+
+    *resultLenOut = 0;
 
     g_resultBuf[0] = '\0';
 
@@ -265,7 +276,8 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
             snprintf(g_resultBuf, sizeof(g_resultBuf),
                      "AMIPILOT " XSTR(VERSION) "." XSTR(REVISION) " PROTOCOL 1\n"
                      "STABLE VERSION\n"
-                     "EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH QUIT\n");
+                     "EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH "
+                     "FSLIST FSSTAT FSMKDIR FSDELETE FSGET QUIT\n");
             result = g_resultBuf;
             break;
 
@@ -401,6 +413,26 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
             break;
         }
 
+        case AMIP_AREXX_CMD_FSLIST:
+            rc = AmipFsList(cmd->path, &result, resultLenOut);
+            break;
+
+        case AMIP_AREXX_CMD_FSSTAT:
+            rc = AmipFsStat(cmd->path, &result, resultLenOut);
+            break;
+
+        case AMIP_AREXX_CMD_FSMKDIR:
+            rc = AmipFsMkdir(cmd->path, &result, resultLenOut);
+            break;
+
+        case AMIP_AREXX_CMD_FSDELETE:
+            rc = AmipFsDelete(cmd->path, &result, resultLenOut);
+            break;
+
+        case AMIP_AREXX_CMD_FSGET:
+            rc = AmipFsGet(cmd->path, &result, resultLenOut);
+            break;
+
         case AMIP_AREXX_CMD_QUIT:
             *runningOut = FALSE;
             break;
@@ -414,6 +446,9 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
             break;
     }
 
+    if (result != NULL && *resultLenOut == 0) {
+        *resultLenOut = (ULONG)strlen(result);
+    }
     *resultOut = result;
     return rc;
 }
@@ -427,12 +462,19 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
  * fits the same wire over bsdsocket.library instead; TCPPORT picks the
  * listen port (no canonical default port is claimed for this project
  * yet, so one must be given explicitly -- see server/README.md). SERIAL
- * and TCP are independent and either or both may be given at once. */
+ * and TCP are independent and either or both may be given at once.
+ *
+ * FSROOT/M grants one or more root directories to the file API
+ * (server/include/fs.h) -- never granted implicitly (server/README.md's
+ * "never assumed" rule): with no FSROOT, every FS* verb returns RC 10.
+ * "FSROOT T: RAM:" grants both in one command (see ReadArgs()'s own
+ * /M semantics: any number of space-separated values after the one
+ * keyword occurrence, not a repeated keyword). */
 #define AMIP_ARG_TEMPLATE \
-    "SERIAL/S,SERDEVICE/K,SERUNIT/K/N,BAUD/K/N,TCP/S,TCPPORT/K/N"
+    "SERIAL/S,SERDEVICE/K,SERUNIT/K/N,BAUD/K/N,TCP/S,TCPPORT/K/N,FSROOT/K/M"
 enum {
     ARG_SERIAL, ARG_SERDEVICE, ARG_SERUNIT, ARG_BAUD,
-    ARG_TCP, ARG_TCPPORT,
+    ARG_TCP, ARG_TCPPORT, ARG_FSROOT,
     ARG_COUNT
 };
 
@@ -440,7 +482,7 @@ static int RealMain(void)
 {
     struct MsgPort *arexxPort;
     struct RDArgs *rdargs;
-    LONG argArray[ARG_COUNT] = { 0, 0, 0, 0, 0, 0 };
+    LONG argArray[ARG_COUNT] = { 0, 0, 0, 0, 0, 0, 0 };
     AmipSerial *serial = NULL;
     AmipTcp *tcp = NULL;
     char portName[32];
@@ -543,6 +585,33 @@ static int RealMain(void)
         }
         printf("AmiPilotServer: wire on TCP port %ld\n", (long)port);
     }
+
+    /* A bad FSROOT is a config mistake, not a soft-degrade case --
+     * fatal now, same as SERIAL/TCP above, rather than silently
+     * running with fewer roots than the caller asked for. */
+    if (argArray[ARG_FSROOT] != 0) {
+        STRPTR *roots = (STRPTR *)argArray[ARG_FSROOT];
+        int i;
+
+        for (i = 0; roots[i] != NULL; i++) {
+            char fsErr[80];
+
+            if (!AmipFsGrantRoot((const char *)roots[i], fsErr, sizeof(fsErr))) {
+                fprintf(stderr, "AmiPilotServer: FSROOT %s failed: %s\n",
+                        (const char *)roots[i], fsErr);
+                AmipFsShutdown(); /* release any roots already granted
+                                   * before this one failed */
+                AmipTcpClose(tcp);
+                AmipSerialClose(serial);
+                FreeArgs(rdargs);
+                AmipArexxClose(arexxPort);
+                AmipActionShutdown();
+                goto cleanup;
+            }
+            printf("AmiPilotServer: file API granted %s\n", (const char *)roots[i]);
+        }
+    }
+
     printf("AmiPilotServer: ARexx port %s ready\n", portName);
     fflush(stdout);
 
@@ -569,7 +638,11 @@ static int RealMain(void)
 
             while ((handle = AmipArexxReceive(arexxPort, &cmd)) != NULL) {
                 const char *result = NULL;
-                int rc = HandleCommand(&cmd, &result, &running);
+                ULONG resultLen; /* unused here -- ARexx RESULT is always
+                                  * a NUL-terminated C string; only the
+                                  * wire's binary-safe framing below
+                                  * needs the explicit length (FSGET). */
+                int rc = HandleCommand(&cmd, &result, &resultLen, &running);
 
                 AmipArexxReply(handle, rc, result);
             }
@@ -595,9 +668,8 @@ static int RealMain(void)
                 ULONG payloadLen;
 
                 AmipArexxParse(lineIn, &cmd);
-                rc = HandleCommand(&cmd, &result, &running);
+                rc = HandleCommand(&cmd, &result, &payloadLen, &running);
 
-                payloadLen = result != NULL ? strlen(result) : 0;
                 snprintf(header, sizeof(header), "RC %d %lu\n",
                          rc, (unsigned long)payloadLen);
                 if (!AmipSerialWrite(serial, header, strlen(header)) ||
@@ -627,9 +699,8 @@ static int RealMain(void)
                 ULONG payloadLen;
 
                 AmipArexxParse(lineIn, &cmd);
-                rc = HandleCommand(&cmd, &result, &running);
+                rc = HandleCommand(&cmd, &result, &payloadLen, &running);
 
-                payloadLen = result != NULL ? strlen(result) : 0;
                 snprintf(header, sizeof(header), "RC %d %lu\n",
                          rc, (unsigned long)payloadLen);
                 if (!AmipTcpWrite(tcp, header, strlen(header)) ||
@@ -640,6 +711,7 @@ static int RealMain(void)
         }
     }
 
+    AmipFsShutdown();
     AmipTcpClose(tcp);
     AmipSerialClose(serial);
     if (rdargs != NULL) {
