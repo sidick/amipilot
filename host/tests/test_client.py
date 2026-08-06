@@ -68,6 +68,22 @@ class Quoting(unittest.TestCase):
         self.assertEqual(c._wire._t.sent[0], b"CLICK @connect_button\n")
         self.assertEqual(c._wire._t.sent[1], b"TYPE @host_field aminet.net\n")
 
+    def test_launch_without_stack(self):
+        c = client_with(b"RC 0 0\n")
+        c.launch("SRC:build/fixtures/GTApp")
+        self.assertEqual(c._wire._t.sent[0], b"LAUNCH SRC:build/fixtures/GTApp\n")
+
+    def test_launch_with_stack(self):
+        c = client_with(b"RC 0 0\n")
+        c.launch("SRC:build/fixtures/GTApp", stack=8192)
+        self.assertEqual(c._wire._t.sent[0],
+                         b"LAUNCH STACK=8192 SRC:build/fixtures/GTApp\n")
+
+    def test_launch_command_with_newline_rejected_locally(self):
+        c = client_with()
+        with self.assertRaises(ValueError):
+            c.launch("SRC:build/fixtures/GTApp\nQUIT")
+
 
 class RcMapping(unittest.TestCase):
     def test_ok_returns_normally(self):
@@ -95,6 +111,12 @@ class RcMapping(unittest.TestCase):
             c.tree("Gone")
         self.assertEqual(ctx.exception.rc, 5)
         self.assertIn("no window", str(ctx.exception))
+
+    def test_launch_fail_raises_action_failed(self):
+        payload = b"launch failed (out of memory or no process slot)"
+        c = client_with(b"RC 20 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(ActionFailed):
+            c.launch("SRC:build/fixtures/GTApp")
 
 
 class Verbs(unittest.TestCase):

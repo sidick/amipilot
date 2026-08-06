@@ -23,6 +23,7 @@ typedef enum {
     AMIP_AREXX_CMD_MANIFEST, /* MANIFEST <file-path> */
     AMIP_AREXX_CMD_VERSION,  /* VERSION -- the wire handshake (server/WIRE.md),
                               * also answerable over ARexx for feature tests */
+    AMIP_AREXX_CMD_LAUNCH,   /* LAUNCH [STACK=n] <command-line...> */
     AMIP_AREXX_CMD_QUIT      /* QUIT */
 } AmipArexxCmdType;
 
@@ -43,6 +44,7 @@ enum {
 #define AMIP_AREXX_MAX_TEXT   256
 #define AMIP_AREXX_MAX_NAME   32   /* manifest logical names ("@name") */
 #define AMIP_AREXX_MAX_PATH   256  /* MANIFEST file path */
+#define AMIP_AREXX_MAX_COMMAND 256 /* LAUNCH command line */
 
 typedef struct {
     AmipArexxCmdType type;
@@ -52,6 +54,9 @@ typedef struct {
                                                 * empty = classic form was used */
     char text[AMIP_AREXX_MAX_TEXT];             /* TYPE */
     char path[AMIP_AREXX_MAX_PATH];             /* MANIFEST */
+    char command[AMIP_AREXX_MAX_COMMAND];       /* LAUNCH */
+    long stackSize;                             /* LAUNCH; 0 = use CreateNewProc's
+                                                  * own default (4000 bytes) */
 } AmipArexxParsed;
 
 /* Parses one ARexx command line into `out`. Case-insensitive command
@@ -66,6 +71,15 @@ typedef struct {
  * the currently-loaded manifest (manifest.h). The '@' prefix is what
  * disambiguates the two forms; a bare name would be ambiguous with a
  * window pattern.
+ *
+ * LAUNCH's command line is everything after the keyword and an
+ * optional leading "STACK=<n>" token (not an AmigaDOS Shell
+ * convention -- this wire's own syntax, consumed here before the rest
+ * of the line is taken verbatim as the command to run, same
+ * unquoted-rest-of-line handling as TYPE's text). "LAUNCH SRC:build/
+ * fixtures/GTApp" and "LAUNCH STACK=8192 SRC:build/fixtures/GTApp"
+ * are both valid; stackSize is 0 (caller's own default) when STACK
+ * isn't given.
  *
  * Returns 0 on success, -1 on an unknown command or a missing required
  * argument (map to AMIP_AREXX_RC_ERROR) -- out->type is

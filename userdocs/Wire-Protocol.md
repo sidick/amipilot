@@ -122,3 +122,49 @@ host-side half of [the inspector](https://github.com/sidick/amipilot/blob/main/d
 connects, fetches a window's tree, and prints it — either the same text
 `AmiInspect` prints (`--format text`, the default) or quirk-profile-ready
 `# name = <id>` suggestions (`--format python`) to copy into a test.
+
+## LAUNCH
+
+From 0.4, a connected session can start its own test subject instead of
+requiring it pre-staged (e.g. via `S:User-Startup`):
+
+```python
+from amipilot import Amipilot, NotFound
+
+with Amipilot.connect("127.0.0.1", 1234) as client:
+    try:
+        client.tree("GadTools")
+        raise AssertionError("should not be running yet")
+    except NotFound:
+        pass
+
+    client.launch("SRC:build/fixtures/GTApp", stack=8192)
+
+    # LAUNCH is asynchronous -- poll for the effect, don't assume timing.
+    import time
+    for _ in range(20):
+        try:
+            window = client.tree("GadTools")
+            break
+        except NotFound:
+            time.sleep(0.5)
+```
+
+`stack` sets the new process's stack size in bytes (AmigaDOS's own
+default is 4000 if omitted — most Intuition/ReAction GUI apps need
+more). On the wire this is `LAUNCH [STACK=<n>] <command-line...>`; the
+command line is Shell syntax, sent verbatim, and must not itself
+contain a line terminator.
+
+**Read this before relying on `RC 0`:** the launch is asynchronous
+(`SystemTagList()`, `SYS_Asynch`) so AmiPilotServer keeps servicing the
+connection while the launched process runs — necessary for anything
+that doesn't exit on its own, like a GUI app. That means `RC 0` only
+confirms the new AmigaDOS process could be *created* (no memory
+exhaustion, a free process slot) — **not** that the command was found
+or that it ran successfully; the shell resolves the command name after
+`LAUNCH`'s own reply has already gone out, and there's no output
+capture yet to see that failure. Always assert on the expected effect
+(a window appearing, as above) rather than trusting the RC alone. A
+`proc-wait` verb for real exit-code retrieval is planned but not built
+yet — see `server/README.md`.

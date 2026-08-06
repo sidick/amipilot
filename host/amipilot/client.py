@@ -205,6 +205,33 @@ class Amipilot:
         server's load-report text."""
         return self._run(f"MANIFEST {path}").text
 
+    def launch(self, command: str, *, stack: int | None = None) -> None:
+        """LAUNCH [STACK=n] <command-line> -- starts `command` as an
+        AmigaDOS process (SystemTagList(), asynchronous), so it's
+        useful for test setup: connect, then launch the fixture under
+        test over the same session instead of pre-staging it via
+        S:User-Startup. `command` is Shell syntax handed to the server
+        verbatim (server/WIRE.md/server/README.md), so it must not
+        itself contain a line terminator.
+
+        `stack` sets the new process's stack size in bytes (AmigaDOS's
+        own CreateNewProc() default is 4000 if omitted) -- pass this
+        for anything that needs more than the default, e.g. most
+        Intuition/ReAction GUI apps.
+
+        Raises ActionFailed if the launch itself couldn't happen (out
+        of memory, no process slot). This does NOT confirm the command
+        was found or ran successfully -- an asynchronous launch
+        returns before the shell has resolved the command name, and
+        AmiPilotServer doesn't capture its output (yet); assert on the
+        expected effect instead (e.g. `tree()` finding its window)."""
+        if "\n" in command or "\r" in command:
+            raise ValueError("LAUNCH command must not contain a line terminator")
+        if stack is not None:
+            self._run(f"LAUNCH STACK={stack} {command}")
+        else:
+            self._run(f"LAUNCH {command}")
+
     def quit(self) -> None:
         """QUIT -- shuts the server down cleanly. The connection is
         still open afterward (the server replies before exiting); call

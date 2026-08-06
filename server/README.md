@@ -65,6 +65,37 @@ Lands in phase 0.2 onward -- see
   outbound connectivity -- is proposed future work, see
   [amipilot#12](https://github.com/sidick/amipilot/issues/12).
 
+- **Program launch (phase 0.4, in progress):** `LAUNCH [STACK=n]
+  <command-line...>` starts an AmigaDOS process from a connected
+  session -- so a test can connect first, confirm nothing is running
+  yet, and start its own subject over the wire instead of pre-staging
+  it via `S:User-Startup`. Implemented with `SystemTagList()`
+  (`SYS_Asynch` so the launch doesn't block AmiPilotServer's own
+  dispatch loop -- a persistent GUI app like a fixture never returns),
+  with explicit `NIL:` input/output handles rather than defaulted ones:
+  `SystemTagList()`'s own docs say an async launch closes the caller's
+  `Input()`/`Output()` on completion "even if these were your Input()
+  and Output()!", so leaving them unset would eventually close
+  AmiPilotServer's own stdio. `STACK` sets `NP_StackSize` (bytes;
+  AmigaDOS's own `CreateNewProc()` default is 4000 if omitted) -- most
+  Intuition/ReAction GUI apps need more than that default. **Honest
+  limit, not silently glossed over:** an async launch's own RC only
+  reflects whether the shell process itself could be created (out of
+  memory, no process slot) -- RC 0 does NOT mean the command was found
+  or ran successfully, since the shell resolves the command name after
+  `SystemTagList()` has already returned. There's no output capture
+  yet either. Assert on the expected effect instead (e.g. polling
+  `TREE` for the launched app's window), same as
+  `tests/copperline/launch-test.py` does. Real command-found
+  verification and exit-code retrieval need a `proc-wait` verb -- part
+  of this phase's plan but not built here, not invented ahead of it.
+  Verified end-to-end by `make test-target`'s LAUNCH check: connect to
+  a bare server (no fixture pre-staged), confirm its window doesn't
+  exist, `LAUNCH ... STACK=8192`, poll until the window appears, then
+  a full `TYPE`/`GETTEXT`/`CLICK` round trip proves the launched
+  process is genuinely functional with the non-default stack, not just
+  that it didn't immediately crash.
+
 ## Phase 0.2 (shipped)
 
 - `src/action.c` + `include/action_engine.h` -- the action engine's

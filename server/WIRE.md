@@ -78,7 +78,7 @@ A client's first command after opening the transport SHOULD be
 ```
 AMIPILOT <major>.<minor> PROTOCOL 1
 STABLE VERSION
-EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST QUIT
+EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH QUIT
 ```
 
 - Line 1: server version (from `version.mk`) and the wire protocol

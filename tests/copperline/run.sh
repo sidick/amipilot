@@ -498,6 +498,88 @@ EOF
 	fi
 }
 
+# --- LAUNCH verb check (phase 0.4) -----------------------------------------
+# Unlike every check above, this one's smoke.script stages ONLY
+# AmiPilotServer -- no fixture pre-launched via User-Startup. Proves
+# the actual point of LAUNCH: a host session connects to a bare
+# server, confirms nothing is running yet, starts the fixture *over
+# the wire* with a non-default STACK, and drives it exactly as if it
+# had been pre-staged -- tests/copperline/launch-test.py.
+run_launch_check() {
+	echo "run.sh: LAUNCH verb"
+
+	rm -f "$BUILD/launch-result.txt" "$BUILD/marker-launch-ready.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+Run >NIL: SRC:build/AmiPilotServer SERIAL
+Wait 5
+Echo "READY" >SRC:build/marker-launch-ready.txt
+EOF
+
+	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
+	rm -f "$info"
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
+		--fast 8M --noaudio --serial tcp --control :0 --control-info "$info" \
+		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
+	COPPERLINE_PID=$!
+
+	tries=0
+	while [ ! -f "$info" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 100 ]; then
+			echo "run.sh: FAIL (launch): copperline never wrote $info"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			return
+		fi
+		sleep 0.1
+	done
+
+	"$COPPERLINE_CTL" --info "$info" run_until '{"seconds": 600}' > /dev/null 2>&1 &
+
+	tries=0
+	while [ ! -f "$BUILD/marker-launch-ready.txt" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 120 ]; then
+			echo "run.sh: FAIL (launch): guest never became ready -- crash or hang"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			rm -f "$info"
+			return
+		fi
+		sleep 0.5
+	done
+
+	python3 "$REPO_ROOT/tests/copperline/launch-test.py" 127.0.0.1:1234 \
+		> "$BUILD/launch-result.txt" 2>&1 || true
+
+	kill "$COPPERLINE_PID" 2>/dev/null || true
+	COPPERLINE_PID=""
+	rm -f "$info"
+
+	ok=1
+	for pattern in \
+		'PRELAUNCH-CHECK PASS' \
+		'LAUNCH-SENT OK' \
+		'WINDOW-APPEARED PASS title=AmiPilot GadTools Fixture' \
+		'GETTEXT RESULT=launched via wire' \
+		'WINDOW-GONE PASS'; do
+		if ! grep -qF "$pattern" "$BUILD/launch-result.txt" 2>/dev/null; then
+			echo "run.sh: FAIL (launch): expected line not found: $pattern"
+			ok=0
+		fi
+	done
+
+	if [ "$ok" -eq 1 ]; then
+		echo "run.sh: PASS (LAUNCH verb)"
+	else
+		echo "run.sh:   --- actual output ---"
+		sed 's/^/run.sh:   /' "$BUILD/launch-result.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+	fi
+}
+
 # --- pytest release gate (phase 0.3, host/amipilot/pytest_plugin.py) ------
 # The literal phase 0.3 release gate (docs/implementation-plan.md): "a
 # host pytest clicks a button and asserts a label changed,
@@ -546,6 +628,7 @@ run_type_check
 run_arexx_check
 run_manifest_check
 run_wire_check
+run_launch_check
 run_pytest_release_gate_check
 
 if [ "$FAILED" -eq 0 ]; then
@@ -559,6 +642,7 @@ if [ "$FAILED" -eq 0 ]; then
 		"$BUILD"/arexx-result.txt "$BUILD"/marker-arexx.txt \
 		"$BUILD"/manifest-result.txt "$BUILD"/marker-manifest.txt \
 		"$BUILD"/wire-result.txt "$BUILD"/marker-wire-ready.txt \
+		"$BUILD"/launch-result.txt "$BUILD"/marker-launch-ready.txt \
 		"$BUILD"/pytest-result.txt
 	echo "run.sh: all fixtures PASS"
 	exit 0
