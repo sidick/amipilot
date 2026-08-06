@@ -7,6 +7,55 @@ the repository's
 [`docs/implementation-plan.md`](https://github.com/sidick/amipilot/blob/main/docs/implementation-plan.md)
 for the full engineering detail and phase sequencing behind each one.
 
+## v0.3 — 2026-08-06
+
+The wire and the host client: the same command set the ARexx port
+speaks, now reachable from a host machine — no ARexx interpreter or
+even a Workbench session on the Amiga side needed to drive it.
+
+- **The wire protocol** (`server/WIRE.md`): a length-prefixed line
+  protocol over serial.device, with no JSON anywhere — requests are the
+  exact same command grammar the ARexx port already parses, responses
+  are `RC <code> <byte-count>` followed by exactly that many payload
+  bytes, binary-safe with zero escaping. A `VERSION` handshake reports
+  the server version, the protocol number, and which verbs are stable
+  vs. experimental.
+- **`AmiPilotServer SERIAL`**: the commodity now optionally carries its
+  whole verb set over serial.device (`SERDEVICE`/`SERUNIT`/`BAUD` to
+  configure), alongside its existing ARexx port — the same dispatch
+  serves both, so results are identical either way. See the new
+  [Wire Protocol](Wire-Protocol.md) page.
+- **The host Python client** (`host/`, `pip install -e host/`): a
+  transport-level `WireClient`, and `Amipilot` — the Pythonic object API
+  (`tree()`/`click()`/`type()`/`get_text()`/`manifest()`, plus `@name`
+  locator forms) that raises typed exceptions instead of requiring
+  manual RC checks.
+- **`amipilot dump <window>`**: the host half of "the inspector" —
+  connects and prints a window's gadget tree, either in the same format
+  `AmiInspect` prints or as ready-to-paste `# name = <id>` suggestions
+  for a quirk profile.
+- **A pytest plugin**: the `amipilot` fixture boots a configured
+  Copperline (or real-hardware-adjacent) session and hands a test a
+  connected client — session-scoped, and it skips cleanly rather than
+  failing when no emulator config is set up. This delivers the phase's
+  actual release gate: a host pytest test types into a field, reads it
+  back, clicks a button, and asserts the window closed — driven
+  entirely from the host, with Copperline booted by the test itself.
+
+**Known gaps, tracked as real follow-up work, not silently accepted:**
+
+- TCP transport (for real hardware or an emulator with no serial
+  bridge) is phase 0.4 scope, along with program launch, the file API,
+  menus, and drag.
+- No wait/expectation primitives yet (`click` that waits for an
+  expected change, timeouts) — a script still adds its own polling.
+- The wire connects host-to-Amiga only; the Amiga dialing out to a
+  configured host (useful behind NAT) is a considered future addition,
+  not yet built.
+- No public CI on-target run yet, same reason as 0.1/0.2:
+  `make test-target` needs a machine-specific Workbench install CI
+  doesn't have.
+
 ## v0.2 — 2026-08-05
 
 The act side of object-level GUI automation: a server commodity, driven
