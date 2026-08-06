@@ -56,6 +56,48 @@ typedef struct AmipWindowModel {
     AmipGadgetModel *gadgets; /* linked list, walk order */
 } AmipWindowModel;
 
+/* One menu item (a plain textual item, or -- via `subItems` -- a
+ * pull-right submenu one level deep; classic Intuition menus don't
+ * nest further, see intuition/intuition.h's own struct MenuItem).
+ * `menuNum`/`itemNum`/`subNum` are this item's position in its own
+ * chain (NextMenu/NextItem), 0-based -- identical to what Intuition
+ * itself reports in IDCMP_MENUPICK's Code field via the MENUNUM()/
+ * ITEMNUM()/SUBNUM() macros, and what a MENUPICK verb addresses a
+ * pick by. `subNum` is -1 for a top-level item. */
+typedef struct AmipMenuItemModel {
+    struct AmipMenuItemModel *next;     /* next sibling at this level */
+    struct AmipMenuItemModel *subItems; /* one level of submenu, NULL if none */
+    STRPTR text;      /* copied out; NULL for a graphical (non-ITEMTEXT) item
+                        * or a separator bar */
+    BOOL   enabled;   /* ITEMENABLED */
+    BOOL   checkit;   /* CHECKIT -- this item is a checkmark toggle */
+    BOOL   checked;   /* CHECKED; only meaningful when checkit is TRUE */
+    BOOL   hasShortcut; /* COMMSEQ, and a non-zero Command byte */
+    UBYTE  shortcut;  /* the Command byte (a plain ASCII char); valid only
+                        * when hasShortcut is TRUE */
+    LONG   menuNum, itemNum, subNum;
+} AmipMenuItemModel;
+
+/* One top-level pulldown menu (a window's MenuStrip is a chain of
+ * these via NextMenu). */
+typedef struct AmipMenuModel {
+    struct AmipMenuModel *next;
+    STRPTR title;     /* copied out; NULL if unset */
+    BOOL   enabled;   /* MENUENABLED */
+    LONG   menuNum;
+    AmipMenuItemModel *items;
+} AmipMenuModel;
+
+/* Walks window->MenuStrip, copying out a full model under a brief
+ * LockIBase() hold -- same discipline as AmipWalkWindow. Returns NULL
+ * if the window has no menu strip at all (not an error: most windows
+ * don't) or on allocation failure; callers can't distinguish the two
+ * from the return value alone, matching AmipWalkWindow's own
+ * NULL-on-either convention. */
+AmipMenuModel *AmipWalkMenuStrip(struct Window *window);
+
+void AmipFreeMenuModel(AmipMenuModel *model);
+
 /* Walks all windows on the given screen (NULL = default public screen),
  * copying out a full model. Returns NULL on allocation failure. The
  * lock on IntuitionBase is held only for the duration of the walk, never

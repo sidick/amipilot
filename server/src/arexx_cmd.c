@@ -88,6 +88,8 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
     else if (ci_streq(kw, "FSMKDIR"))  out->type = AMIP_AREXX_CMD_FSMKDIR;
     else if (ci_streq(kw, "FSDELETE")) out->type = AMIP_AREXX_CMD_FSDELETE;
     else if (ci_streq(kw, "FSGET"))    out->type = AMIP_AREXX_CMD_FSGET;
+    else if (ci_streq(kw, "MENU"))     out->type = AMIP_AREXX_CMD_MENU;
+    else if (ci_streq(kw, "MENUPICK")) out->type = AMIP_AREXX_CMD_MENUPICK;
     else if (ci_streq(kw, "QUIT"))     out->type = AMIP_AREXX_CMD_QUIT;
     else { out->type = AMIP_AREXX_CMD_UNKNOWN; return -1; }
 
@@ -107,6 +109,41 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
             return -1;
         }
         read_token(p, out->path, sizeof(out->path));
+        return 0;
+    }
+
+    if (out->type == AMIP_AREXX_CMD_MENUPICK) {
+        char numbuf[16];
+
+        p = skip_ws(p);
+        if (*p == '\0') {
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+        p = read_token(p, out->windowPattern, sizeof(out->windowPattern));
+
+        p = skip_ws(p);
+        if (*p == '\0') {
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+        p = read_token(p, numbuf, sizeof(numbuf));
+        out->menuNum = strtol(numbuf, NULL, 10);
+
+        p = skip_ws(p);
+        if (*p == '\0') {
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+        p = read_token(p, numbuf, sizeof(numbuf));
+        out->itemNum = strtol(numbuf, NULL, 10);
+
+        out->subNum = -1;
+        p = skip_ws(p);
+        if (*p != '\0') {
+            read_token(p, numbuf, sizeof(numbuf));
+            out->subNum = strtol(numbuf, NULL, 10);
+        }
         return 0;
     }
 
@@ -149,7 +186,7 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
         out->type = AMIP_AREXX_CMD_UNKNOWN;
         return -1;
     }
-    if (*p == '@' && out->type != AMIP_AREXX_CMD_TREE) {
+    if (*p == '@' && out->type != AMIP_AREXX_CMD_TREE && out->type != AMIP_AREXX_CMD_MENU) {
         p++;
         p = read_token(p, out->manifestName, sizeof(out->manifestName));
         if (out->manifestName[0] == '\0') {
@@ -160,7 +197,7 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
         p = read_token(p, out->windowPattern, sizeof(out->windowPattern));
     }
 
-    if (out->type == AMIP_AREXX_CMD_TREE) {
+    if (out->type == AMIP_AREXX_CMD_TREE || out->type == AMIP_AREXX_CMD_MENU) {
         return 0;
     }
 

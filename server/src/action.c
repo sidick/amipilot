@@ -332,6 +332,92 @@ BOOL AmipTypeString(CONST_STRPTR text)
     return TRUE;
 }
 
+struct MenuItem *AmipFindMenuItem(struct Window *window, LONG menuNum, LONG itemNum, LONG subNum)
+{
+    struct Menu *menu;
+    struct MenuItem *item;
+    LONG i;
+
+    if (window == NULL || menuNum < 0 || itemNum < 0) {
+        return NULL;
+    }
+
+    menu = window->MenuStrip;
+    for (i = 0; i < menuNum && menu != NULL; i++) {
+        menu = menu->NextMenu;
+    }
+    if (menu == NULL) {
+        return NULL;
+    }
+
+    item = menu->FirstItem;
+    for (i = 0; i < itemNum && item != NULL; i++) {
+        item = item->NextItem;
+    }
+    if (item == NULL || subNum < 0) {
+        return item;
+    }
+
+    item = item->SubItem;
+    for (i = 0; i < subNum && item != NULL; i++) {
+        item = item->NextItem;
+    }
+    return item;
+}
+
+AmipMenuPickResult AmipMenuPickByShortcut(struct Window *window, struct MenuItem *item)
+{
+    UBYTE ch;
+    UBYTE pairs[AMIP_MAX_PAIRS_PER_CHAR * 2];
+    LONG n;
+
+    if (window == NULL || item == NULL) {
+        return AMIP_MENUPICK_NO_SHORTCUT;
+    }
+    if (!(item->Flags & ITEMENABLED)) {
+        return AMIP_MENUPICK_DISABLED;
+    }
+    if (!(item->Flags & COMMSEQ) || item->Command == 0) {
+        return AMIP_MENUPICK_NO_SHORTCUT;
+    }
+    if (KeymapBase == NULL) {
+        return AMIP_MENUPICK_INJECT_FAILED;
+    }
+
+    /* Same "bring the target forward first" rationale as AmipClickGadget
+     * -- a keystroke only reaches the window that's actually active. */
+    ScreenToFront(window->WScreen);
+    WindowToFront(window);
+    ActivateWindow(window);
+
+    /* MenuItem->Command is a plain ASCII char (intuition.h), inverted
+     * into its rawkey + qualifier under the LIVE keymap the same way
+     * AmipTypeString does per character -- self-adapting to non-US
+     * layouts rather than assuming a fixed US rawkey table. */
+    ch = (UBYTE)item->Command;
+    n = MapANSI((CONST_STRPTR)&ch, 1, (STRPTR)pairs, sizeof(pairs) / 2, NULL);
+    if (n != 1) {
+        /* A shortcut char needing a dead-key sequence (or otherwise not
+         * a single keystroke under the active keymap) isn't the case
+         * classic Amiga menu shortcuts are meant to produce -- fail
+         * loudly rather than guess which pair of the sequence is "the"
+         * keystroke. */
+        return AMIP_MENUPICK_INJECT_FAILED;
+    }
+
+    /* Right-Amiga is the conventional menu-shortcut modifier (the same
+     * key the Amiga-key glyph next to a menu's shortcut letter refers
+     * to) -- OR it into the keymap-resolved qualifier rather than
+     * replacing it, so a shortcut that itself needs Shift under the
+     * active keymap still gets it. Intuition resolves the combination
+     * against window's live MenuStrip on its own; this doesn't
+     * synthesize IDCMP_MENUPICK directly. */
+    if (!StrikeKey(pairs[0], (UWORD)(pairs[1] | IEQUALIFIER_RCOMMAND))) {
+        return AMIP_MENUPICK_INJECT_FAILED;
+    }
+    return AMIP_MENUPICK_OK;
+}
+
 /* GFLG_RELWIDTH/RELHEIGHT/RELRIGHT/RELBOTTOM (intuition.h): a classic,
  * pre-BOOPSI Intuition convention where the corresponding Width/Height/
  * LeftEdge/TopEdge is stored as a NEGATIVE offset from the window's own

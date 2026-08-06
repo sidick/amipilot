@@ -125,4 +125,36 @@ struct Gadget *AmipFindGadgetById(struct Window *window, ULONG id);
  * built -- see docs/implementation-plan.md. */
 BOOL AmipIsWindowOpen(struct Window *target);
 
+/* Locates the MenuItem at (menuNum, itemNum, subNum) in window's live
+ * MenuStrip, walking NextMenu/NextItem by 0-based position -- the same
+ * addressing intuition-model's AmipWalkMenuStrip() stamps onto its
+ * model and Intuition itself reports via IDCMP_MENUPICK's MENUNUM()/
+ * ITEMNUM()/SUBNUM() macros. subNum < 0 means "a top-level item, not
+ * a submenu entry" (AmipMenuItemModel's own convention). Returns NULL
+ * if window has no menu strip or any index is out of range. */
+struct MenuItem *AmipFindMenuItem(struct Window *window, LONG menuNum, LONG itemNum, LONG subNum);
+
+typedef enum {
+    AMIP_MENUPICK_OK = 0,
+    AMIP_MENUPICK_DISABLED,     /* item->Flags lacks ITEMENABLED */
+    AMIP_MENUPICK_NO_SHORTCUT,  /* no COMMSEQ/Command, or Command isn't a
+                                  * single keystroke under the active
+                                  * keymap -- pointer-based menu
+                                  * navigation isn't built yet (see
+                                  * server/README.md) */
+    AMIP_MENUPICK_INJECT_FAILED /* keymap.library unavailable, or
+                                  * input.device event injection failed */
+} AmipMenuPickResult;
+
+/* Selects `item` via its keyboard shortcut: activates window, then
+ * strikes the Command byte with the right-Amiga qualifier held, the
+ * same input.device path a human pressing Right-Amiga+<key> would
+ * produce -- Intuition itself resolves that combination against the
+ * window's live MenuStrip, so this doesn't need to (and doesn't)
+ * synthesize IDCMP_MENUPICK directly. Does NOT open the menu or move
+ * the pointer -- pointer-based selection (for items without a
+ * shortcut) is planned but not built (docs/implementation-plan.md,
+ * "menu-pick"). */
+AmipMenuPickResult AmipMenuPickByShortcut(struct Window *window, struct MenuItem *item);
+
 #endif /* AMIPILOT_ACTION_ENGINE_H */

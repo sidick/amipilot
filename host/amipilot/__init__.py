@@ -11,6 +11,7 @@ The pytest plugin (emulator-booting fixtures) lands on top of this.
 
 from .client import ActionFailed, Amipilot, AmipilotError, CommandError, NotFound
 from .fs import FsEntry, FsParseError
+from .menu import Menu, MenuItem, MenuParseError, MenuStrip
 from .model import Gadget, TreeParseError, Window
 from .wire import ProtocolMismatch, Reply, ServerInfo, WireClient, WireError
 
@@ -22,6 +23,10 @@ __all__ = [
     "FsEntry",
     "FsParseError",
     "Gadget",
+    "Menu",
+    "MenuItem",
+    "MenuParseError",
+    "MenuStrip",
     "NotFound",
     "ProtocolMismatch",
     "Reply",

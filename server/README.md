@@ -126,6 +126,53 @@ Lands in phase 0.2 onward -- see
   for-byte, creates and deletes a subdirectory, and confirms `FSLIST
   SYS:` -- outside the granted root -- is rejected rather than served.
 
+- **Menus (phase 0.4, in progress):** `MENU <window-pattern>` walks a
+  window's live `struct Menu`/`struct MenuItem` chain
+  (`intuition-model`'s `AmipWalkMenuStrip()`, `intuition-model/src/
+  walk.c`) and returns every pulldown menu, its items, and (one level
+  deep -- classic Intuition menus don't nest a second pull-right
+  level) their submenu items, each with its checkit/checked/enabled
+  state and keyboard shortcut if it has one. `MENUPICK
+  <window-pattern> <menu-num> <item-num> [<sub-num>]` addresses an
+  item by the same 0-based chain positions `MENU`'s own output
+  reports (and what Intuition itself decodes an `IDCMP_MENUPICK`
+  `Code` into via `MENUNUM()`/`ITEMNUM()`/`SUBNUM()`).
+
+  **Selection is keyboard-shortcut only for now.** `AmipMenuPickByShortcut()`
+  (`server/src/action.c`) activates the window, then strikes the
+  item's `Command` byte (inverted through the live keymap via
+  `MapANSI()`, same technique `AmipTypeString()` uses per character)
+  with the right-Amiga qualifier held -- the same input.device path a
+  human pressing Right-Amiga+key produces. Intuition resolves that
+  combination against the window's own live menu strip on its own;
+  this deliberately does not synthesize `IDCMP_MENUPICK` directly, so
+  a successful `RC 0` is genuine evidence the pick reached the app
+  through the real menu-shortcut path, not a shortcut around it.
+  **Honest limit:** an item with no keyboard shortcut (`COMMSEQ`
+  unset) can't be picked yet -- `RC 20` names this explicitly
+  ("pointer-based menu selection isn't built yet") rather than
+  silently failing or guessing a fallback. Pointer-based navigation
+  (open the menu, move across items/submenus, release over the target
+  -- `LayoutMenusA()` already precomputes every item's screen-absolute
+  geometry before the menu is ever opened, so this is buildable) is
+  real follow-up work, not invented here ahead of it. A disabled item
+  (`ITEMENABLED` unset) is rejected client-side, before any keystroke
+  is sent at all -- `RC 20`, distinct from the no-shortcut case.
+
+  Verified end-to-end by `make test-target`'s MENU/MENUPICK check
+  (`tests/copperline/menu-test.py`) against a menu strip added to
+  `fixtures/gadtools-app` for this purpose: walks the menu and asserts
+  every field the walker read live (including a `CHECKIT|MENUTOGGLE`
+  item's starting `checked` state and a separator bar's blank,
+  disabled entry), `MENUPICK`s a top-level item and a submenu item by
+  their shortcuts and confirms each pick genuinely reached the
+  fixture's own `IDCMP_MENUPICK` handler (which writes a distinct
+  marker into its Host string gadget, read back via the
+  already-verified `GETTEXT` path -- proof of real delivery through
+  Intuition, not just that a keystroke was injected), and confirms the
+  fixture's permanently-disabled item is rejected without ever sending
+  a keystroke.
+
 ## Phase 0.2 (shipped)
 
 - `src/action.c` + `include/action_engine.h` -- the action engine's

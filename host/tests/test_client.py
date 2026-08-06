@@ -197,6 +197,44 @@ class Verbs(unittest.TestCase):
         with self.assertRaises(CommandError):
             c.fs_list("SYS:")
 
+    def test_menu_parses_payload(self):
+        payload = (
+            'window "GadTools" [0,0 10x10]\n'
+            'menu num=0 title="Project" enabled=1\n'
+            '  item num=0/0 text="About" shortcut=A checkit=0 checked=0 enabled=1\n'
+        )
+        c = client_with(b"RC 0 %d\n%s" % (len(payload), payload.encode()))
+        strip = c.menu("GadTools")
+        self.assertEqual(c._wire._t.sent[0], b"MENU GadTools\n")
+        self.assertEqual(strip.menus[0].items[0].text, "About")
+
+    def test_menu_pick_without_subnum(self):
+        c = client_with(b"RC 0 0\n")
+        c.menu_pick("GadTools", 0, 0)
+        self.assertEqual(c._wire._t.sent[0], b"MENUPICK GadTools 0 0\n")
+
+    def test_menu_pick_with_subnum(self):
+        c = client_with(b"RC 0 0\n")
+        c.menu_pick("GadTools", 0, 4, 0)
+        self.assertEqual(c._wire._t.sent[0], b"MENUPICK GadTools 0 4 0\n")
+
+    def test_menu_pick_disabled_raises_action_failed(self):
+        payload = b"menu item is disabled"
+        c = client_with(b"RC 20 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(ActionFailed):
+            c.menu_pick("GadTools", 0, 2)
+
+    def test_menu_pick_no_shortcut_raises_action_failed(self):
+        payload = b"item has no keyboard shortcut"
+        c = client_with(b"RC 20 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(ActionFailed):
+            c.menu_pick("GadTools", 0, 1)
+
+    def test_menu_pick_missing_item_raises_not_found(self):
+        c = client_with(b"RC 5 11\nnot matched")
+        with self.assertRaises(NotFound):
+            c.menu_pick("GadTools", 9, 9)
+
 
 class FakeSocket:
     """A connected-socket stand-in for connect_with_retry's post-

@@ -29,6 +29,8 @@ typedef enum {
     AMIP_AREXX_CMD_FSMKDIR,  /* FSMKDIR <path> */
     AMIP_AREXX_CMD_FSDELETE, /* FSDELETE <path> */
     AMIP_AREXX_CMD_FSGET,    /* FSGET <path> */
+    AMIP_AREXX_CMD_MENU,     /* MENU <window-pattern> */
+    AMIP_AREXX_CMD_MENUPICK, /* MENUPICK <window-pattern> <menu-num> <item-num> [<sub-num>] */
     AMIP_AREXX_CMD_QUIT      /* QUIT */
 } AmipArexxCmdType;
 
@@ -62,6 +64,9 @@ typedef struct {
     char command[AMIP_AREXX_MAX_COMMAND];       /* LAUNCH */
     long stackSize;                             /* LAUNCH; 0 = use CreateNewProc's
                                                   * own default (4000 bytes) */
+    long menuNum, itemNum;                      /* MENUPICK */
+    long subNum;                                /* MENUPICK; -1 = a top-level
+                                                  * item, not a submenu entry */
 } AmipArexxParsed;
 
 /* Parses one ARexx command line into `out`. Case-insensitive command
@@ -91,6 +96,16 @@ typedef struct {
  * fixtures/GTApp" and "LAUNCH STACK=8192 SRC:build/fixtures/GTApp"
  * are both valid; stackSize is 0 (caller's own default) when STACK
  * isn't given.
+ *
+ * MENU takes a single <window-pattern>, same as TREE (no "@name"
+ * form -- menus aren't part of the manifest contract). MENUPICK takes
+ * <window-pattern> <menu-num> <item-num> [<sub-num>], three or four
+ * space-separated tokens with no "@name" form either; subNum is -1
+ * (top-level item) when the fourth token is omitted. These are
+ * 0-based chain positions, the same ones intuition-model's
+ * AmipWalkMenuStrip() stamps onto its model (see MENU's own output)
+ * and Intuition itself reports via IDCMP_MENUPICK's MENUNUM()/
+ * ITEMNUM()/SUBNUM() macros.
  *
  * Returns 0 on success, -1 on an unknown command or a missing required
  * argument (map to AMIP_AREXX_RC_ERROR) -- out->type is

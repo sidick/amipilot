@@ -1,10 +1,10 @@
 """The AmiPilot object API: a Pythonic client over `WireClient`
 (server/WIRE.md framing) matching the verb set `AmiPilotServer`
 currently implements (TREE/CLICK/TYPE/GETTEXT/MANIFEST/LAUNCH/
-FSLIST/FSSTAT/FSMKDIR/FSDELETE/FSGET/VERSION/QUIT -- see
-server/README.md; windows/list, find, drag, menu-pick, wait-for, and
-fs-put are still 0.4+ scope, not invented here ahead of the server
-actually offering them).
+FSLIST/FSSTAT/FSMKDIR/FSDELETE/FSGET/MENU/MENUPICK/VERSION/QUIT --
+see server/README.md; windows/list, find, drag, wait-for, and fs-put
+are still 0.4+ scope, not invented here ahead of the server actually
+offering them).
 
 Quoting matches the ARexx port's own command grammar (arexx_cmd.c):
 window-pattern arguments containing a space must be double-quoted; a
@@ -18,6 +18,7 @@ import socket
 import time
 
 from .fs import FsEntry, parse_fs_entries, parse_fs_entry
+from .menu import MenuStrip, parse_menu_strip
 from .model import Window, parse_tree
 from .wire import RC_ERROR, RC_FAIL, RC_OK, RC_WARN, Reply, ServerInfo, WireClient
 
@@ -275,6 +276,43 @@ class Amipilot:
         mechanism the wire doesn't have yet (deferred, see the plan's
         "File system access" section)."""
         return self._run(f"FSGET {_quote(path)}").payload
+
+    def menu(self, window_pattern: str) -> MenuStrip:
+        """MENU <window-pattern> -- the matched window's full menu
+        strip: every pulldown menu, its items, and (one level deep)
+        their submenu items, with the checkit/checked/enabled state
+        and keyboard shortcut (if any) the walker read live off
+        Intuition's own struct Menu/MenuItem chain. Raises NotFound if
+        no window matches; a window with no menu strip at all returns
+        a MenuStrip with an empty `menus` list, not an error."""
+        reply = self._run(f"MENU {_quote(window_pattern)}")
+        return parse_menu_strip(reply.text)
+
+    def menu_pick(
+        self, window_pattern: str, menu_num: int, item_num: int, sub_num: int | None = None
+    ) -> None:
+        """MENUPICK <window-pattern> <menu-num> <item-num> [<sub-num>]
+        -- selects a menu item via its keyboard shortcut (Right-Amiga
+        + the shortcut character), the same input.device path a human
+        pressing that combination would use. `menu_num`/`item_num`/
+        `sub_num` are the same 0-based chain positions `menu()`'s
+        MenuItem.menu_num/item_num/sub_num report -- use `menu(...).
+        find("Some Label")` to look one up by text instead of
+        hand-counting positions.
+
+        Raises NotFound if the window or the addressed item doesn't
+        exist, ActionFailed if the item is disabled, has no keyboard
+        shortcut (pointer-based menu navigation for shortcut-less
+        items isn't built yet -- see server/README.md), or the
+        keystroke injection itself failed. RC 0 confirms the keystroke
+        was genuinely delivered to input.device; Intuition resolves it
+        against the window's live menu strip on its own, so this
+        doesn't (and can't) confirm the app's own IDCMP_MENUPICK
+        handler ran -- assert on the expected effect instead."""
+        cmd = f"MENUPICK {_quote(window_pattern)} {menu_num} {item_num}"
+        if sub_num is not None:
+            cmd += f" {sub_num}"
+        self._run(cmd)
 
     def quit(self) -> None:
         """QUIT -- shuts the server down cleanly. The connection is

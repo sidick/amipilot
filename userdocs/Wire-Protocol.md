@@ -69,10 +69,10 @@ A quick manual session over the Copperline bridge:
 ```
 $ nc 127.0.0.1 1234
 VERSION
-RC 0 134
+RC 0 148
 AMIPILOT 0.3 PROTOCOL 1
 STABLE VERSION
-EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH FSLIST FSSTAT FSMKDIR FSDELETE FSGET QUIT
+EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH FSLIST FSSTAT FSMKDIR FSDELETE FSGET MENU MENUPICK QUIT
 GETTEXT GadTools 2
 RC 0 10
 aminet.net
@@ -223,3 +223,48 @@ not a general file transfer mechanism.
 binary request body, and the wire's request grammar today is strictly
 single LF-terminated text lines — a real protocol addition, deferred
 as its own follow-up rather than bolted on here.
+
+## Menus
+
+From 0.4, a connected session can read a window's menu strip and
+select an item by its keyboard shortcut:
+
+```python
+from amipilot import ActionFailed, Amipilot
+
+with Amipilot.connect("127.0.0.1", 1234) as client:
+    strip = client.menu("GadTools")
+    project = strip.menus[0]
+    print(project.title, [i.text for i in project.items])
+
+    about = strip.find("About")             # look up by label instead
+    client.menu_pick("GadTools", about.menu_num, about.item_num)
+
+    try:
+        client.menu_pick("GadTools", 0, 2)   # a disabled item, say
+    except ActionFailed:
+        pass                                  # RC 20, expected
+```
+
+`menu()` returns a `MenuStrip`: one `Menu` per pulldown title, each
+with a list of `MenuItem`s and — one level deep, matching classic
+Intuition's own limit — their submenu items. Each `MenuItem` carries
+`text`, `checkit`/`checked` (for a checkmark toggle item),
+`enabled`, `shortcut` (the single keyboard character, or `None`), and
+`menu_num`/`item_num`/`sub_num` — the same 0-based chain positions
+Intuition itself reports via `IDCMP_MENUPICK`'s `MENUNUM()`/
+`ITEMNUM()`/`SUBNUM()` macros. `MenuStrip.find("some label")` looks up
+an item by its text instead of hand-counting positions.
+
+**`menu_pick()` selects by keyboard shortcut only, for now.** It
+activates the window, then strikes the item's shortcut character with
+the right-Amiga qualifier held — the same input.device path a human
+pressing Right-Amiga+key produces. Intuition resolves that
+combination against the window's own live menu strip; AmiPilot
+doesn't (and can't) synthesize the pick event directly, so `RC 0` is
+real evidence the pick reached the app through the genuine
+menu-shortcut path. Raises `ActionFailed` (`RC 20`) if the item is
+disabled, or if it has no keyboard shortcut at all — pointer-based
+navigation (open the menu, move across items, release over the
+target) for shortcut-less items is planned but not built yet; see
+`server/README.md`.
