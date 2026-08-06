@@ -96,6 +96,36 @@ Lands in phase 0.2 onward -- see
   process is genuinely functional with the non-default stack, not just
   that it didn't immediately crash.
 
+- **File API (phase 0.4, in progress):** `FSLIST`/`FSSTAT`/`FSMKDIR`/
+  `FSDELETE`/`FSGET`, each taking a single `<path>` argument (quoted
+  the same way a window pattern is if it contains a space) --
+  `src/fs.c`. Disabled entirely until the server is started with at
+  least one `AmiPilotServer ... FSROOT=<path> [FSROOT=<path> ...]`
+  grant (`FSROOT/K/M`, so multiple roots may be given); every verb
+  refuses a path outside every granted root with `RC 10` naming the
+  granted list, and there is no way to grant a root after startup.
+  Containment is checked by **lock identity**
+  (`Lock()`/`ParentDir()`/`SameLock()`, all V36), never by string
+  prefix matching -- Amiga assigns mean two different path strings can
+  name the same or a nested location, so string comparison would miss
+  genuine matches and genuine escapes alike. `FSGET` returns the whole
+  file as raw bytes (may contain embedded NULs; the wire's
+  length-prefixed framing carries them intact) and is capped at the
+  server's own internal buffer (`AMIP_FS_BUF_SIZE`, 16KB) -- this is a
+  test-staging channel for small fixtures/config/log files, not a file
+  manager, and `RC 20` on anything larger. **`FSPUT` (host-to-Amiga
+  writes) is deliberately not built here** -- the wire's request
+  grammar is strictly single LF-terminated text lines today, and a
+  binary request body needs its own protocol addition; a real, separate
+  follow-up, not silently dropped scope.
+  Verified end-to-end by `make test-target`'s file API check
+  (`tests/copperline/fs-test.py`): seeds a granted `RAM:` directory
+  with a file via `S:User-Startup` before the server starts (`FSROOT`
+  is a startup-time `Lock()`, so the root must already exist), then
+  over the wire lists it, stats and reads the seeded file back byte-
+  for-byte, creates and deletes a subdirectory, and confirms `FSLIST
+  SYS:` -- outside the granted root -- is rejected rather than served.
+
 ## Phase 0.2 (shipped)
 
 - `src/action.c` + `include/action_engine.h` -- the action engine's

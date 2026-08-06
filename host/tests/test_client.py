@@ -84,6 +84,15 @@ class Quoting(unittest.TestCase):
         with self.assertRaises(ValueError):
             c.launch("SRC:build/fixtures/GTApp\nQUIT")
 
+    def test_fs_verbs_quote_spaced_paths(self):
+        c = client_with(b"RC 0 0\n", b"RC 0 0\n", b"RC 0 0\n")
+        c.fs_mkdir("Work:My Dir")
+        c.fs_delete("Work:My Dir")
+        c.fs_get("Work:My Dir/file")
+        self.assertEqual(c._wire._t.sent[0], b'FSMKDIR "Work:My Dir"\n')
+        self.assertEqual(c._wire._t.sent[1], b'FSDELETE "Work:My Dir"\n')
+        self.assertEqual(c._wire._t.sent[2], b'FSGET "Work:My Dir/file"\n')
+
 
 class RcMapping(unittest.TestCase):
     def test_ok_returns_normally(self):
@@ -143,6 +152,50 @@ class Verbs(unittest.TestCase):
     def test_quit_does_not_raise_on_ok(self):
         c = client_with(b"RC 0 0\n")
         c.quit()
+
+    def test_fs_list_parses_entries(self):
+        payload = (
+            'entry name="GTApp" type=file size=4096 prot=rwed '
+            'date="06-Aug-26 12:00:00" comment=""\n'
+            'entry name="fixtures" type=dir size=0 prot=rwed '
+            'date="06-Aug-26 12:00:00" comment="test data"\n'
+        )
+        c = client_with(b"RC 0 %d\n%s" % (len(payload), payload.encode()))
+        entries = c.fs_list("Work:build")
+        self.assertEqual(c._wire._t.sent[0], b"FSLIST Work:build\n")
+        self.assertEqual(len(entries), 2)
+        self.assertEqual(entries[0].name, "GTApp")
+        self.assertFalse(entries[0].is_dir)
+        self.assertEqual(entries[0].size, 4096)
+        self.assertTrue(entries[1].is_dir)
+        self.assertEqual(entries[1].comment, "test data")
+
+    def test_fs_stat_parses_single_entry(self):
+        payload = (
+            'entry name="GTApp" type=file size=4096 prot=rwed '
+            'date="06-Aug-26 12:00:00" comment=""\n'
+        )
+        c = client_with(b"RC 0 %d\n%s" % (len(payload), payload.encode()))
+        entry = c.fs_stat("Work:build/GTApp")
+        self.assertEqual(c._wire._t.sent[0], b"FSSTAT Work:build/GTApp\n")
+        self.assertEqual(entry.name, "GTApp")
+        self.assertEqual(entry.prot, "rwed")
+
+    def test_fs_get_returns_raw_bytes_with_embedded_nul(self):
+        payload = b"hello\x00world"
+        c = client_with(b"RC 0 %d\n%s" % (len(payload), payload))
+        self.assertEqual(c.fs_get("Work:build/data"), payload)
+
+    def test_fs_mkdir_and_delete_do_not_raise_on_ok(self):
+        c = client_with(b"RC 0 0\n", b"RC 0 0\n")
+        c.fs_mkdir("Work:newdir")
+        c.fs_delete("Work:newdir")
+
+    def test_fs_list_outside_allowlist_raises_command_error(self):
+        payload = b"path not under any granted root (granted: Work:)"
+        c = client_with(b"RC 10 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(CommandError):
+            c.fs_list("SYS:")
 
 
 class FakeSocket:

@@ -1,9 +1,10 @@
 """The AmiPilot object API: a Pythonic client over `WireClient`
 (server/WIRE.md framing) matching the verb set `AmiPilotServer`
-currently implements (TREE/CLICK/TYPE/GETTEXT/MANIFEST/VERSION/QUIT --
-see server/README.md; windows/list, find, drag, menu-pick, wait-for,
-launch, and the file API are 0.4 scope, not invented here ahead of the
-server actually offering them).
+currently implements (TREE/CLICK/TYPE/GETTEXT/MANIFEST/LAUNCH/
+FSLIST/FSSTAT/FSMKDIR/FSDELETE/FSGET/VERSION/QUIT -- see
+server/README.md; windows/list, find, drag, menu-pick, wait-for, and
+fs-put are still 0.4+ scope, not invented here ahead of the server
+actually offering them).
 
 Quoting matches the ARexx port's own command grammar (arexx_cmd.c):
 window-pattern arguments containing a space must be double-quoted; a
@@ -16,6 +17,7 @@ from __future__ import annotations
 import socket
 import time
 
+from .fs import FsEntry, parse_fs_entries, parse_fs_entry
 from .model import Window, parse_tree
 from .wire import RC_ERROR, RC_FAIL, RC_OK, RC_WARN, Reply, ServerInfo, WireClient
 
@@ -231,6 +233,48 @@ class Amipilot:
             self._run(f"LAUNCH STACK={stack} {command}")
         else:
             self._run(f"LAUNCH {command}")
+
+    def fs_list(self, path: str) -> list[FsEntry]:
+        """FSLIST <path> -- lists a directory's entries. `path` must
+        resolve inside a root granted to the server at startup via
+        FSROOT (server/README.md's "File API"); anything else raises
+        CommandError naming the granted roots. Raises NotFound if
+        `path` doesn't exist, ActionFailed if it exists but isn't a
+        directory."""
+        return parse_fs_entries(self._run(f"FSLIST {_quote(path)}").text)
+
+    def fs_stat(self, path: str) -> FsEntry:
+        """FSSTAT <path> -- a single file or directory's metadata,
+        without listing a directory's contents. Same allowlist and
+        NotFound rules as fs_list()."""
+        return parse_fs_entry(self._run(f"FSSTAT {_quote(path)}").text)
+
+    def fs_mkdir(self, path: str) -> None:
+        """FSMKDIR <path> -- creates a directory. `path` itself need
+        not (must not) already exist, but its parent must, and must
+        resolve inside a granted root -- a bare relative name with no
+        volume/assign or `/` is rejected rather than guessed against
+        some assumed current directory."""
+        self._run(f"FSMKDIR {_quote(path)}")
+
+    def fs_delete(self, path: str) -> None:
+        """FSDELETE <path> -- deletes a file or empty directory (plain
+        DeleteFile() semantics -- a non-empty directory fails). Same
+        allowlist and NotFound rules as fs_list()."""
+        self._run(f"FSDELETE {_quote(path)}")
+
+    def fs_get(self, path: str) -> bytes:
+        """FSGET <path> -- reads a file's full contents back as raw
+        bytes (may contain embedded NULs; the wire's length-prefixed
+        framing carries them intact, unlike the other verbs' NUL-
+        terminated text payloads). The server caps this at its own
+        internal buffer size (server/src/fs.c's AMIP_FS_BUF_SIZE, a
+        test-staging channel, not a file manager) and raises
+        ActionFailed for anything larger. There is no fs_put() --
+        writing files host-to-Amiga needs a binary request-body
+        mechanism the wire doesn't have yet (deferred, see the plan's
+        "File system access" section)."""
+        return self._run(f"FSGET {_quote(path)}").payload
 
     def quit(self) -> None:
         """QUIT -- shuts the server down cleanly. The connection is

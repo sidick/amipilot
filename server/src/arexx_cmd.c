@@ -83,6 +83,11 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
     else if (ci_streq(kw, "MANIFEST")) out->type = AMIP_AREXX_CMD_MANIFEST;
     else if (ci_streq(kw, "VERSION"))  out->type = AMIP_AREXX_CMD_VERSION;
     else if (ci_streq(kw, "LAUNCH"))   out->type = AMIP_AREXX_CMD_LAUNCH;
+    else if (ci_streq(kw, "FSLIST"))   out->type = AMIP_AREXX_CMD_FSLIST;
+    else if (ci_streq(kw, "FSSTAT"))   out->type = AMIP_AREXX_CMD_FSSTAT;
+    else if (ci_streq(kw, "FSMKDIR"))  out->type = AMIP_AREXX_CMD_FSMKDIR;
+    else if (ci_streq(kw, "FSDELETE")) out->type = AMIP_AREXX_CMD_FSDELETE;
+    else if (ci_streq(kw, "FSGET"))    out->type = AMIP_AREXX_CMD_FSGET;
     else if (ci_streq(kw, "QUIT"))     out->type = AMIP_AREXX_CMD_QUIT;
     else { out->type = AMIP_AREXX_CMD_UNKNOWN; return -1; }
 
@@ -90,7 +95,12 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
         return 0;
     }
 
-    if (out->type == AMIP_AREXX_CMD_MANIFEST) {
+    if (out->type == AMIP_AREXX_CMD_MANIFEST ||
+        out->type == AMIP_AREXX_CMD_FSLIST ||
+        out->type == AMIP_AREXX_CMD_FSSTAT ||
+        out->type == AMIP_AREXX_CMD_FSMKDIR ||
+        out->type == AMIP_AREXX_CMD_FSDELETE ||
+        out->type == AMIP_AREXX_CMD_FSGET) {
         p = skip_ws(p);
         if (*p == '\0') {
             out->type = AMIP_AREXX_CMD_UNKNOWN;

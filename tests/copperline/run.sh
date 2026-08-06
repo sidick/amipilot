@@ -580,6 +580,92 @@ EOF
 	fi
 }
 
+# --- file API check (phase 0.4, allowlist-scoped FSLIST/FSSTAT/FSMKDIR/
+# FSDELETE/FSGET) ------------------------------------------------------
+# smoke.script stages a granted root (RAM:amipilot-fs-test, created and
+# seeded with a small file BEFORE AmiPilotServer starts -- FSROOT is a
+# Lock() at startup, so the directory must already exist) and starts
+# the server with FSROOT=RAM:amipilot-fs-test. tests/copperline/
+# fs-test.py then exercises the happy path (list/stat/get the seeded
+# file, mkdir/stat/delete a subdirectory) and the containment check
+# (FSLIST SYS: must be rejected, not served) over the wire.
+run_fs_check() {
+	echo "run.sh: file API"
+
+	rm -f "$BUILD/fs-result.txt" "$BUILD/marker-fs-ready.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+MakeDir RAM:amipilot-fs-test
+Echo "seed data" >RAM:amipilot-fs-test/seed.txt
+Run >NIL: SRC:build/AmiPilotServer SERIAL FSROOT=RAM:amipilot-fs-test
+Wait 5
+Echo "READY" >SRC:build/marker-fs-ready.txt
+EOF
+
+	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
+	rm -f "$info"
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
+		--fast 8M --noaudio --serial tcp --control :0 --control-info "$info" \
+		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
+	COPPERLINE_PID=$!
+
+	tries=0
+	while [ ! -f "$info" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 100 ]; then
+			echo "run.sh: FAIL (fs): copperline never wrote $info"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			return
+		fi
+		sleep 0.1
+	done
+
+	"$COPPERLINE_CTL" --info "$info" run_until '{"seconds": 600}' > /dev/null 2>&1 &
+
+	tries=0
+	while [ ! -f "$BUILD/marker-fs-ready.txt" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 120 ]; then
+			echo "run.sh: FAIL (fs): guest never became ready -- crash or hang"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			rm -f "$info"
+			return
+		fi
+		sleep 0.5
+	done
+
+	python3 "$REPO_ROOT/tests/copperline/fs-test.py" 127.0.0.1:1234 \
+		> "$BUILD/fs-result.txt" 2>&1 || true
+
+	kill "$COPPERLINE_PID" 2>/dev/null || true
+	COPPERLINE_PID=""
+	rm -f "$info"
+
+	ok=1
+	for pattern in \
+		'FSLIST-SEED PASS' \
+		"FSGET RESULT='seed data" \
+		'FSMKDIR PASS' \
+		'FSDELETE PASS' \
+		'CONTAINMENT PASS SYS: rejected'; do
+		if ! grep -qF "$pattern" "$BUILD/fs-result.txt" 2>/dev/null; then
+			echo "run.sh: FAIL (fs): expected line not found: $pattern"
+			ok=0
+		fi
+	done
+
+	if [ "$ok" -eq 1 ]; then
+		echo "run.sh: PASS (file API)"
+	else
+		echo "run.sh:   --- actual output ---"
+		sed 's/^/run.sh:   /' "$BUILD/fs-result.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+	fi
+}
+
 # --- pytest release gate (phase 0.3, host/amipilot/pytest_plugin.py) ------
 # The literal phase 0.3 release gate (docs/implementation-plan.md): "a
 # host pytest clicks a button and asserts a label changed,
@@ -629,6 +715,7 @@ run_arexx_check
 run_manifest_check
 run_wire_check
 run_launch_check
+run_fs_check
 run_pytest_release_gate_check
 
 if [ "$FAILED" -eq 0 ]; then
@@ -643,6 +730,7 @@ if [ "$FAILED" -eq 0 ]; then
 		"$BUILD"/manifest-result.txt "$BUILD"/marker-manifest.txt \
 		"$BUILD"/wire-result.txt "$BUILD"/marker-wire-ready.txt \
 		"$BUILD"/launch-result.txt "$BUILD"/marker-launch-ready.txt \
+		"$BUILD"/fs-result.txt "$BUILD"/marker-fs-ready.txt \
 		"$BUILD"/pytest-result.txt
 	echo "run.sh: all fixtures PASS"
 	exit 0

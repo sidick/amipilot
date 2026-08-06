@@ -39,6 +39,11 @@ match wins. Quote it if it contains spaces.
 | `MANIFEST` | `<file-path>` | Loads an application's manifest (see below). Replaces any previously loaded one. `RESULT` reports what loaded (`loaded GTApp: 1 windows, 3 gadgets`); a rejected manifest returns `RC=10` with the reason (including line number) in `RESULT`. |
 | `VERSION` | (none) | Returns the server version, wire-protocol number, and the stable/experimental verb lists (multi-line, same payload the [wire handshake](Wire-Protocol.md) uses) — for feature-testing from a script. |
 | `LAUNCH` | `[STACK=<n>] <command-line...>` | Starts `command-line` as an AmigaDOS process (asynchronous — the commodity keeps servicing the port while it runs). `STACK` sets the new process's stack in bytes (default 4000, AmigaDOS's own `CreateNewProc()` default — most Intuition/ReAction GUI apps need more). `RC=0` means the process itself could be created, **not** that the command was found or ran successfully; assert on the expected effect (a window appearing) instead. See [Wire Protocol](Wire-Protocol.md#launch) for the full contract and its honest limits. |
+| `FSLIST` | `<path>` | Lists a directory's entries (name, file/dir, size, protection, date, comment). Only works inside a root granted at startup — see [File API](Wire-Protocol.md#file-api). |
+| `FSSTAT` | `<path>` | The metadata for a single file or directory, without listing its contents. |
+| `FSMKDIR` | `<path>` | Creates a directory. Its parent must already exist and be inside a granted root. |
+| `FSDELETE` | `<path>` | Deletes a file or empty directory. |
+| `FSGET` | `<path>` | Returns a file's full contents (`RESULT` is the raw bytes, capped at the server's own small internal buffer — a test-staging channel, not a file manager). There is no `FSPUT`: writing files host-to-Amiga needs a wire feature that doesn't exist yet. |
 | `QUIT` | (none) | Shuts the commodity down cleanly. |
 
 The same command set is also reachable from a host machine over

@@ -15,11 +15,12 @@ in the repository.
 > Run AmiPilotServer SERIAL
 > Run AmiPilotServer TCP TCPPORT=6800
 > Run AmiPilotServer SERIAL TCP TCPPORT=6800
+> Run AmiPilotServer SERIAL FSROOT=Work:amipilot-staging
 ```
 
 `SERIAL` and `TCP` are independent — enable either or both. Options
 (ReadArgs template `SERIAL/S,SERDEVICE/K,SERUNIT/K/N,BAUD/K/N,TCP/S,
-TCPPORT/K/N`):
+TCPPORT/K/N,FSROOT/K/M`):
 
 | Argument | Default | Meaning |
 |----------|---------|---------|
@@ -29,6 +30,7 @@ TCPPORT/K/N`):
 | `BAUD` | `19200` | Line rate; both ends must agree. 19200 is a safe floor for a plain 68000; faster CPUs handle more |
 | `TCP` | off | Enable the TCP transport (bsdsocket.library) |
 | `TCPPORT` | *(required with `TCP`)* | Listen port |
+| `FSROOT` | off (file API disabled) | Grants a directory to the file API (see [File API](#file-api) below). Repeatable — `FSROOT=Work:a FSROOT=Work:b` grants both. The directory must already exist; it's locked once at startup and held for the server's whole run. |
 
 The serial line is 8N1 with xon/xoff **disabled** (responses are
 binary-safe; software flow control would corrupt them). TCP is
@@ -67,10 +69,10 @@ A quick manual session over the Copperline bridge:
 ```
 $ nc 127.0.0.1 1234
 VERSION
-RC 0 90
+RC 0 134
 AMIPILOT 0.3 PROTOCOL 1
 STABLE VERSION
-EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST QUIT
+EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH FSLIST FSSTAT FSMKDIR FSDELETE FSGET QUIT
 GETTEXT GadTools 2
 RC 0 10
 aminet.net
@@ -168,3 +170,56 @@ capture yet to see that failure. Always assert on the expected effect
 (a window appearing, as above) rather than trusting the RC alone. A
 `proc-wait` verb for real exit-code retrieval is planned but not built
 yet — see `server/README.md`.
+
+## File API
+
+From 0.4, a connected session can list/stat/create/delete files and
+read one back, scoped to directories explicitly granted at startup via
+one or more `FSROOT` options (above) — nothing is granted implicitly,
+and there is no way to grant a root once the server is running:
+
+```python
+from amipilot import Amipilot, CommandError, NotFound
+
+with Amipilot.connect("127.0.0.1", 1234) as client:
+    for entry in client.fs_list("Work:amipilot-staging"):
+        print(entry.name, "dir" if entry.is_dir else "file", entry.size)
+
+    data = client.fs_get("Work:amipilot-staging/results.log")
+
+    client.fs_mkdir("Work:amipilot-staging/run3")
+    client.fs_delete("Work:amipilot-staging/run3")
+
+    try:
+        client.fs_list("SYS:")          # outside every granted root
+    except CommandError:
+        pass                             # RC 10, expected
+```
+
+`fs_stat()` returns the same `FsEntry` shape as one `fs_list()` row —
+name, `is_dir`, `size`, `prot` (the classic four-character `rwed`
+string, inverted-bit gotcha already handled), `date`, `comment` — for
+a single path without listing a whole directory.
+
+**Containment is checked by lock identity, not string matching** —
+`Lock()`/`ParentDir()`/`SameLock()`, walking up from the target to see
+whether it lands on a granted root. Amiga assigns mean two different
+path *strings* can name the same or a nested location, so a prefix
+check would be both wrong (missing genuine matches) and unsafe
+(missing genuine escapes). A path outside every granted root raises
+`CommandError` (`RC 10`) naming what *is* granted; a genuinely missing
+path raises `NotFound` (`RC 5`).
+
+`fs_get()` returns the file's exact bytes (`Reply.payload`, not the
+NUL-terminated `.text` other verbs use — a file's contents may
+legitimately contain embedded NULs, and the wire's length-prefixed
+framing carries them intact). The server caps this at its own small
+internal buffer (`server/src/fs.c`'s `AMIP_FS_BUF_SIZE`, currently
+16KB) and raises `ActionFailed` (`RC 20`) for anything larger — this
+is a test-staging channel for small fixtures, config, and log files,
+not a general file transfer mechanism.
+
+**There is no `fs_put()`.** Writing a file host-to-Amiga needs a
+binary request body, and the wire's request grammar today is strictly
+single LF-terminated text lines — a real protocol addition, deferred
+as its own follow-up rather than bolted on here.
