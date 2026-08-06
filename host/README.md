@@ -38,15 +38,43 @@ needs installing beyond Python 3.9+.
   `GETTEXT`/`CLICK` all round-trip correctly, RC-5 (not found) surfaces
   as a clean CLI error.
 
-Still to come: the pytest plugin (fixtures that boot an emulator config,
-wait for the server, and expose `Amipilot`).
+- **`amipilot.pytest_plugin`** -- the pytest plugin (auto-registered via
+  the `pytest11` entry point once `host/` is installed): the
+  session-scoped `amipilot` fixture boots a Copperline config that
+  already stages `AmiPilotServer SERIAL` (same `S:User-Startup` staging
+  technique `tests/copperline/run.sh` uses), waits for the wire
+  transport to answer, and hands the test a connected `Amipilot`. This
+  is phase 0.3's actual release gate: "a host pytest clicks a button and
+  asserts a label changed, deterministically, under the emulator."
+  Options: `--amipilot-config PATH` (or the `amipilot_config` ini
+  setting) -- unconfigured tests **skip cleanly**, the same "skip, don't
+  fake a pass" contract `make test-target` uses without a real
+  Kickstart/Workbench asset. `--amipilot-copperline`/
+  `--amipilot-copperline-ctl` (default from `$COPPERLINE`/
+  `$COPPERLINE_CTL`, else the bare binary names), `--amipilot-wire-port`
+  (default 1234), `--amipilot-boot-timeout` (default 60s), and the
+  `amipilot_copperline_args` ini setting for extra Copperline flags
+  (model/chipset/chip/fast/etc. -- `--config`/`--serial tcp`/`--control`
+  are added automatically).
+
+  ```python
+  def test_connect_click_asserts_label(amipilot):
+      amipilot.type("GadTools", 2, "aminet.net")
+      assert amipilot.get_text("GadTools", 2) == "aminet.net"
+      amipilot.click("GadTools", 1)
+  ```
 
 ## Running the tests
 
 ```sh
-python3 -m unittest discover -s tests -v   # from this directory, or:
-make test-host                              # from the repo root
+python3 -m pytest tests -v   # from this directory, or:
+make test-host                # from the repo root (installs host/[test] first)
 ```
+
+The plugin's own boot/skip logic is covered without a real emulator
+(monkeypatched subprocesses, `pytest`'s own `pytester` fixture driving
+real sub-sessions); `tests/copperline/run.sh` additionally exercises it
+live against a real guest under Copperline.
 
 ## Installing (for `amipilot dump`)
 

@@ -498,11 +498,55 @@ EOF
 	fi
 }
 
+# --- pytest release gate (phase 0.3, host/amipilot/pytest_plugin.py) ------
+# The literal phase 0.3 release gate (docs/implementation-plan.md): "a
+# host pytest clicks a button and asserts a label changed,
+# deterministically, under the emulator." Unlike every check above,
+# THIS ONE doesn't launch Copperline itself -- the `amipilot` pytest
+# fixture does that, from --amipilot-config, exercising the plugin's own
+# boot path (not just its unit-tested mock) against a real guest. Only
+# the User-Startup staging (GTApp + AmiPilotServer SERIAL) is this
+# script's job, same smoke.script mechanism every other check uses.
+run_pytest_release_gate_check() {
+	echo "run.sh: pytest release gate"
+
+	if ! python3 -m pytest --version > /dev/null 2>&1; then
+		echo "run.sh: pytest not installed -- run: pip install -e '$REPO_ROOT/host/[test]'"
+		FAILED=1
+		return
+	fi
+
+	rm -f "$BUILD/pytest-result.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+Run >NIL: SRC:build/fixtures/GTApp
+Wait 5
+Run >NIL: SRC:build/AmiPilotServer SERIAL
+EOF
+
+	python3 -m pytest "$REPO_ROOT/tests/copperline/pytest-example" -v \
+		--amipilot-config="$CONFIG" \
+		--amipilot-copperline="$COPPERLINE" \
+		--amipilot-copperline-ctl="$COPPERLINE_CTL" \
+		--amipilot-boot-timeout=40 \
+		> "$BUILD/pytest-result.txt" 2>&1
+	rc=$?
+
+	if [ "$rc" -eq 0 ] && grep -qE '1 passed' "$BUILD/pytest-result.txt"; then
+		echo "run.sh: PASS (pytest release gate)"
+	else
+		echo "run.sh: FAIL (pytest release gate): exit=$rc"
+		echo "run.sh:   --- actual output ---"
+		sed 's/^/run.sh:   /' "$BUILD/pytest-result.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+	fi
+}
+
 run_click_check
 run_type_check
 run_arexx_check
 run_manifest_check
 run_wire_check
+run_pytest_release_gate_check
 
 if [ "$FAILED" -eq 0 ]; then
 	rm -f "$BUILD"/.copperline-ctl-info-*.json "$BUILD"/.copperline-log-*.txt \
@@ -514,7 +558,8 @@ if [ "$FAILED" -eq 0 ]; then
 		"$BUILD"/marker-type.txt \
 		"$BUILD"/arexx-result.txt "$BUILD"/marker-arexx.txt \
 		"$BUILD"/manifest-result.txt "$BUILD"/marker-manifest.txt \
-		"$BUILD"/wire-result.txt "$BUILD"/marker-wire-ready.txt
+		"$BUILD"/wire-result.txt "$BUILD"/marker-wire-ready.txt \
+		"$BUILD"/pytest-result.txt
 	echo "run.sh: all fixtures PASS"
 	exit 0
 else

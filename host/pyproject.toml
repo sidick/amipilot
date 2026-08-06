@@ -18,5 +18,8 @@ test = ["pytest"]
 [project.scripts]
 amipilot = "amipilot.__main__:main"
 
+[project.entry-points.pytest11]
+amipilot = "amipilot.pytest_plugin"
+
 [tool.setuptools.packages.find]
 include = ["amipilot*"]
