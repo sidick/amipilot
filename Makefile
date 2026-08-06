@@ -149,12 +149,17 @@ docker:
 # assuming a prior job already ran it.
 build: amiga fixtures
 
-# Host-side unit tests: the wire client's framing/handshake against
-# server/WIRE.md, pure stdlib unittest (no emulator, no dependencies) --
-# the first real test-host content (phase 0.3). The pytest plugin will
-# sit on top of, not replace, these.
+# Host-side tests: wire client framing/handshake, the TREE parser, the
+# object API, and the pytest plugin's own boot/skip logic (phase 0.3) --
+# all against a scripted transport/subprocess, no emulator needed. Runs
+# under pytest (a superset of unittest -- it collects the plain
+# unittest.TestCase files here too, so this is one test run, not two);
+# host/ is editable-installed first so amipilot.pytest_plugin registers
+# via its real pytest11 entry point, exactly as a real consumer sees it,
+# not force-loaded with -p.
 test-host:
-	python3 -m unittest discover -s host/tests -v
+	pip install --quiet -e 'host/[test]'
+	python3 -m pytest host/tests -v
 
 # tests/copperline/run.sh boots both fixtures headlessly under Copperline
 # and asserts AmiInspect's classification output -- but it needs
