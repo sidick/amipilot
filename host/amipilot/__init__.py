@@ -1,10 +1,30 @@
 """AmiPilot host-side client (phase 0.3, growing).
 
-Currently: the wire-protocol client (`amipilot.wire`) speaking
-server/WIRE.md's framing over any byte-stream transport. The object API
-and pytest plugin land on top of this.
+- `amipilot.wire` -- the transport-level client (server/WIRE.md framing)
+  over any byte-stream transport.
+- `amipilot.model` -- parses the TREE text format into Window/Gadget.
+- `amipilot.client` -- `Amipilot`, the object API on top of both: the
+  thing test code actually imports.
+
+The pytest plugin (emulator-booting fixtures) lands on top of this.
 """
 
-from .wire import Reply, WireClient, WireError, ProtocolMismatch
+from .client import ActionFailed, Amipilot, AmipilotError, CommandError, NotFound
+from .model import Gadget, TreeParseError, Window
+from .wire import ProtocolMismatch, Reply, ServerInfo, WireClient, WireError
 
-__all__ = ["Reply", "WireClient", "WireError", "ProtocolMismatch"]
+__all__ = [
+    "ActionFailed",
+    "Amipilot",
+    "AmipilotError",
+    "CommandError",
+    "Gadget",
+    "NotFound",
+    "ProtocolMismatch",
+    "Reply",
+    "ServerInfo",
+    "TreeParseError",
+    "WireClient",
+    "WireError",
+    "Window",
+]

@@ -23,10 +23,14 @@ genuine public ARexx port **and** (0.3) the serial wire transport
 (`server/src/serial.c`, framing contract in `server/WIRE.md`) — see
 `server/README.md` for the verb set and what's verified. `manifest/`
 carries the manifest contract (`manifest/SPEC.md`, parsed by
-`server/src/manifest.c`). `host/` has its first real code: the wire
-client (`host/amipilot/wire.py`) with stdlib-unittest coverage
-(`make test-host` is a real check now); the object API and pytest
-plugin are still to come. User-facing documentation lives in `userdocs/` (built
+`server/src/manifest.c`). `host/` is a real, installable package now:
+the wire client (`host/amipilot/wire.py`), the TREE-text parser
+(`host/amipilot/model.py`), the object API (`host/amipilot/client.py` —
+`Amipilot`, what test code actually imports), and `amipilot dump`
+(`host/amipilot/dump.py`, a console script via `host/pyproject.toml`) —
+all with stdlib-unittest coverage (`make test-host` is a real check).
+Only the pytest plugin (emulator-booting fixtures) is still to come.
+User-facing documentation lives in `userdocs/` (built
 as a MkDocs site,
 `mkdocs.yml`) and mirrored to AmigaGuide via `make guide`
 (`tools/docs2guide.py`) — see `userdocs/Building-and-Testing.md`.

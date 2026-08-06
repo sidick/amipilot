@@ -84,3 +84,27 @@ assert reply.text == "aminet.net"
 The commands themselves are documented in the
 [ARexx Reference](ARexx-Reference.md) — the wire adds no verbs of its
 own beyond `VERSION`.
+
+## The object API and `amipilot dump`
+
+Most scripts won't touch `WireClient` directly — `amipilot.client`
+wraps it in a Pythonic API that raises exceptions on non-OK replies
+instead of requiring you to check RC codes by hand:
+
+```python
+from amipilot import Amipilot, NotFound
+
+with Amipilot.connect("127.0.0.1", 1234) as client:
+    client.type("GadTools", 2, "aminet.net")
+    window = client.tree("GadTools")           # -> Window, gadgets parsed
+    try:
+        client.click("GadTools", 99)
+    except NotFound:
+        ...
+```
+
+`amipilot dump "<window>"` (installed via `pip install -e host/`) is the
+host-side half of [the inspector](https://github.com/sidick/amipilot/blob/main/docs/implementation-plan.md#the-inspector):
+connects, fetches a window's tree, and prints it — either the same text
+`AmiInspect` prints (`--format text`, the default) or quirk-profile-ready
+`# name = <id>` suggestions (`--format python`) to copy into a test.

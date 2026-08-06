@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "amipilot"
+version = "0.3.0"
+description = "Host-side client for AmiPilot: object-level GUI automation for classic AmigaOS"
+readme = "README.md"
+requires-python = ">=3.9"
+# Stdlib-only by design (sockets, argparse) -- matches the wire's own
+# no-JSON-parser, no-dependency spirit (docs/implementation-plan.md).
+dependencies = []
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[project.scripts]
+amipilot = "amipilot.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["amipilot*"]
