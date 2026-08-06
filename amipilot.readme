@@ -2,23 +2,25 @@ Short:        Object-level GUI automation for classic AmigaOS
 Author:       simond@irrelevant.org (Simon Dick)
 Uploader:     simond@irrelevant.org (Simon Dick)
 Type:         util/misc
-Version:      0.1
+Version:      0.3
 Architecture: m68k-amigaos
 Distribution: GitHub only (not yet on Aminet)
 
-AmiInspect is a standalone Shell command that walks any window's gadget
-tree and prints its roles, labels, classes, IDs, positions, and states -
-semantically, not by pixels. It's the platform's first UIA-Inspect /
-browser element-picker equivalent: no host machine, server, or session
-required, and no coordinate-level guessing that breaks on the next
-layout change.
+AmiPilot is an object-level GUI automation system for classic AmigaOS:
+find a window or gadget by ID, label, or role; act on it with genuinely
+synthesised input (real input.device events, not coordinate guessing);
+assert on the result. This archive has two pieces:
 
-This is the first release of AmiPilot, a project building toward full
-object-level GUI automation (find a window/gadget, act on it with
-genuinely synthesised input, assert on the result) - AmiInspect is the
-read side of that, shipped first because it's independently useful on
-its own and is the development tool everything after it gets debugged
-against.
+  - AmiInspect: a standalone Shell command that walks any window's
+    gadget tree and prints its roles, labels, classes, IDs, positions,
+    and states - the platform's first UIA-Inspect / browser element-
+    picker equivalent. No host machine, server, or session required.
+  - AmiPilotServer: a commodity that hosts the same walker plus a real
+    action engine (click, type, read state) behind a public ARexx port
+    and, from 0.3, the same command set over a host-facing wire
+    protocol (serial.device) - so a script running on the SAME Amiga,
+    or a Python client on a host machine, can drive another program's
+    GUI. See "Documentation" below for the full command/wire reference.
 
 Features
 --------
@@ -32,8 +34,14 @@ Features
   - BOOPSI/ReAction gadgets: reads the real, live class name
     (button.gadget, checkbox.gadget, layout.gadget, and more) via a
     documented NDK mechanism, and maps known classes to a role.
-  - Verified against a real, unmodified stock AmigaOS Prefs editor, not
-    just software built for this project.
+  - Genuine input.device event synthesis for clicks and typed text
+    (IECLASS_NEWPOINTERPOS/RAWKEY), not coordinate-level or posted-
+    message shortcuts - driven from an ARexx port (AmiPilotServer) or,
+    from 0.3, the same commands over serial.device from a host Python
+    client.
+  - Verified against real, unmodified stock AmigaOS software and
+    purpose-built conformance fixtures, not just software built for
+    this project.
   - Honest, documented limits rather than silent gaps: a few specific,
     well-understood cases (PLACETEXT_IN button labels, a window.class
     window's layout.gadget-nested children) are genuinely unreadable at
@@ -45,19 +53,24 @@ Requirements
   - AmigaOS 2.04 (V37) or later. Plain 68000, no FPU - nothing here does
     float work or needs anything newer than a stock CPU.
   - gadtools.library (any version) is optional but recommended - without
-    it, AmiInspect can't distinguish a GadTools checkbox from a plain
-    button.
+    it, gadget classification degrades gracefully rather than failing.
+  - rexxsyslib.library is required to run AmiPilotServer's ARexx port
+    (AmiInspect needs neither this nor gadtools.library to run at all).
 
 Installation
 ------------
-  Copy "AmiInspect" to C: (or anywhere on your command Path). No reboot,
-  no configuration.
+  Copy "AmiInspect" and/or "AmiPilotServer" to C: (or anywhere on your
+  command Path). No reboot, no configuration.
 
 Quick start
 -----------
   AmiInspect                  inspect the active window
   AmiInspect WINDOW=Prefs     inspect the first window whose title
                                contains "Prefs"
+  Run AmiPilotServer           start the commodity; opens an ARexx port
+                               named AMIPILOT.1 (or the next free slot)
+  Run AmiPilotServer SERIAL    also carry the same commands over
+                               serial.device, for a host Python client
 
 AI disclosure
 -------------
@@ -65,16 +78,17 @@ AI disclosure
   (Anthropic's Claude, via Claude Code), working under human direction,
   review, and on-target testing. Every feature in this release was
   verified on-target under the Copperline emulator against real AmigaOS
-  3.2.3 - including catching and fixing a genuine crash bug found only
-  by that testing - before being considered done. The entire source is
-  BSD-licensed and open for review.
+  3.2.3 before being considered done. The entire source is BSD-licensed
+  and open for review.
 
 Documentation
 -------------
-  The full command reference, locator-tier/limits documentation, and
-  troubleshooting notes are online at https://sidick.github.io/amipilot/
-  and included as amipilot.guide in this archive (AmigaGuide/MultiView,
-  OS 2.x+) for offline/on-Amiga reading - same source, both forms.
+  The full command reference (Shell, ARexx, and wire protocol),
+  locator-tier/limits documentation, and troubleshooting notes are
+  online at https://sidick.github.io/amipilot/ and included as
+  amipilot.guide in this archive (AmigaGuide/MultiView, OS 2.x+) for
+  offline/on-Amiga reading - same source, both forms. See the
+  Changelog there for what's new in each release.
 
 Source and licence
 -------------------
