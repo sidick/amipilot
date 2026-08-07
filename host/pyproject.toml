@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "amipilot"
-version = "0.3.0"
+version = "0.4.0"
 description = "Host-side client for AmiPilot: object-level GUI automation for classic AmigaOS"
 readme = "README.md"
 requires-python = ">=3.9"

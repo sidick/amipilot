@@ -7,6 +7,74 @@ the repository's
 [`docs/implementation-plan.md`](https://github.com/sidick/amipilot/blob/main/docs/implementation-plan.md)
 for the full engineering detail and phase sequencing behind each one.
 
+## v0.4 — 2026-08-07
+
+Reach: everything 0.3's wire needed to actually be useful for driving
+a real application end to end — a second transport, launching the
+subject under test, moving files, menus, and two new ways to locate
+and act on a gadget.
+
+- **TCP transport** (`AmiPilotServer TCP TCPPORT=n`): the same wire
+  over `bsdsocket.library`, for real hardware with TCP/IP or an
+  emulator with no serial bridge — listen-mode only for now (the host
+  connects in). Opt-in hardening: `TCPALLOW` (a source-IP/CIDR
+  allowlist) and `TCPPASSWORD` (gates a new `AUTH` verb, defaulting to
+  a public starting password so it works out of the box). Neither
+  makes this internet-safe — no TLS, no rate-limiting; LAN/trusted-
+  network use only, see [Wire Protocol](Wire-Protocol.md#securing-tcp).
+- **Program launch** (`LAUNCH [STACK=n] <command-line>`): starts the
+  test subject itself over the wire — `SystemTagList()`-based,
+  asynchronous, with an overridable stack size — so a test session
+  doesn't need the target pre-staged via `S:User-Startup`.
+- **The file API** (`FSLIST`/`FSSTAT`/`FSMKDIR`/`FSDELETE`/`FSGET`):
+  allowlist-scoped to directories granted at startup (`FSROOT`),
+  disabled entirely otherwise. A test-staging channel for small
+  fixtures/config/log files, not a file manager — `FSGET` is capped at
+  the server's own internal buffer. `FSPUT` (host-to-Amiga writes)
+  needs a wire protocol addition and isn't built yet.
+- **Menus** (`MENU`/`MENUPICK`): walks a window's live menu strip —
+  every pulldown, its items, checkit/checked/enabled state, and any
+  keyboard shortcut — and selects an item via that shortcut, the same
+  input.device path a human pressing Right-Amiga+key would use.
+  Pointer-based selection for items with no shortcut isn't built yet.
+- **Multi-screen support** (`SCREENS`, `SCREEN=<substring>`): lists
+  every open screen and narrows any window-targeting verb's search to
+  a specific one, keyed off each screen's own `DefaultTitle`.
+- **Tier-2 semantic locators** (`ROLE=<role>`/`LABEL=<substring>`/
+  `INDEX=<n>`, in place of a bare `GA_ID` on `CLICK`/`TYPE`/`GETTEXT`):
+  find a gadget by role and label text, or by position among several
+  matches, instead of only by numeric ID or a manifest `@name` — see
+  [ARexx Reference](ARexx-Reference.md#tier-2-semantic-locators).
+  Proximity-to-a-label matching (the third tier-2 style from the
+  design docs) isn't built yet.
+- **`DRAG`**: a genuine press/move/release drag, either by a pixel
+  offset from a gadget's current center (the natural shape for
+  adjusting a slider/scroller) or onto a second gadget's center
+  (drag-and-drop/reorder, both resolved live, zero coordinates in the
+  script).
+- **Host-side real serial port support**
+  (`Amipilot.connect_serial()`/`WireClient.connect_serial()`, the
+  pytest plugin's `--amipilot-serial-device`): connect directly over a
+  real or virtual serial port — real Amiga hardware over a real cable,
+  or a Copperline config using a real serial device — instead of only
+  Copperline's TCP bridge. Optional `pyserial` dependency
+  (`pip install amipilot[serial]`).
+
+**Known gaps, tracked as real follow-up work, not silently accepted:**
+
+- No wait/expectation primitives yet (`click` that waits for an
+  expected change, timeouts) — a script still adds its own polling.
+  Carried over from 0.1–0.3.
+- The wire connects host-to-Amiga only; the Amiga dialing out to a
+  configured host (useful behind NAT) is a considered future addition
+  ([#12](https://github.com/sidick/amipilot/issues/12)), not yet
+  built.
+- The MUI locator tier (driving MUI apps through their own automatic
+  ARexx port) isn't started.
+- No public CI on-target run yet, same reason as 0.1–0.3:
+  `make test-target` needs a machine-specific Workbench install CI
+  doesn't have.
+
 ## v0.3 — 2026-08-06
 
 The wire and the host client: the same command set the ARexx port

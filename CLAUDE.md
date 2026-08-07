@@ -13,8 +13,8 @@ protocol, and phase sequencing live in `docs/implementation-plan.md` —
 read that before making architectural decisions; this file only covers
 what's needed to build and navigate the code day to day.
 
-**Current state:** v0.2 released; phase 0.3 (the wire, the host client)
-and phase 0.4 (reach) are complete on main, not yet tagged.
+**Current state:** v0.3 released; phase 0.4 (reach) is complete on
+main, released as v0.4.
 `intuition-model/` (the walker library) and `amiinspect/` (the Shell
 command) are real, building, and verified on-target. `server/` is
 real: the action engine (`server/src/action.c`, click/type/geometry/
