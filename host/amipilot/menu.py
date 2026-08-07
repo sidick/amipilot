@@ -20,19 +20,19 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
-from .model import _WINDOW_RE
+from .model import ESCAPED_FIELD, _WINDOW_RE, unescape
 
 _MENU_RE = re.compile(
-    r'^menu num=(?P<num>\d+) title="(?P<title>[^"]*)" enabled=(?P<enabled>[01])$'
+    rf'^menu num=(?P<num>\d+) title="(?P<title>{ESCAPED_FIELD})" enabled=(?P<enabled>[01])$'
 )
 _ITEM_RE = re.compile(
     r"^  item num=(?P<menu>\d+)/(?P<item>\d+)"
-    r' text="(?P<text>[^"]*)"(?: shortcut=(?P<shortcut>\S))?'
+    rf' text="(?P<text>{ESCAPED_FIELD})"(?: shortcut=(?P<shortcut>\S))?'
     r" checkit=(?P<checkit>[01]) checked=(?P<checked>[01]) enabled=(?P<enabled>[01])$"
 )
 _SUBITEM_RE = re.compile(
     r"^    subitem num=(?P<menu>\d+)/(?P<item>\d+)/(?P<sub>\d+)"
-    r' text="(?P<text>[^"]*)"(?: shortcut=(?P<shortcut>\S))?'
+    rf' text="(?P<text>{ESCAPED_FIELD})"(?: shortcut=(?P<shortcut>\S))?'
     r" checkit=(?P<checkit>[01]) checked=(?P<checked>[01]) enabled=(?P<enabled>[01])$"
 )
 
@@ -87,7 +87,7 @@ def _parse_item(m: "re.Match[str]", sub_num: int | None) -> MenuItem:
         menu_num=int(m["menu"]),
         item_num=int(m["item"]),
         sub_num=sub_num,
-        text=m["text"],
+        text=unescape(m["text"]),
         shortcut=m["shortcut"],
         checkit=m["checkit"] == "1",
         checked=m["checked"] == "1",
@@ -106,7 +106,7 @@ def parse_menu_strip(text: str) -> MenuStrip:
     wm = _WINDOW_RE.match(lines[0])
     if wm is None:
         raise MenuParseError(f"unrecognised window line: {lines[0]!r}")
-    strip = MenuStrip(window_title=wm["title"], screen=wm["screen"])
+    strip = MenuStrip(window_title=unescape(wm["title"]), screen=unescape(wm["screen"]))
 
     current_menu: Menu | None = None
     current_item: MenuItem | None = None
@@ -117,7 +117,8 @@ def parse_menu_strip(text: str) -> MenuStrip:
         mm = _MENU_RE.match(line)
         if mm is not None:
             current_menu = Menu(
-                menu_num=int(mm["num"]), title=mm["title"], enabled=mm["enabled"] == "1"
+                menu_num=int(mm["num"]), title=unescape(mm["title"]),
+                enabled=mm["enabled"] == "1"
             )
             current_item = None
             strip.menus.append(current_menu)

@@ -9,6 +9,11 @@ live `Title` field -- see server/include/action_engine.h's
 `AmipFindWindow` doc comment for why: `Title` tracks whichever window
 is currently active on that screen rather than naming the screen
 itself, so it isn't a stable identity to match or report.
+
+`title` is escaped by the server exactly like a C string literal
+(`EscapeQuotes()`, server/src/amipilotserver/main.c) -- a screen's
+`DefaultTitle` can legitimately contain a literal `"` -- so it uses
+model.py's shared ESCAPED_FIELD/unescape() rather than a bare `[^"]*`.
 """
 
 from __future__ import annotations
@@ -16,8 +21,10 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from .model import ESCAPED_FIELD, unescape
+
 _SCREEN_RE = re.compile(
-    r'^screen title="(?P<title>[^"]*)" '
+    rf'^screen title="(?P<title>{ESCAPED_FIELD})" '
     r"\[(?P<left>-?\d+),(?P<top>-?\d+) (?P<width>\d+)x(?P<height>\d+)\] "
     r"frontmost=(?P<frontmost>[01])$"
 )
@@ -51,7 +58,7 @@ def parse_screens(text: str) -> list[Screen]:
             raise ScreenParseError(f"unrecognised screen line: {line!r}")
         screens.append(
             Screen(
-                title=m["title"],
+                title=unescape(m["title"]),
                 left=int(m["left"]),
                 top=int(m["top"]),
                 width=int(m["width"]),

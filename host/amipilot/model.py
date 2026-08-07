@@ -10,6 +10,18 @@ server/src/amipilotserver/main.c (identical to AmiInspect's own
 This is plain text, not a grammar meant to grow -- see the plan's
 no-JSON decision (docs/implementation-plan.md, "Protocol and client").
 The parser here is a fixed-format reader, not a general one.
+
+Quoted text fields (title, screen, class, label, value, and every
+other quoted field this project's other parsers read) are escaped by
+the server exactly like a C string literal: a literal quote becomes a
+backslash-quote pair, and a literal backslash becomes a backslash pair
+(`EscapeQuotes()`, server/src/amipilotserver/main.c) -- otherwise a
+real Amiga gadget label or window title containing a literal quote
+(e.g. a `3.5" Drive` label) would produce a well-formed response no
+fixed-format regex could delimit correctly. `ESCAPED_FIELD`
+and `unescape()` below are shared with this package's other parsers
+(menu.py imports both) so every wire consumer treats quoting the same
+way.
 """
 
 from __future__ import annotations
@@ -17,14 +29,39 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 
+# Matches the *escaped* contents of one quoted field: any run of
+# characters that are neither a bare quote nor a bare backslash, or a
+# backslash followed by any one character (an escape sequence) --
+# NOT a bare `[^"]*`, which stops at the first embedded quote even
+# when that quote is itself escaped (`\"`).
+ESCAPED_FIELD = r'(?:[^"\\]|\\.)*'
+
+
+def unescape(s: str) -> str:
+    """Reverses the server's own `\\"`/`\\\\` escaping. Call this on
+    every field captured via ESCAPED_FIELD before handing it back --
+    the raw regex match still contains the escape sequences verbatim."""
+    out = []
+    i = 0
+    while i < len(s):
+        c = s[i]
+        if c == "\\" and i + 1 < len(s):
+            out.append(s[i + 1])
+            i += 2
+        else:
+            out.append(c)
+            i += 1
+    return "".join(out)
+
+
 _WINDOW_RE = re.compile(
-    r'^window "(?P<title>.*)" screen="(?P<screen>[^"]*)" '
+    rf'^window "(?P<title>{ESCAPED_FIELD})" screen="(?P<screen>{ESCAPED_FIELD})" '
     r"\[(?P<left>-?\d+),(?P<top>-?\d+) (?P<width>\d+)x(?P<height>\d+)\]$"
 )
 _GADGET_RE = re.compile(
     r"^  gadget id=(?P<id>\d+) role=(?P<role>\S+) "
-    r'class="(?P<class>[^"]*)" label="(?P<label>[^"]*)"'
-    r'(?: value="(?P<value>[^"]*)")?'
+    rf'class="(?P<class>{ESCAPED_FIELD})" label="(?P<label>{ESCAPED_FIELD})"'
+    rf'(?: value="(?P<value>{ESCAPED_FIELD})")?'
     r" \[(?P<left>-?\d+),(?P<top>-?\d+) (?P<width>\d+)x(?P<height>\d+)\]$"
 )
 
@@ -81,8 +118,8 @@ def parse_tree(text: str) -> Window:
     if m is None:
         raise TreeParseError(f"unrecognised window line: {lines[0]!r}")
     window = Window(
-        title=m["title"],
-        screen=m["screen"],
+        title=unescape(m["title"]),
+        screen=unescape(m["screen"]),
         left=int(m["left"]),
         top=int(m["top"]),
         width=int(m["width"]),
@@ -99,9 +136,9 @@ def parse_tree(text: str) -> Window:
             Gadget(
                 gadget_id=int(gm["id"]),
                 role=gm["role"],
-                class_name=gm["class"],
-                label=gm["label"],
-                value=gm["value"],
+                class_name=unescape(gm["class"]),
+                label=unescape(gm["label"]),
+                value=unescape(gm["value"]) if gm["value"] is not None else None,
                 left=int(gm["left"]),
                 top=int(gm["top"]),
                 width=int(gm["width"]),

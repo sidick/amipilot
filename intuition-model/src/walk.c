@@ -331,22 +331,66 @@ static AmipWindowModel *WalkOneWindow(struct Window *window)
     return model;
 }
 
+/* TRUE if target is still genuinely linked into IntuitionBase's own
+ * live screen/window lists -- confirmed via LockIBase(), not assumed
+ * from the caller merely having a copy of the pointer. Duplicated
+ * from server/src/action.c's own AmipIsWindowOpen() rather than
+ * shared: this library has no dependency on the server (see this
+ * file's header comment), so it can't call across that boundary, and
+ * the walk needing this check for its own safety is a genuinely
+ * separate concern from the action engine's locate-then-act one. */
+static BOOL IsWindowStillOpen(struct Window *target)
+{
+    struct Screen *screen;
+    struct Window *window;
+    BOOL found = FALSE;
+
+    LockIBase(0);
+    for (screen = IntuitionBase->FirstScreen; screen != NULL && !found; screen = screen->NextScreen) {
+        for (window = screen->FirstWindow; window != NULL; window = window->NextWindow) {
+            if (window == target) {
+                found = TRUE;
+                break;
+            }
+        }
+    }
+    UnlockIBase(0);
+
+    return found;
+}
+
 AmipWindowModel *AmipWalkWindow(struct Window *window)
 {
-    AmipWindowModel *model;
-
     if (window == NULL) {
         return NULL;
     }
 
-    /* Brief hold: no allocation happens while the lock is held. We take
-     * a private snapshot of just the pointer we need before releasing. */
-    LockIBase(0);
-    struct Window *snapshot = window;
-    UnlockIBase(0);
+    /* Confirms `window` is still genuinely in Intuition's own live
+     * list right before the walk starts -- replacing what used to be
+     * here (a LockIBase()/UnlockIBase() pair wrapping nothing but a
+     * pointer copy, which protected nothing at all: the caller
+     * already had a valid pointer, so re-copying it under a lock
+     * confirmed nothing new). This narrows, but does NOT eliminate,
+     * the gap between this check and WalkOneWindow() finishing its
+     * walk -- same honest, already-accepted limit AmipIsWindowOpen()
+     * documents for the click path (server/include/action_engine.h):
+     * the window could still close in the instant after this check
+     * returns. The real fix ("action-scoped expectations", atomic
+     * with respect to the target closing) is planned but not built.
+     *
+     * WalkOneWindow()'s own work (GetAttr()/OCLASS() dispatch via
+     * WalkGadgetList(), CopyString()'s AllocVec()) genuinely cannot
+     * happen while LockIBase() is held -- its own autodoc says so
+     * explicitly: "Do not call any Intuition functions (nor any
+     * graphics, layers, dos, or other high-level system function)
+     * while holding this lock." So holding the lock across the whole
+     * walk, which would look like a stronger guarantee, is not an
+     * available option here, not just an unchosen one. */
+    if (!IsWindowStillOpen(window)) {
+        return NULL;
+    }
 
-    model = WalkOneWindow(snapshot);
-    return model;
+    return WalkOneWindow(window);
 }
 
 AmipWindowModel *AmipWalkScreen(struct Screen *screen)
@@ -548,6 +592,16 @@ AmipMenuModel *AmipWalkMenuStrip(struct Window *window)
         return NULL;
     }
 
+    /* Same IsWindowStillOpen() re-check AmipWalkWindow() uses (see its
+     * own comment for the full rationale) -- window->MenuStrip is
+     * only safe to dereference at all if `window` is still genuinely
+     * live. Two separate LockIBase()/UnlockIBase() pairs, not one
+     * held across both calls: IsWindowStillOpen() takes its own lock
+     * internally, and LockIBase()'s own autodoc gives no indication
+     * it's safe to nest. */
+    if (!IsWindowStillOpen(window)) {
+        return NULL;
+    }
     LockIBase(0);
     strip = window->MenuStrip;
     UnlockIBase(0);

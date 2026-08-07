@@ -4,7 +4,7 @@ import unittest
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from amipilot.model import TreeParseError, parse_tree  # noqa: E402
+from amipilot.model import TreeParseError, parse_tree, unescape  # noqa: E402
 
 TREE_TEXT = (
     'window "GadTools" screen="Workbench Screen" [10,20 300x120]\n'
@@ -56,6 +56,39 @@ class ParseTree(unittest.TestCase):
     def test_garbage_gadget_line_raises(self):
         with self.assertRaises(TreeParseError):
             parse_tree('window "W" screen="S" [0,0 1x1]\n  not a gadget line\n')
+
+    def test_label_with_embedded_quote_parses(self):
+        # A real Amiga gadget label like `3.5" Drive` must round-trip --
+        # the server escapes it as `3.5\" Drive` (EscapeQuotes(),
+        # server/src/amipilotserver/main.c) and this must unescape it
+        # back, not choke on the embedded quote.
+        window = parse_tree(
+            'window "GadTools" screen="Workbench Screen" [0,0 10x10]\n'
+            '  gadget id=1 role=BUTTON class="" label="3.5\\" Drive" [0,0 1x1]\n'
+        )
+        self.assertEqual(window.gadgets[0].label, '3.5" Drive')
+
+    def test_title_with_backslash_parses(self):
+        window = parse_tree('window "C:\\\\Path" screen="" [0,0 1x1]\n')
+        self.assertEqual(window.title, "C:\\Path")
+
+
+class Unescape(unittest.TestCase):
+    def test_no_escapes_unchanged(self):
+        self.assertEqual(unescape("plain text"), "plain text")
+
+    def test_escaped_quote(self):
+        self.assertEqual(unescape('3.5\\" Drive'), '3.5" Drive')
+
+    def test_escaped_backslash(self):
+        self.assertEqual(unescape("C:\\\\Path"), "C:\\Path")
+
+    def test_trailing_backslash_kept_literal(self):
+        # A lone trailing backslash (not a valid escape sequence) is
+        # passed through as-is rather than raising or dropping it --
+        # matches the server's own EscapeQuotes(), which never emits
+        # this, but the parser shouldn't crash on malformed input.
+        self.assertEqual(unescape("abc\\"), "abc\\")
 
 
 if __name__ == "__main__":
