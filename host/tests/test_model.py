@@ -13,6 +13,21 @@ TREE_TEXT = (
     "[10,20 200x14]\n"
 )
 
+# Lowercase roles, matching AmipRoleName()'s real vocabulary
+# (server-side) -- TREE_TEXT above uses uppercase to exercise the
+# parser's own tolerance, not to represent a real server payload. Two
+# same-role gadgets (button) so index disambiguation has something
+# real to pick between, mirroring the gadtools-app fixture's own
+# Connect/Cancel pair added for the same reason.
+ROLE_TREE_TEXT = (
+    'window "GadTools" screen="Workbench Screen" [10,20 220x154]\n'
+    '  gadget id=1 role=button class="" label="Connect" [20,24 100x14]\n'
+    '  gadget id=2 role=string class="" label="Host" value="aminet.net" '
+    "[10,48 200x14]\n"
+    '  gadget id=3 role=checkbox class="" label="Enabled" [10,72 100x14]\n'
+    '  gadget id=4 role=button class="" label="Cancel" [20,96 100x14]\n'
+)
+
 
 class ParseTree(unittest.TestCase):
     def test_window_header(self):
@@ -71,6 +86,43 @@ class ParseTree(unittest.TestCase):
     def test_title_with_backslash_parses(self):
         window = parse_tree('window "C:\\\\Path" screen="" [0,0 1x1]\n')
         self.assertEqual(window.title, "C:\\Path")
+
+
+class FindByRole(unittest.TestCase):
+    def test_role_only_first_match(self):
+        window = parse_tree(ROLE_TREE_TEXT)
+        gadget = window.find_by_role(role="button")
+        self.assertEqual(gadget.gadget_id, 1)
+
+    def test_role_and_index_picks_second_match(self):
+        window = parse_tree(ROLE_TREE_TEXT)
+        gadget = window.find_by_role(role="button", index=1)
+        self.assertEqual(gadget.gadget_id, 4)
+
+    def test_label_only(self):
+        window = parse_tree(ROLE_TREE_TEXT)
+        gadget = window.find_by_role(label="Cancel")
+        self.assertEqual(gadget.gadget_id, 4)
+
+    def test_role_and_label_together(self):
+        window = parse_tree(ROLE_TREE_TEXT)
+        gadget = window.find_by_role(role="button", label="Can")
+        self.assertEqual(gadget.gadget_id, 4)
+
+    def test_label_is_case_sensitive_substring(self):
+        # Matches the server's own strstr-based matching, not
+        # case-insensitive -- see find_by_role()'s own doc comment.
+        window = parse_tree(ROLE_TREE_TEXT)
+        self.assertIsNone(window.find_by_role(label="cancel"))
+        self.assertIsNotNone(window.find_by_role(label="Cancel"))
+
+    def test_index_out_of_range_returns_none(self):
+        window = parse_tree(ROLE_TREE_TEXT)
+        self.assertIsNone(window.find_by_role(role="button", index=5))
+
+    def test_no_match_returns_none(self):
+        window = parse_tree(ROLE_TREE_TEXT)
+        self.assertIsNone(window.find_by_role(role="slider"))
 
 
 class Unescape(unittest.TestCase):

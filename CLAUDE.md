@@ -153,12 +153,19 @@ silently leaves you testing against a binary that no longer exists.
 
 Two known gaps already found this way, documented as TODO comments at
 their exact site in `intuition-model/src/walk.c`, not silently patched
-around: GadTools only populates `gadget->GadgetText` for
-`PLACETEXT_LEFT/RIGHT/ABOVE/BELOW`, so `PLACETEXT_IN` button labels
-legitimately read empty; and `BUTTON_KIND`/`CHECKBOX_KIND` both produce a
-plain `GTYP_BOOLGADGET`, requiring a `GT_GetGadgetAttrsA` kind-probe
-(see `ClassifyBoolGadget`) to tell them apart rather than a single flag
-check.
+around: GadTools populates `gadget->GadgetText` for external-label
+placements (`PLACETEXT_LEFT/RIGHT/ABOVE/BELOW`) on kinds like
+`CHECKBOX_KIND`/`STRING_KIND`, but **`BUTTON_KIND` is a documented
+exception** — confirmed against a second button added to
+`fixtures/gadtools-app` (2026-08-07) that `PLACETEXT_RIGHT` bakes a
+button's label into its rendered imagery exactly like `PLACETEXT_IN`
+does, leaving `gadget->GadgetText` NULL either way; a button's label
+is invisible to this tier under every `PLACETEXT_*` value tried, not
+just `PLACETEXT_IN` as originally thought (address a button by
+`GA_ID` or a `ROLE=`/`INDEX=` locator, not `LABEL=`); and
+`BUTTON_KIND`/`CHECKBOX_KIND` both produce a plain `GTYP_BOOLGADGET`,
+requiring a `GT_GetGadgetAttrsA` kind-probe (see `ClassifyBoolGadget`)
+to tell them apart rather than a single flag check.
 
 ## Architecture
 

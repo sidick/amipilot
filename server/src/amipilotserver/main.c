@@ -329,6 +329,75 @@ static BOOL FindGadgetText(struct Window *window, ULONG gadgetId, char *buf, siz
     return found;
 }
 
+/* Resolves CLICK/TYPE/GETTEXT's (and DRAG's, 0.4) target gadget --
+ * either the classic numeric cmd->gadgetId (today's original,
+ * unchanged path: a plain AmipFindGadgetById lookup) or, when
+ * cmd->gadgetLocatorMode is set, a tier-2 ROLE=/LABEL=/INDEX= locator
+ * (arexx_cmd.h's doc comment on AmipArexxParse). The locator path
+ * walks a fresh AmipWalkWindow() model (same as TREE/GETTEXT already
+ * do) to get role/label classification, filters by role (if
+ * cmd->roleName is set, via AmipRoleFromName()) and by label
+ * (case-sensitive substring, same convention as window/screen pattern
+ * matching -- see arexx_cmd.h), takes the cmd->locatorIndex'th match,
+ * then resolves that match's gadgetId back to a live struct Gadget*
+ * via the existing AmipFindGadgetById -- the walk model itself is
+ * always freed before returning, so no live Intuition pointer is ever
+ * handed out from it (this project's own "never hand out live
+ * pointers from a walk" rule, docs/implementation-plan.md).
+ *
+ * *rcOut is set to AMIP_AREXX_RC_WARN (never touched on success) when
+ * the window has since closed or nothing matches -- same RC class an
+ * unmatched numeric gadget ID already uses, so callers don't need to
+ * special-case the two locator forms. */
+static struct Gadget *ResolveTargetGadget(struct Window *window, const AmipArexxParsed *cmd,
+                                          int *rcOut)
+{
+    AmipWindowModel *model;
+    const AmipGadgetModel *gadget;
+    AmipRole wantRole;
+    long matchIndex = 0;
+    ULONG matchedId = 0;
+    BOOL matched = FALSE;
+
+    if (!cmd->gadgetLocatorMode) {
+        struct Gadget *g = AmipFindGadgetById(window, (ULONG)cmd->gadgetId);
+        if (g == NULL) {
+            *rcOut = AMIP_AREXX_RC_WARN;
+        }
+        return g;
+    }
+
+    wantRole = cmd->roleName[0] != '\0' ? AmipRoleFromName(cmd->roleName) : AMIP_ROLE_UNKNOWN;
+    model = AmipWalkWindow(window);
+    if (model == NULL) {
+        *rcOut = AMIP_AREXX_RC_WARN;
+        return NULL;
+    }
+    for (gadget = model->gadgets; gadget != NULL; gadget = gadget->next) {
+        if (cmd->roleName[0] != '\0' && gadget->role != wantRole) {
+            continue;
+        }
+        if (cmd->labelSubstring[0] != '\0'
+            && (gadget->label == NULL
+                || strstr((const char *)gadget->label, cmd->labelSubstring) == NULL)) {
+            continue;
+        }
+        if (matchIndex == cmd->locatorIndex) {
+            matchedId = gadget->gadgetId;
+            matched = TRUE;
+            break;
+        }
+        matchIndex++;
+    }
+    AmipFreeWindowModel(model);
+
+    if (!matched) {
+        *rcOut = AMIP_AREXX_RC_WARN;
+        return NULL;
+    }
+    return AmipFindGadgetById(window, matchedId);
+}
+
 /* static, not stack-allocated: a Shell-launched process's default stack
  * is small and treeBuf+resultBuf approach 4.5KB -- confirmed the hard
  * way, 2026-08-05: as locals they silently overflowed the default
@@ -488,7 +557,7 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                 rc = AMIP_AREXX_RC_WARN;
                 break;
             }
-            g = AmipFindGadgetById(w, (ULONG)cmd->gadgetId);
+            g = ResolveTargetGadget(w, cmd, &rc);
             if (g == NULL || !AmipIsWindowOpen(w)) {
                 rc = AMIP_AREXX_RC_WARN;
                 break;
@@ -507,7 +576,7 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                 rc = AMIP_AREXX_RC_WARN;
                 break;
             }
-            g = AmipFindGadgetById(w, (ULONG)cmd->gadgetId);
+            g = ResolveTargetGadget(w, cmd, &rc);
             if (g == NULL || !AmipIsWindowOpen(w)) {
                 rc = AMIP_AREXX_RC_WARN;
                 break;
@@ -520,12 +589,18 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
 
         case AMIP_AREXX_CMD_GETTEXT: {
             struct Window *w = AmipFindWindow((CONST_STRPTR)cmd->screenPattern, (CONST_STRPTR)cmd->windowPattern);
+            struct Gadget *g;
 
             if (w == NULL) {
                 rc = AMIP_AREXX_RC_WARN;
                 break;
             }
-            if (!FindGadgetText(w, (ULONG)cmd->gadgetId, g_resultBuf, sizeof(g_resultBuf))) {
+            g = ResolveTargetGadget(w, cmd, &rc);
+            if (g == NULL) {
+                rc = AMIP_AREXX_RC_WARN;
+                break;
+            }
+            if (!FindGadgetText(w, g->GadgetID, g_resultBuf, sizeof(g_resultBuf))) {
                 rc = AMIP_AREXX_RC_WARN;
                 break;
             }

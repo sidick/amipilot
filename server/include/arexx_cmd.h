@@ -17,9 +17,15 @@
 typedef enum {
     AMIP_AREXX_CMD_UNKNOWN = 0,
     AMIP_AREXX_CMD_TREE,     /* TREE <window-pattern> */
-    AMIP_AREXX_CMD_CLICK,    /* CLICK <window-pattern> <gadget-id> | CLICK @<name> */
-    AMIP_AREXX_CMD_TYPE,     /* TYPE <window-pattern> <gadget-id> <text...> | TYPE @<name> <text...> */
-    AMIP_AREXX_CMD_GETTEXT,  /* GETTEXT <window-pattern> <gadget-id> | GETTEXT @<name> */
+    AMIP_AREXX_CMD_CLICK,    /* CLICK <window-pattern> <gadget-id> |
+                              * CLICK <window-pattern> ROLE=<r> [LABEL=<l>] [INDEX=<n>] |
+                              * CLICK @<name> */
+    AMIP_AREXX_CMD_TYPE,     /* TYPE <window-pattern> <gadget-id> <text...> |
+                              * TYPE <window-pattern> ROLE=<r> [LABEL=<l>] [INDEX=<n>] <text...> |
+                              * TYPE @<name> <text...> */
+    AMIP_AREXX_CMD_GETTEXT,  /* GETTEXT <window-pattern> <gadget-id> |
+                              * GETTEXT <window-pattern> ROLE=<r> [LABEL=<l>] [INDEX=<n>] |
+                              * GETTEXT @<name> */
     AMIP_AREXX_CMD_MANIFEST, /* MANIFEST <file-path> */
     AMIP_AREXX_CMD_VERSION,  /* VERSION -- the wire handshake (server/WIRE.md),
                               * also answerable over ARexx for feature tests */
@@ -54,6 +60,9 @@ enum {
 #define AMIP_AREXX_MAX_NAME   32   /* manifest logical names ("@name") */
 #define AMIP_AREXX_MAX_PATH   256  /* MANIFEST file path */
 #define AMIP_AREXX_MAX_COMMAND 256 /* LAUNCH command line */
+#define AMIP_AREXX_MAX_ROLE   32   /* "ROLE=<name>" -- longest real name is
+                                    * "radio_button"/"listbrowser", both well
+                                    * under this */
 
 typedef struct {
     AmipArexxCmdType type;
@@ -62,9 +71,40 @@ typedef struct {
                                                 * TREE/CLICK/TYPE/GETTEXT/MENU/MENUPICK's
                                                 * classic form; empty = unset (search every
                                                 * screen, today's unchanged behavior) */
-    long gadgetId;                             /* CLICK/TYPE/GETTEXT (classic form) */
-    char manifestName[AMIP_AREXX_MAX_NAME];    /* CLICK/TYPE/GETTEXT "@name" form;
+    long gadgetId;                             /* CLICK/TYPE/GETTEXT/DRAG (classic
+                                                * form) when gadgetLocatorMode is 0 */
+    char manifestName[AMIP_AREXX_MAX_NAME];    /* CLICK/TYPE/GETTEXT/DRAG "@name" form;
                                                 * empty = classic form was used */
+    int gadgetLocatorMode;                     /* CLICK/TYPE/GETTEXT/DRAG classic form
+                                                * only: 0 = gadgetId above is the
+                                                * locator (today's behavior); 1 =
+                                                * roleName/labelSubstring/locatorIndex
+                                                * below are the locator (tier-2,
+                                                * "gadget by role + label text, or by
+                                                * position-in-set" -- docs/
+                                                * implementation-plan.md's "Locator
+                                                * tiers"). Never set for the "@name"
+                                                * form, which is always a single exact
+                                                * gadget. */
+    char roleName[AMIP_AREXX_MAX_ROLE];        /* "ROLE=<name>" token, e.g. "button" --
+                                                * matched case-insensitively against
+                                                * AmipRoleName()'s own vocabulary
+                                                * (AmipRoleFromName(), intuition-model);
+                                                * empty = any role. */
+    char labelSubstring[AMIP_AREXX_MAX_TEXT];  /* "LABEL=<substring>" token, quotable
+                                                * the same as a window pattern;
+                                                * case-SENSITIVE substring match
+                                                * (strstr) against a gadget's label --
+                                                * same convention as window/screen
+                                                * pattern matching (AmipFindWindow,
+                                                * action.c), not a new inconsistent
+                                                * behavior; empty = any label
+                                                * (role-only locator). */
+    long locatorIndex;                         /* "INDEX=<n>" token, 0-based; picks the
+                                                * n'th gadget (in chain order) matching
+                                                * roleName/labelSubstring when more than
+                                                * one does. Default 0 (the first
+                                                * match) when INDEX= is omitted. */
     char text[AMIP_AREXX_MAX_TEXT];             /* TYPE */
     char path[AMIP_AREXX_MAX_PATH];             /* MANIFEST; also dual-purposed
                                                   * for AUTH's <password> token,
@@ -117,6 +157,25 @@ typedef struct {
  * the currently-loaded manifest (manifest.h). The '@' prefix is what
  * disambiguates the two forms; a bare name would be ambiguous with a
  * window pattern.
+ *
+ * CLICK/TYPE/GETTEXT's classic form also accepts a tier-2 semantic
+ * locator in place of the bare <gadget-id>: one or more of
+ * "ROLE=<name>" (matched against AmipRoleName()'s vocabulary --
+ * "button", "string", "slider", etc. -- case-insensitively),
+ * "LABEL=<substring>" (quotable the same as a window pattern;
+ * case-SENSITIVE substring match, same convention as window/screen
+ * pattern matching), and "INDEX=<n>" (0-based; picks
+ * the n'th match in gadget-chain order when more than one gadget
+ * matches, default 0). At least one of ROLE=/LABEL= must be given to
+ * enter this form; a bare digit is always the classic numeric
+ * <gadget-id>, unchanged. Resolved server-side against a live walk of
+ * the target window (server/src/amipilotserver/main.c's
+ * ResolveTargetGadget()) -- no match is AMIP_AREXX_RC_WARN, same
+ * class as an unmatched numeric ID. Proximity-to-a-label matching
+ * (docs/implementation-plan.md's third tier-2 locator style) is
+ * deliberately not built -- see CLAUDE.md's "honest limits"
+ * convention; ROLE=/LABEL=/INDEX= is the full locator vocabulary this
+ * parser understands today.
  *
  * FSLIST/FSSTAT/FSMKDIR/FSDELETE/FSGET all take a single <path>
  * argument, parsed exactly like MANIFEST's (into the same `path`

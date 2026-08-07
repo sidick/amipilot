@@ -73,6 +73,28 @@ def _screen_prefix(screen: str | None) -> str:
     return f"SCREEN={_quote(screen)} " if screen is not None else ""
 
 
+def _role_locator(role: str | None, label: str | None, index: int) -> str:
+    """Renders the tier-2 "ROLE=<r> [LABEL=<l>] [INDEX=<n>]" gadget
+    locator (server/include/arexx_cmd.h) in place of a bare numeric
+    <gadget-id>. `label` is matched case-sensitively as a substring by
+    the server (strstr, same convention as window/screen patterns --
+    NOT case-insensitive). At least one of role/label is required --
+    an empty locator is nonsensical and rejected here, client-side,
+    rather than sent as a malformed request. `index` is only emitted
+    when non-zero (0 is the server's own default -- the first match),
+    keeping the wire line minimal for the common case."""
+    if role is None and label is None:
+        raise ValueError("click_by_role/type_by_role/get_text_by_role need at least one of role= or label=")
+    parts = []
+    if role is not None:
+        parts.append(f"ROLE={_quote(role)}")
+    if label is not None:
+        parts.append(f"LABEL={_quote(label)}")
+    if index:
+        parts.append(f"INDEX={index}")
+    return " ".join(parts)
+
+
 # SECURITY: this is a PUBLIC default (it's in this open-source repo,
 # and matches AmiPilotServer's own AMIP_TCP_DEFAULT_PASSWORD) -- it
 # exists only so TCP works out of the box with zero config changes
@@ -255,6 +277,29 @@ class Amipilot:
         manifest loaded first via `manifest()`."""
         self._run(f"CLICK @{name}")
 
+    def click_by_role(
+        self,
+        window_pattern: str,
+        *,
+        role: str | None = None,
+        label: str | None = None,
+        index: int = 0,
+        screen: str | None = None,
+    ) -> None:
+        """CLICK <window-pattern> ROLE=<r> [LABEL=<l>] [INDEX=<n>] --
+        the tier-2 semantic locator (docs/implementation-plan.md's
+        "Locator tiers"): finds the gadget by role and/or label text
+        instead of a numeric GA_ID, resolved live against the window
+        at action time. At least one of `role`/`label` is required.
+        `index` (0-based, default the first match) disambiguates when
+        more than one gadget matches. Raises NotFound if the window or
+        no matching gadget exists, ActionFailed if the click itself
+        didn't deliver."""
+        self._run(
+            f"CLICK {_screen_prefix(screen)}{_quote(window_pattern)} "
+            f"{_role_locator(role, label, index)}"
+        )
+
     def type(
         self, window_pattern: str, gadget_id: int, text: str, *, screen: str | None = None
     ) -> None:
@@ -272,6 +317,26 @@ class Amipilot:
             raise ValueError("TYPE text must not contain a line terminator")
         self._run(f"TYPE @{name} {text}")
 
+    def type_by_role(
+        self,
+        window_pattern: str,
+        text: str,
+        *,
+        role: str | None = None,
+        label: str | None = None,
+        index: int = 0,
+        screen: str | None = None,
+    ) -> None:
+        """TYPE <window-pattern> ROLE=<r> [LABEL=<l>] [INDEX=<n>] <text>
+        -- the tier-2 locator form of `type()`; see `click_by_role()`
+        for the locator semantics."""
+        if "\n" in text or "\r" in text:
+            raise ValueError("TYPE text must not contain a line terminator")
+        self._run(
+            f"TYPE {_screen_prefix(screen)}{_quote(window_pattern)} "
+            f"{_role_locator(role, label, index)} {text}"
+        )
+
     def get_text(self, window_pattern: str, gadget_id: int, *, screen: str | None = None) -> str:
         """GETTEXT <window-pattern> <gadget-id> -- a string/integer
         gadget's live value, else its label. `screen` narrows the
@@ -282,6 +347,23 @@ class Amipilot:
 
     def get_text_by_name(self, name: str) -> str:
         return self._run(f"GETTEXT @{name}").text
+
+    def get_text_by_role(
+        self,
+        window_pattern: str,
+        *,
+        role: str | None = None,
+        label: str | None = None,
+        index: int = 0,
+        screen: str | None = None,
+    ) -> str:
+        """GETTEXT <window-pattern> ROLE=<r> [LABEL=<l>] [INDEX=<n>] --
+        the tier-2 locator form of `get_text()`; see `click_by_role()`
+        for the locator semantics."""
+        return self._run(
+            f"GETTEXT {_screen_prefix(screen)}{_quote(window_pattern)} "
+            f"{_role_locator(role, label, index)}"
+        ).text
 
     def manifest(self, path: str) -> str:
         """MANIFEST <path> -- loads (replacing any previous) manifest

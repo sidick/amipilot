@@ -288,6 +288,34 @@ Lands in phase 0.2 onward -- see
   fixture's permanently-disabled item is rejected without ever sending
   a keystroke.
 
+- **Tier-2 semantic locators (phase 0.4, in progress):** `CLICK`/`TYPE`/
+  `GETTEXT`'s classic form accepts a `ROLE=<role>`/`LABEL=<substring>`/
+  `INDEX=<n>` locator in place of the bare numeric `<gadget-id>` --
+  `docs/implementation-plan.md`'s "Locator tiers" section, tier 2
+  ("gadget by role + label text, or by position-in-set"). `ROLE=`
+  matches `intuition-model`'s `AmipRoleName()` vocabulary
+  (`"button"`, `"string"`, `"slider"`, etc., case-insensitively --
+  `AmipRoleFromName()` is the reverse lookup); `LABEL=` is a
+  case-**sensitive** substring match (`strstr`), the same convention
+  window/screen patterns already use, not a new inconsistent
+  behavior; `INDEX=` (0-based, default the first match) disambiguates
+  when more than one gadget matches. At least one of `ROLE=`/`LABEL=`
+  must be given -- a bare digit is always the original numeric form,
+  unchanged. Resolved server-side (`ResolveTargetGadget()`,
+  `amipilotserver/main.c`) against a fresh walk of the live window
+  (the same `AmipWalkWindow()` call `TREE`/`GETTEXT` already make, so
+  no new classification logic), never a cached or stale model. No
+  match is `RC 5`, same class an unmatched numeric ID already uses.
+  **Honest limit:** proximity-to-a-label matching (the plan's third
+  tier-2 locator style) isn't built -- `ROLE=`/`LABEL=`/`INDEX=` is
+  the complete locator vocabulary today, not a partial step toward a
+  fuzzier heuristic.
+
+  `fixtures/gadtools-app` carries a second `BUTTON_KIND` gadget
+  (Connect, Cancel) specifically so `INDEX=` has a real same-role
+  pair to disambiguate, not just a single unambiguous instance
+  `ROLE=`/`LABEL=` alone could already find.
+
 - **Screens (phase 0.4, in progress):** `SCREENS` (no arguments) lists
   every open screen -- title, position, size, and whether it's
   frontmost. Every window-targeting verb (`TREE`/`CLICK`/`TYPE`/

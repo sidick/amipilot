@@ -135,4 +135,14 @@ void AmipFreeWindowModel(AmipWindowModel *model);
 
 const char *AmipRoleName(AmipRole role);
 
+/* Reverse of AmipRoleName() -- case-insensitive match against its
+ * exact vocabulary ("button", "string", "radio_button", etc.).
+ * AMIP_ROLE_UNKNOWN both for "unknown" itself and for anything that
+ * doesn't match a known name (indistinguishable to a caller, same as
+ * AmipRoleName(AMIP_ROLE_UNKNOWN) already being ambiguous with a
+ * genuinely-unrecognised role -- this locator's own doc comment in
+ * arexx_cmd.h notes ROLE= is validated by "matches nothing" (RC 5),
+ * not a separate "bad role name" error, so this ambiguity is fine). */
+AmipRole AmipRoleFromName(const char *name);
+
 #endif /* AMIPILOT_INTUITION_MODEL_H */

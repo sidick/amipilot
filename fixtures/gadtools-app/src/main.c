@@ -1,11 +1,24 @@
 /*
  * gadtools-app -- minimal GadTools application used as an AmiPilot
  * conformance fixture (docs/implementation-plan.md phase 0.1). Opens a
- * window with a button, a string gadget, and a checkbox, each with a
- * stable GA_ID and a label, so AmiInspect/the walker has real content to
- * classify instead of only a window's built-in system gadgets.
+ * window with two buttons, a string gadget, and a checkbox, each with a
+ * stable GA_ID, so AmiInspect/the walker has real content to classify
+ * instead of only a window's built-in system gadgets. The two buttons
+ * (Connect, Cancel) share AMIP_ROLE_BUTTON and exist specifically so
+ * tier-2 ROLE=/INDEX= locators (phase 0.4) have a real same-role pair
+ * to disambiguate by INDEX= -- both are PLACETEXT_IN (label baked into
+ * the button's own rendered imagery, confirmed via AmiInspect NOT to
+ * populate gadget->GadgetText -- see the "Confirmed limit" in
+ * intuition-model/src/walk.c and CLAUDE.md), so LABEL= locator testing
+ * uses the Host/Enabled gadgets below instead, whose labels genuinely
+ * are visible to the walker (PLACETEXT_LEFT/RIGHT).
  *
- * Quits on close-gadget or the button being pressed.
+ * Quits on close-gadget or the Connect button being pressed. Cancel
+ * writes an observable marker into the Host string gadget (same
+ * technique the menu items below already use) so a CLICK against it --
+ * addressed either by GA_ID or by a ROLE=/INDEX= locator -- is
+ * verifiable via the existing GETTEXT path without a new assertion
+ * mechanism.
  *
  * Also carries a menu strip (phase 0.4 MENU/MENUPICK conformance):
  * one "Project" menu with an "About" item (shortcut A, sets the Host
@@ -37,6 +50,7 @@ struct Library *GadToolsBase;
 #define GID_CONNECT  1
 #define GID_HOST     2
 #define GID_ENABLED  3
+#define GID_CANCEL   4
 
 #define MENUNUM_PROJECT   0
 #define ITEMNUM_ABOUT     0
@@ -121,6 +135,25 @@ int main(void)
                         GT_Underscore, '_',
                         TAG_DONE);
 
+    ng.ng_TopEdge += 24;
+    ng.ng_GadgetText = (UBYTE *)"Ca_ncel";
+    ng.ng_GadgetID = GID_CANCEL;
+    /* PLACETEXT_IN, same as Connect above -- tried PLACETEXT_RIGHT
+     * here first (like the Enabled checkbox below, whose label DOES
+     * populate GadgetText), expecting a real external label the
+     * walker could see for LABEL= locator testing. Confirmed via
+     * AmiInspect (ground truth, no server/wire involved) that
+     * BUTTON_KIND leaves gadget->GadgetText unpopulated regardless of
+     * PLACETEXT_IN vs PLACETEXT_RIGHT -- a real, newly-confirmed
+     * refinement of the existing "Confirmed limit" in
+     * intuition-model/src/walk.c and CLAUDE.md, not a bug in this
+     * fixture or the walker: see those files for the corrected claim.
+     * Reverted to PLACETEXT_IN (matching Connect) since PLACETEXT_RIGHT
+     * bought nothing here; LABEL= locator testing uses the Host/
+     * Enabled gadgets instead, whose labels are genuinely visible. */
+    ng.ng_Flags = PLACETEXT_IN;
+    gad = CreateGadget(BUTTON_KIND, gad, &ng, GT_Underscore, '_', TAG_DONE);
+
     if (gad == NULL) {
         rc = RETURN_FAIL;
         goto cleanup;
@@ -138,7 +171,7 @@ int main(void)
 
     window = OpenWindowTags(NULL,
                              WA_Left, 40, WA_Top, 40,
-                             WA_Width, 220, WA_Height, 130,
+                             WA_Width, 220, WA_Height, 154,
                              WA_Title, (ULONG)"AmiPilot GadTools Fixture",
                              WA_Gadgets, (ULONG)glist,
                              WA_CloseGadget, TRUE,
@@ -181,6 +214,9 @@ int main(void)
                 case IDCMP_GADGETUP:
                     if (((struct Gadget *)msg->IAddress)->GadgetID == GID_CONNECT) {
                         done = TRUE;
+                    } else if (((struct Gadget *)msg->IAddress)->GadgetID == GID_CANCEL) {
+                        GT_SetGadgetAttrs(hostGad, window, NULL,
+                                          GTST_String, (ULONG)"cancel clicked", TAG_DONE);
                     }
                     break;
                 /* Diagnostic: IDCMP_MOUSEBUTTONS only arrives for clicks

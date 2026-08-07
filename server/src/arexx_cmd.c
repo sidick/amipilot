@@ -295,19 +295,48 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
         return 0;
     }
 
-    /* Classic form: CLICK/TYPE/GETTEXT take a gadget ID next. The
-     * "@name" form already carries the whole locator. */
+    /* Classic form: CLICK/TYPE/GETTEXT take a gadget locator next --
+     * either a bare numeric <gadget-id> (today's original form) or a
+     * tier-2 ROLE=/LABEL=/INDEX= locator (see arexx_cmd.h's doc
+     * comment on AmipArexxParse). The "@name" form already carries
+     * the whole locator, so this whole block is skipped for it. */
     if (out->manifestName[0] == '\0') {
-        char idbuf[16];
-        int trunc;
         p = skip_ws(p);
         if (*p == '\0') {
             out->type = AMIP_AREXX_CMD_UNKNOWN;
             return -1;
         }
-        p = read_token(p, idbuf, sizeof(idbuf), &trunc);
-        if (fail_if_trunc(trunc, out)) return -1;
-        out->gadgetId = strtol(idbuf, NULL, 10);
+        if (ci_streq_prefix(p, "ROLE=") || ci_streq_prefix(p, "LABEL=") ||
+            ci_streq_prefix(p, "INDEX=")) {
+            out->gadgetLocatorMode = 1;
+            for (;;) {
+                int trunc;
+                if (ci_streq_prefix(p, "ROLE=")) {
+                    p += 5; /* strlen("ROLE=") */
+                    p = read_token(p, out->roleName, sizeof(out->roleName), &trunc);
+                    if (fail_if_trunc(trunc, out)) return -1;
+                } else if (ci_streq_prefix(p, "LABEL=")) {
+                    p += 6; /* strlen("LABEL=") */
+                    p = read_token(p, out->labelSubstring, sizeof(out->labelSubstring), &trunc);
+                    if (fail_if_trunc(trunc, out)) return -1;
+                } else if (ci_streq_prefix(p, "INDEX=")) {
+                    char numbuf[16];
+                    p += 6; /* strlen("INDEX=") */
+                    p = read_token(p, numbuf, sizeof(numbuf), &trunc);
+                    if (fail_if_trunc(trunc, out)) return -1;
+                    out->locatorIndex = strtol(numbuf, NULL, 10);
+                } else {
+                    break;
+                }
+                p = skip_ws(p);
+            }
+        } else {
+            char idbuf[16];
+            int trunc;
+            p = read_token(p, idbuf, sizeof(idbuf), &trunc);
+            if (fail_if_trunc(trunc, out)) return -1;
+            out->gadgetId = strtol(idbuf, NULL, 10);
+        }
     }
 
     if (out->type == AMIP_AREXX_CMD_TYPE) {
