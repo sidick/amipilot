@@ -63,6 +63,26 @@ use for fields that might contain one (a filename/title/label);
 `host/amipilot`'s `_quote()` applies it automatically. The wire adds
 no verbs of its own except that `VERSION` (below) is its handshake.
 
+**Text encoding: Latin-1 (ISO-8859-1), matching AmigaOS's own native
+convention.** Every text payload — request lines, and non-binary
+response text (`TREE`, `GETTEXT`, window/gadget labels, `MENU`, error
+messages) — is a sequence of raw bytes interpreted as Latin-1, not
+UTF-8. This isn't an arbitrary choice: `keymap.library`'s `MapANSI()`
+(what `AmipTypeString()`, `server/src/action.c`, uses to synthesize
+`TYPE`'s keystrokes) is documented as encoding an "ANSI byte string,"
+the same convention Amiga text/console I/O has always used, so
+treating the wire as Latin-1 end-to-end matches what the Amiga side
+actually does with the bytes. `host/amipilot/wire.py` encodes/decodes
+accordingly (`Reply.text`'s `.decode("latin-1")`,
+`WireClient.command()`'s `.encode("latin-1")`) — a non-Latin-1
+character (e.g. an emoji, CJK text) raises `UnicodeEncodeError`
+immediately, client-side, before it ever reaches the socket, rather
+than being silently mangled or sent as multi-byte UTF-8 the Amiga side
+would misinterpret one byte at a time. `FSGET`/the file API's payloads
+are the one exception: those are explicitly raw, charset-agnostic
+bytes (may contain embedded NULs), never decoded as text at all — see
+"File API" in `server/README.md`.
+
 ## Responses
 
 Every request gets exactly one response, in request order:
