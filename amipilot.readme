@@ -2,7 +2,7 @@ Short:        Object-level GUI automation for classic AmigaOS
 Author:       simond@irrelevant.org (Simon Dick)
 Uploader:     simond@irrelevant.org (Simon Dick)
 Type:         util/misc
-Version:      0.4
+Version:      0.5
 Architecture: m68k-amigaos
 Distribution: GitHub only (not yet on Aminet)
 
@@ -49,15 +49,24 @@ Features
     launch the test subject itself over the wire (LAUNCH); read and
     manage files inside an allowlisted directory (the file API); walk
     and select a window's live menu strip (MENU/MENUPICK).
-  - Verified against real, unmodified stock AmigaOS software and
-    purpose-built conformance fixtures, not just software built for
-    this project.
+  - Verified against real, unmodified stock AmigaOS software (including
+    a real crash-causing bug found and fixed this way) and purpose-built
+    conformance fixtures, not just software built for this project.
   - Honest, documented limits rather than silent gaps: a few specific,
     well-understood cases (PLACETEXT_IN and PLACETEXT_RIGHT button
     labels, a window.class window's layout.gadget-nested children) are
     genuinely unreadable at this tier, and AmiInspect says so rather
     than guessing - see the included guide's "Locator Tiers and
-    Limits" page.
+    Limits" page, including a table of which locator tier reaches
+    which kind of UI and why.
+  - From 0.5: wait for a real condition (a window appearing/closing, a
+    gadget's text matching) instead of a guessed sleep, closing the
+    classic click-then-check race (WAITFOR, CLICK's EXPECT=); community-
+    authored "quirk profiles" for third-party applications you don't
+    control, using the same manifest file format; a golden-tree
+    mechanism for catching structural UI drift as a regression; and a
+    bridge into MUI (Magic User Interface) applications through their
+    own built-in ARexx port (MUIREXX).
 
 Requirements
 ------------

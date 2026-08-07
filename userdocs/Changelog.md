@@ -7,6 +7,69 @@ the repository's
 [`docs/implementation-plan.md`](https://github.com/sidick/amipilot/blob/main/docs/implementation-plan.md)
 for the full engineering detail and phase sequencing behind each one.
 
+## v0.5 — 2026-08-08
+
+Reliability and reach into the wider ecosystem: waiting on real
+conditions instead of guessed sleeps, community-authored coverage for
+apps you don't control, structural regression fixtures, verification
+against genuine stock AmigaOS and MUI software (not just purpose-built
+fixtures), and a real bridge into MUI's own ARexx-driven applications.
+
+- **Wait/expectation primitives** (`WAITFOR`, and `CLICK`'s trailing
+  `EXPECT=`): closes the classic click-then-check race by polling
+  server-side, in the same request, instead of a host-side loop.
+  `WAITFOR WINDOW=<pattern>` / `NOWINDOW=<pattern>` wait for a window
+  to appear or close; `CLICK`'s own `EXPECT=WINDOW=<pattern>` /
+  `EXPECT=NOWINDOW` compose the click atomically with the wait,
+  `EXPECT=NOWINDOW` checked by identity against the exact window the
+  click itself resolved (not a fresh pattern search). `WAITFOR` also
+  takes a `TEXT=<value>` condition — wait for a gadget's text to
+  exactly equal a value — reusing the same locator parsing and
+  gadget-text reading `CLICK`/`TYPE`/`GETTEXT` already share. A
+  condition that never becomes true is a new, distinct `RC=15`. See
+  [ARexx Reference](ARexx-Reference.md#waitexpectation-primitives).
+- **Quirk profiles**: the manifest format ([Manifest
+  contract](https://github.com/sidick/amipilot/blob/main/manifest/SPEC.md))
+  isn't only for an application's own developer — the same file
+  format, loaded the same way, works for a user or the community
+  describing a third-party application's structure, with a documented
+  convention for recording known behavioral oddities as comment
+  lines. No new machinery, one grammar for both cases.
+- **The honest-limits toolkit-to-tier table**
+  ([Locator Tiers and Limits](Locator-Tiers-and-Limits.md)): which
+  locator tier actually reaches which kind of UI, and why — plain
+  GadTools/top-level ReAction gadgets, `window.class`+`layout.gadget`
+  nested children, MUI applications, and custom-rendered UIs each
+  land somewhere different, stated plainly rather than left to
+  discover the hard way.
+- **Golden-tree fixtures**: a saved structural dump doubles as a
+  regression fixture — `amipilot dump <window> --golden PATH
+  [--update-golden]`, or `Amipilot.assert_tree_matches()` inside a
+  test, compares a live window/gadget tree against a checked-in
+  snapshot and fails loudly on drift.
+- **The stock-app conformance set**: automation verified against
+  genuine, unmodified stock AmigaOS software, not only hand-written
+  fixtures — driving AmigaOS 3.2's own Time Preferences editor
+  end-to-end via tier-2 locators discovered purely from `AmiInspect`/
+  `amipilot dump` output. This also caught two real bugs: a host
+  client socket-timeout bug (`connect_with_retry()` could silently
+  break a legitimately slow-but-successful `WAITFOR`/`EXPECT=` wait)
+  and a genuine machine-wide hang walking a different stock
+  application's window (a custom gadget claiming a BOOPSI object
+  header it didn't actually have) — both fixed, the latter now
+  regression-tested directly against the real application.
+- **The MUI-ARexx bridge tier** (`MUIREXX <app-base> [TIMEOUT=<n>]
+  <command...>`): drives a MUI (Magic User Interface) application
+  through the ARexx port every MUI app carries automatically — a
+  different mechanism from `CLICK`/`TYPE`/`GETTEXT` entirely, since
+  MUI internals are opaque to structural walking. Verified live
+  against a real MUI application that MUI's own built-in ARexx
+  support is a small, universal command set (window lifecycle plus
+  fixed metadata), not a generic per-widget accessor — `MUIREXX`
+  passes an application's own commands through honestly rather than
+  promising generic MUI widget control it can't deliver. See
+  [ARexx Reference](ARexx-Reference.md#driving-mui-applications).
+
 ## v0.4 — 2026-08-07
 
 Reach: everything 0.3's wire needed to actually be useful for driving

@@ -13,8 +13,8 @@ protocol, and phase sequencing live in `docs/implementation-plan.md` —
 read that before making architectural decisions; this file only covers
 what's needed to build and navigate the code day to day.
 
-**Current state:** v0.4 released (phase 0.4, reach, complete). Phase
-0.5's scope is feature-complete on main, not yet tagged: `WAITFOR` (including its
+**Current state:** v0.5 released (phase 0.5, reliability and reach
+into the wider ecosystem, complete). `WAITFOR` (including its
 `TEXT=` condition) and `CLICK`'s `EXPECT=` (wait/expectation
 primitives, docs/implementation-plan.md's "Async by design" section)
 -- see `server/README.md`'s own section. Quirk profiles are real too:
