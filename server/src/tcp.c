@@ -73,6 +73,7 @@ struct AmipTcp {
     char line[AMIP_TCP_LINE];
     int lineLen;
     BOOL lineOverflow;
+    BOOL lastLineOverflowed;  /* see AmipTcpLastLineOverflowed() */
     char out[AMIP_TCP_LINE];
 
     AmipTcpAllowEntry allow[AMIP_TCP_MAX_ALLOW];
@@ -303,6 +304,11 @@ const char *AmipTcpNextLine(AmipTcp *tcp)
         if (c == '\n') {
             int n = tcp->lineLen;
 
+            /* Latch overflow state for this returned line before
+             * resetting it for the next one -- see
+             * AmipTcpLastLineOverflowed()'s doc comment for why the
+             * caller must check this before parsing. */
+            tcp->lastLineOverflowed = tcp->lineOverflow;
             tcp->lineLen = 0;
             tcp->lineOverflow = FALSE;
             if (n > 0 && tcp->line[n - 1] == '\r') {
@@ -326,6 +332,11 @@ const char *AmipTcpNextLine(AmipTcp *tcp)
     }
 
     return NULL;
+}
+
+BOOL AmipTcpLastLineOverflowed(const AmipTcp *tcp)
+{
+    return tcp->lastLineOverflowed;
 }
 
 BOOL AmipTcpWrite(AmipTcp *tcp, const void *data, ULONG len)

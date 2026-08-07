@@ -79,6 +79,30 @@ typedef struct {
     long menuNum, itemNum;                      /* MENUPICK */
     long subNum;                                /* MENUPICK; -1 = a top-level
                                                   * item, not a submenu entry */
+    int argTooLong;                             /* set when some argument didn't
+                                                  * fit its field (see the
+                                                  * AMIP_AREXX_MAX_* caps above)
+                                                  * -- type is forced to
+                                                  * AMIP_AREXX_CMD_UNKNOWN in
+                                                  * this case, same as any
+                                                  * other parse failure, but
+                                                  * this flag lets the caller
+                                                  * report a specific reason
+                                                  * instead of the generic
+                                                  * "bad arguments" message,
+                                                  * per this project's own
+                                                  * "explicit, not silent"
+                                                  * convention -- see the
+                                                  * doc comment on
+                                                  * read_token() in
+                                                  * arexx_cmd.c for why this
+                                                  * matters (a value that was
+                                                  * silently truncated here
+                                                  * could otherwise cause the
+                                                  * server to act on the
+                                                  * WRONG path/pattern, not
+                                                  * just report a cosmetic
+                                                  * error). */
 } AmipArexxParsed;
 
 /* Parses one ARexx command line into `out`. Case-insensitive command

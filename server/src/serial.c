@@ -33,6 +33,9 @@ struct AmipSerial {
     char line[AMIP_SER_LINE];     /* line being accumulated */
     int lineLen;
     BOOL lineOverflow;            /* drop-until-LF after hitting the cap */
+    BOOL lastLineOverflowed;      /* true iff the line NextLine() most
+                                    * recently returned was truncated --
+                                    * see AmipSerialLastLineOverflowed() */
     char out[AMIP_SER_LINE];      /* the line handed to the caller */
 };
 
@@ -205,9 +208,16 @@ const char *AmipSerialNextLine(AmipSerial *serial)
             if (c == '\n') {
                 int n = serial->lineLen;
 
-                /* On overflow, hand up the truncated prefix anyway --
-                 * the parser rejecting it is WIRE.md's spec'd RC 10
-                 * outcome, not a transport-level drop. */
+                /* On overflow, still hand up the truncated prefix --
+                 * but ALSO latch lastLineOverflowed so the caller can
+                 * reject it with an explicit "line too long" RC 10
+                 * before ever handing it to the parser, rather than
+                 * relying on the parser happening to choke on the
+                 * chopped text (a truncated-but-still-well-formed
+                 * command would otherwise silently run as a
+                 * different, unintended command -- see
+                 * AmipSerialLastLineOverflowed()'s own doc comment). */
+                serial->lastLineOverflowed = serial->lineOverflow;
                 serial->lineLen = 0;
                 serial->lineOverflow = FALSE;
                 if (n > 0 && serial->line[n - 1] == '\r') {
@@ -234,6 +244,11 @@ const char *AmipSerialNextLine(AmipSerial *serial)
             return NULL;
         }
     }
+}
+
+BOOL AmipSerialLastLineOverflowed(const AmipSerial *serial)
+{
+    return serial->lastLineOverflowed;
 }
 
 BOOL AmipSerialWrite(AmipSerial *serial, const void *data, ULONG len)

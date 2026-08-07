@@ -63,9 +63,18 @@ ULONG AmipTcpWait(AmipTcp *tcp, ULONG extraSigMask);
  * -- unlike a real serial cable, plain TCP has no hardware reason to
  * refuse a second connection, so this is a deliberate policy choice,
  * not a transport limitation. Lines longer than the wire's 512-byte
- * request cap are truncated (the parser then rejects them, the spec'd
- * RC 10 outcome, not a transport error). */
+ * request cap are truncated -- check AmipTcpLastLineOverflowed()
+ * before parsing a returned line, since a truncated-but-still-
+ * parseable line would otherwise silently run as a different,
+ * unintended command rather than fail. */
 const char *AmipTcpNextLine(AmipTcp *tcp);
+
+/* True iff the line most recently returned by AmipTcpNextLine() was
+ * truncated to fit the 512-byte request cap -- meaning it is NOT the
+ * line the sender actually intended, just as much of it as fit. The
+ * caller should reject it outright (an explicit "line too long" RC 10)
+ * rather than hand it to the parser. */
+BOOL AmipTcpLastLineOverflowed(const AmipTcp *tcp);
 
 /* Synchronously writes len bytes to the active client connection.
  * Returns FALSE if there is no active connection or the write failed
