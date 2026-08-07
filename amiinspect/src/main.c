@@ -75,23 +75,53 @@ static struct Window *FindWindow(CONST_STRPTR titleSubstring)
     return NULL;
 }
 
+/* Escapes '"' and '\' as '\"'/'\\', matching the wire's own escaping
+ * (server/src/amipilotserver/main.c's EscapeQuotes()) exactly -- this
+ * file's whole point is printing the same text shape the wire emits
+ * (see its own header comment), so a gadget label/title/menu text
+ * containing a literal '"' must render identically here too, not
+ * break AmiInspect's own output while the wire handles it fine.
+ * Returns a static scratch buffer; NOT reentrant, same as the wire's
+ * own copy -- never call this twice for arguments to the same printf,
+ * since argument evaluation order is unspecified and both calls
+ * would race to fill the one buffer. Every call site below uses one
+ * escape per printf for exactly this reason. */
+static const char *EscapeQuotes(const char *in)
+{
+    static char buf[512];
+    size_t o = 0;
+
+    if (in == NULL) {
+        buf[0] = '\0';
+        return buf;
+    }
+    for (; *in != '\0' && o + 2 < sizeof(buf); in++) {
+        if (*in == '"' || *in == '\\') {
+            buf[o++] = '\\';
+        }
+        buf[o++] = *in;
+    }
+    buf[o] = '\0';
+    return buf;
+}
+
 static void PrintModel(const AmipWindowModel *model)
 {
     const AmipGadgetModel *gadget;
 
-    printf("window \"%s\" screen=\"%s\" [%d,%d %dx%d]\n",
-           model->title != NULL ? (const char *)model->title : "(untitled)",
-           model->screenTitle != NULL ? (const char *)model->screenTitle : "",
+    printf("window \"%s\" screen=\"", model->title != NULL
+                                          ? EscapeQuotes((const char *)model->title)
+                                          : "(untitled)");
+    printf("%s\" [%d,%d %dx%d]\n", EscapeQuotes((const char *)model->screenTitle),
            model->left, model->top, model->width, model->height);
 
     for (gadget = model->gadgets; gadget != NULL; gadget = gadget->next) {
-        printf("  gadget id=%lu role=%s class=\"%s\" label=\"%s\"",
-               (unsigned long)gadget->gadgetId,
-               AmipRoleName(gadget->role),
-               gadget->className != NULL ? (const char *)gadget->className : "",
-               gadget->label != NULL ? (const char *)gadget->label : "");
+        printf("  gadget id=%lu role=%s class=\"",
+               (unsigned long)gadget->gadgetId, AmipRoleName(gadget->role));
+        printf("%s\" label=\"", EscapeQuotes((const char *)gadget->className));
+        printf("%s\"", EscapeQuotes((const char *)gadget->label));
         if (gadget->value != NULL) {
-            printf(" value=\"%s\"", (const char *)gadget->value);
+            printf(" value=\"%s\"", EscapeQuotes((const char *)gadget->value));
         }
         printf(" [%d,%d %dx%d]\n",
                gadget->left, gadget->top, gadget->width, gadget->height);
@@ -104,7 +134,7 @@ static void PrintMenuItemLine(const AmipMenuItemModel *item, const char *tag, in
     if (item->subNum >= 0) {
         printf("/%ld", (long)item->subNum);
     }
-    printf(" text=\"%s\"", item->text != NULL ? (const char *)item->text : "");
+    printf(" text=\"%s\"", EscapeQuotes((const char *)item->text));
     if (item->hasShortcut) {
         printf(" shortcut=%c", (char)item->shortcut);
     }
@@ -119,9 +149,8 @@ static void PrintMenus(const AmipMenuModel *menus)
     for (menu = menus; menu != NULL; menu = menu->next) {
         const AmipMenuItemModel *item;
 
-        printf("menu num=%ld title=\"%s\" enabled=%d\n",
-               (long)menu->menuNum, menu->title != NULL ? (const char *)menu->title : "",
-               menu->enabled);
+        printf("menu num=%ld title=\"", (long)menu->menuNum);
+        printf("%s\" enabled=%d\n", EscapeQuotes((const char *)menu->title), menu->enabled);
 
         for (item = menu->items; item != NULL; item = item->next) {
             const AmipMenuItemModel *sub;

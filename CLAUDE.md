@@ -163,12 +163,22 @@ check.
 ## Architecture
 
 **`intuition-model/`** — the reusable Intuition walker library, with no
-dependency on the server. All structure walking happens under a brief
-`LockIBase()` hold, copying data out into a private model
-(`AmipWindowModel` → linked list of `AmipGadgetModel`) before releasing
-the lock; nothing hands out live Intuition pointers, and nothing patches
-anything (no `SetFunction` anywhere in this codebase — see "Design
-principles" in the implementation plan). `AmipRole` is an AT-SPI-style
+dependency on the server. Every walk starts with a brief `LockIBase()`
+hold to confirm its target is still genuinely linked into Intuition's
+own live screen/window lists, copying out a private model
+(`AmipWindowModel` → linked list of `AmipGadgetModel`); nothing hands
+out live Intuition pointers, and nothing patches anything (no
+`SetFunction` anywhere in this codebase — see "Design principles" in
+the implementation plan). **The lock does NOT stay held for the whole
+walk** — `LockIBase()`'s own autodoc is explicit that no Intuition,
+graphics, layers, or dos call is permitted while holding it, and the
+per-gadget work (`GetAttr()`/`OCLASS()` dispatch, `CopyString()`'s own
+`AllocVec()`) needs exactly those, so it happens after release. This
+narrows, but doesn't eliminate, the gap between the liveness check and
+the walk finishing — a window/gadget closing in that instant is a
+known, accepted risk (same shape as `AmipIsWindowOpen()`'s own
+documented limit for the action engine, below), not a guarantee this
+library claims to provide. `AmipRole` is an AT-SPI-style
 classification independent of which toolkit produced the gadget
 (GadTools, BOOPSI/ReAction, MUI). Role classification covers plain
 GadTools kinds (`ClassifyGadget`/`ClassifyBoolGadget`) and BOOPSI/

@@ -9,6 +9,14 @@ Plain text, not a grammar meant to grow -- see model.py's own note
 about the plan's no-JSON decision. FSMKDIR/FSDELETE return plain
 human-readable text (not this format) and FSGET returns raw file
 bytes, so none of those three need a parser here.
+
+`name`/`comment` are escaped by the server exactly like a C string
+literal (`EscapeQuotesInto()`, server/src/fs.c) -- a filename or
+comment can legitimately contain a literal `"` (e.g. a `12" disk`
+comment) -- so both use model.py's shared ESCAPED_FIELD/unescape()
+rather than a bare `[^"]*`. `date` is server-formatted
+(`DD-Mon-YY HH:MM:SS`) and never contains a quote, so it's left as a
+plain `[^"]*`.
 """
 
 from __future__ import annotations
@@ -16,10 +24,12 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 
+from .model import ESCAPED_FIELD, unescape
+
 _ENTRY_RE = re.compile(
-    r'^entry name="(?P<name>[^"]*)" type=(?P<type>file|dir) '
+    rf'^entry name="(?P<name>{ESCAPED_FIELD})" type=(?P<type>file|dir) '
     r"size=(?P<size>\d+) prot=(?P<prot>[rwed-]{4}) "
-    r'date="(?P<date>[^"]*)" comment="(?P<comment>[^"]*)"$'
+    rf'date="(?P<date>[^"]*)" comment="(?P<comment>{ESCAPED_FIELD})"$'
 )
 
 
@@ -51,12 +61,12 @@ def parse_fs_entries(text: str) -> list[FsEntry]:
             raise FsParseError(f"unrecognised entry line: {line!r}")
         entries.append(
             FsEntry(
-                name=m["name"],
+                name=unescape(m["name"]),
                 is_dir=m["type"] == "dir",
                 size=int(m["size"]),
                 prot=m["prot"],
                 date=m["date"],
-                comment=m["comment"],
+                comment=unescape(m["comment"]),
             )
         )
     return entries

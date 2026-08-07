@@ -155,7 +155,17 @@ def _boot_copperline(request: "pytest.FixtureRequest", tmp_path_factory) -> _Boo
                 "before writing its control-info file"
             )
         if time.monotonic() > deadline:
+            # Same terminate-then-wait-then-kill sequence _Boot.stop()
+            # uses -- this path raises before a _Boot object exists to
+            # own that cleanup, so it must do its own; terminate()
+            # alone leaves a zombie until this process eventually
+            # exits, since nothing else ever reaps it.
             copperline_proc.terminate()
+            try:
+                copperline_proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                copperline_proc.kill()
+                copperline_proc.wait(timeout=5)
             raise TimeoutError("copperline never wrote its control-info file")
         time.sleep(0.1)
 

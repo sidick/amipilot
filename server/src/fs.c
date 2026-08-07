@@ -164,7 +164,23 @@ static void DescribeRootsError(const char **resultOut, ULONG *outLen)
 
 /* Locks `path` (an EXISTING file or directory) and confirms it's
  * under a granted root. Returns the lock (caller must UnLock it), or
- * 0 with *rcOut, *resultOut, and *outLen already set. */
+ * 0 with *rcOut, *resultOut, and *outLen already set.
+ *
+ * KNOWN LIMITATION (TOCTOU, accepted, matching AmipIsWindowOpen()'s own
+ * documented "shrinks the gap, doesn't close it entirely" precedent --
+ * see action_engine.h): callers that need to act on the ORIGINAL PATH
+ * STRING rather than the lock itself (AmipFsDelete()'s DeleteFile(),
+ * AmipFsGet()'s Open()) must release this lock first, since AmigaDOS
+ * (V37 floor) has no "open/delete relative to an already-held lock"
+ * primitive for these operations. Between that UnLock() and the real
+ * operation, an assign or a symlink component in the path could be
+ * repointed so the path no longer resolves to the location this
+ * function verified -- the containment check and the actual operation
+ * are not atomic. This is a real, standing gap, not a hypothetical:
+ * documented here rather than silently assumed closed. The general fix
+ * (act on a lock/handle throughout, never re-resolve a path string) is
+ * blocked on AmigaDOS's own API shape for these verbs and isn't
+ * planned as a near-term fix. */
 static BPTR ResolveExisting(const char *path, int *rcOut,
                             const char **resultOut, ULONG *outLen)
 {
@@ -222,6 +238,34 @@ static void RenderDate(LONG days, LONG mins, LONG ticks, char *dateOut, char *ti
     }
 }
 
+/* Escapes '"' and '\' as '\"'/'\\' so `name`/`comment` (arbitrary
+ * AmigaDOS text -- a filename or comment can legitimately contain a
+ * literal '"', e.g. a file commented "12\" disk") can be safely
+ * delimited by the surrounding quotes below; without this, such an
+ * entry produced a well-formed response every host parser's
+ * fixed-format regex still couldn't match. Writes into `out` (cap
+ * outCap), truncating silently if the escaped form would overflow --
+ * a local stack buffer, not this file's shared static ones, since
+ * AmigaDOS filenames/comments are already short (MAXFILENAMELEN-class
+ * bounds), same size class as this function's own `rwed`/`dateStr`
+ * locals just below. */
+static void EscapeQuotesInto(const char *in, char *out, size_t outCap)
+{
+    size_t o = 0;
+
+    if (in == NULL) {
+        out[0] = '\0';
+        return;
+    }
+    for (; *in != '\0' && o + 2 < outCap; in++) {
+        if (*in == '"' || *in == '\\') {
+            out[o++] = '\\';
+        }
+        out[o++] = *in;
+    }
+    out[o] = '\0';
+}
+
 static void AppendEntry(char *buf, size_t bufCap, const char *name, LONG type,
                         ULONG size, ULONG prot, LONG days, LONG mins, LONG ticks,
                         const char *comment)
@@ -229,18 +273,21 @@ static void AppendEntry(char *buf, size_t bufCap, const char *name, LONG type,
     size_t used = strlen(buf);
     char rwed[5];
     char dateStr[LEN_DATSTRING], timeStr[LEN_DATSTRING];
+    char nameEsc[256], commentEsc[256];
 
     if (used >= bufCap - 1) {
         return;
     }
     RenderProtection(prot, rwed);
     RenderDate(days, mins, ticks, dateStr, timeStr);
+    EscapeQuotesInto(name, nameEsc, sizeof(nameEsc));
+    EscapeQuotesInto(comment, commentEsc, sizeof(commentEsc));
     snprintf(buf + used, bufCap - used,
              "entry name=\"%s\" type=%s size=%lu prot=%s date=\"%s %s\" comment=\"%s\"\n",
-             name != NULL ? name : "",
+             nameEsc,
              type < 0 ? "file" : "dir",
              (unsigned long)size, rwed, dateStr, timeStr,
-             comment != NULL ? comment : "");
+             commentEsc);
 }
 
 int AmipFsList(const char *path, const char **resultOut, ULONG *outLen)
@@ -397,6 +444,10 @@ int AmipFsMkdir(const char *path, const char **resultOut, ULONG *outLen)
     }
     UnLock(parentLock);
 
+    /* Same TOCTOU gap ResolveExisting()'s doc comment describes: the
+     * parent lock verified above is released before CreateDir()
+     * re-resolves `path` from scratch (CreateDir() has no
+     * relative-to-lock form on this floor). */
     newLock = CreateDir((CONST_STRPTR)path);
     if (newLock == 0) {
         SetErr(resultOut, outLen, "could not create directory (already exists?)");
@@ -419,7 +470,10 @@ int AmipFsDelete(const char *path, const char **resultOut, ULONG *outLen)
     }
     /* DeleteFile() takes a path string, not a lock -- and a shared
      * read lock like this one would block deletion on some
-     * filesystems anyway, so release it first. */
+     * filesystems anyway, so release it first. This reopens the TOCTOU
+     * gap ResolveExisting()'s doc comment describes: the containment
+     * check just passed applies to the lock, not to whatever `path`
+     * resolves to by the time DeleteFile() below actually runs. */
     UnLock(lock);
 
     if (!DeleteFile((CONST_STRPTR)path)) {
@@ -470,6 +524,11 @@ int AmipFsGet(const char *path, const char **resultOut, ULONG *outLen)
         return AMIP_AREXX_RC_FAIL;
     }
 
+    /* Same TOCTOU gap ResolveExisting()'s doc comment describes: the
+     * lock above is already released (Examine() needed it, Open()
+     * below doesn't accept one), so this Open() re-resolves `path`
+     * from scratch rather than reusing anything already verified as
+     * contained. */
     fh = Open((CONST_STRPTR)path, MODE_OLDFILE);
     if (fh == 0) {
         SetErr(resultOut, outLen, "could not open file");

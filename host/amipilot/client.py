@@ -103,12 +103,15 @@ class Amipilot:
         (it isn't, by default -- see DEFAULT_TCP_PASSWORD's own
         docstring: this is not real security, just a sane non-empty
         starting point). Raises CommandError (RC 10) if the password
-        is wrong."""
+        is wrong. Closes the socket before propagating any failure from
+        the handshake or AUTH step (WireError, OSError, CommandError)
+        -- a single connection attempt that fails must not leak the
+        socket it just opened."""
         client = cls(WireClient.connect(host, port, timeout=timeout))
-        client.handshake()
         try:
+            client.handshake()
             client._run(f"AUTH {_quote(password)}")
-        except CommandError:
+        except BaseException:
             client.close()
             raise
         return client
@@ -169,15 +172,22 @@ class Amipilot:
             sock.settimeout(min(max(deadline - time.monotonic(), 0.1), 3.0))
             try:
                 client.handshake()
+                client._run(f"AUTH {_quote(password)}")
             except OSError as e:
+                # Covers both steps -- the AUTH round trip is just as
+                # exposed to the "bytes silently dropped, not buffered,
+                # if the far end's transport wasn't fully ready yet"
+                # failure mode described above as VERSION was, so it
+                # gets the same retry-on-the-same-held-connection
+                # treatment, not just the handshake.
                 last_error = e
                 continue
-            try:
-                client._run(f"AUTH {_quote(password)}")
-            except CommandError:
-                # A wrong password is a real, non-retryable error, not
-                # a transient connection hiccup -- but the socket is
-                # still open at this point and would otherwise leak.
+            except BaseException:
+                # A wrong password (CommandError) or a malformed
+                # handshake response (WireError) is a real,
+                # non-retryable error, not a transient connection
+                # hiccup -- but the socket is still open at this point
+                # and would otherwise leak.
                 client.close()
                 raise
             return client

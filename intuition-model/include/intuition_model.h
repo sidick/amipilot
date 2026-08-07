@@ -119,7 +119,16 @@ void AmipFreeMenuModel(AmipMenuModel *model);
  * across allocation. Caller must release with AmipFreeWindowModel(). */
 AmipWindowModel *AmipWalkScreen(struct Screen *screen);
 
-/* Walks a single known window. */
+/* Walks a single known window, after confirming under LockIBase() that
+ * it's still genuinely linked into Intuition's own live screen/window
+ * lists (not just that the caller's pointer is non-NULL) -- narrows,
+ * but per LockIBase()'s own documented "brief hold, no high-level
+ * calls while held" contract cannot eliminate, the gap between that
+ * check and the walk itself finishing (same accepted limit
+ * AmipIsWindowOpen() documents for the action engine's click path).
+ * Returns NULL if `window` is NULL, no longer open, or on allocation
+ * failure -- callers can't distinguish the three from the return
+ * value alone. */
 AmipWindowModel *AmipWalkWindow(struct Window *window);
 
 void AmipFreeWindowModel(AmipWindowModel *model);

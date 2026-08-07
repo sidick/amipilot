@@ -212,7 +212,18 @@ Lands in phase 0.2 onward -- see
   (`Lock()`/`ParentDir()`/`SameLock()`, all V36), never by string
   prefix matching -- Amiga assigns mean two different path strings can
   name the same or a nested location, so string comparison would miss
-  genuine matches and genuine escapes alike. `FSGET` returns the whole
+  genuine matches and genuine escapes alike. **Known limitation
+  (TOCTOU, accepted):** `FSDELETE`, `FSGET`, and `FSMKDIR` verify
+  containment via a lock, then release it and re-resolve the same path
+  *string* for the actual `DeleteFile()`/`Open()`/`CreateDir()` --
+  AmigaDOS (this project's V37 floor) has no relative-to-lock form of
+  any of those calls. An assign or path component repointed in the gap
+  between the check and the real operation could steer the operation
+  outside the granted root; this narrows nothing further than the
+  check itself and is a real, standing gap, not silently assumed closed
+  (see the doc comment on `ResolveExisting()` in `src/fs.c`, matching
+  `AmipIsWindowOpen()`'s own "shrinks the gap, doesn't close it
+  entirely" precedent). `FSGET` returns the whole
   file as raw bytes (may contain embedded NULs; the wire's
   length-prefixed framing carries them intact) and is capped at the
   server's own internal buffer (`AMIP_FS_BUF_SIZE`, 16KB) -- this is a

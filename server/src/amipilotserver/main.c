@@ -130,37 +130,98 @@ static int LoadManifest(const char *path, char *errOut, int errCap)
     return AMIP_AREXX_RC_OK;
 }
 
+/* Escapes '"' and '\' as '\"'/'\\' so a text field can be safely
+ * delimited by its own surrounding quotes on the wire. Before this,
+ * none of this file's response payloads escaped anything -- a real
+ * Amiga gadget label, window/screen title, or menu item text
+ * containing a literal '"' (e.g. a `3.5" Drive` label) produced a
+ * genuinely well-formed RC 0 response that broke every host parser's
+ * fixed-format regex, since `[^"]*` stops at the first embedded quote.
+ * Returns g_escapeBuf; NOT reentrant (a second call before the first
+ * result is consumed overwrites it) -- every call site below uses it
+ * for exactly one field per snprintf(), never two in the same call,
+ * for exactly this reason. Truncates silently if the escaped form
+ * would overflow AMIP_ESCAPE_BUF_SIZE, same graceful-degradation
+ * policy as this project's other bounded buffers. */
+#define AMIP_ESCAPE_BUF_SIZE 512
+static char g_escapeBuf[AMIP_ESCAPE_BUF_SIZE];
+
+static const char *EscapeQuotes(const char *in)
+{
+    size_t o = 0;
+
+    if (in == NULL) {
+        g_escapeBuf[0] = '\0';
+        return g_escapeBuf;
+    }
+    for (; *in != '\0' && o + 2 < AMIP_ESCAPE_BUF_SIZE; in++) {
+        if (*in == '"' || *in == '\\') {
+            g_escapeBuf[o++] = '\\';
+        }
+        g_escapeBuf[o++] = (char)*in;
+    }
+    g_escapeBuf[o] = '\0';
+    return g_escapeBuf;
+}
+
 /* Appends one gadget's line to buf in the same shape AmiInspect's
  * PrintModel prints it, tracking remaining space so a window with more
- * gadgets than fit just truncates rather than overflowing. */
+ * gadgets than fit just truncates rather than overflowing. Each
+ * quoted field gets its own EscapeQuotes() + snprintf() pair -- see
+ * EscapeQuotes()'s own comment for why never two in one call. */
 static void AppendGadgetLine(char *buf, size_t cap, const AmipGadgetModel *gadget)
 {
     size_t used = strlen(buf);
     if (used >= cap - 1) {
         return;
     }
-    snprintf(buf + used, cap - used, "  gadget id=%lu role=%s class=\"%s\" label=\"%s\"",
-             (unsigned long)gadget->gadgetId, AmipRoleName(gadget->role),
-             gadget->className != NULL ? (const char *)gadget->className : "",
-             gadget->label != NULL ? (const char *)gadget->label : "");
+    snprintf(buf + used, cap - used, "  gadget id=%lu role=%s class=\"",
+             (unsigned long)gadget->gadgetId, AmipRoleName(gadget->role));
+    used = strlen(buf);
+    snprintf(buf + used, cap - used, "%s", EscapeQuotes((const char *)gadget->className));
+    used = strlen(buf);
+    snprintf(buf + used, cap - used, "\" label=\"");
+    used = strlen(buf);
+    snprintf(buf + used, cap - used, "%s", EscapeQuotes((const char *)gadget->label));
+    used = strlen(buf);
+    snprintf(buf + used, cap - used, "\"");
     if (gadget->value != NULL) {
         used = strlen(buf);
-        snprintf(buf + used, cap - used, " value=\"%s\"", (const char *)gadget->value);
+        snprintf(buf + used, cap - used, " value=\"");
+        used = strlen(buf);
+        snprintf(buf + used, cap - used, "%s", EscapeQuotes((const char *)gadget->value));
+        used = strlen(buf);
+        snprintf(buf + used, cap - used, "\"");
     }
     used = strlen(buf);
     snprintf(buf + used, cap - used, " [%d,%d %dx%d]\n",
              gadget->left, gadget->top, gadget->width, gadget->height);
 }
 
+/* Appends the shared "window ... screen ... [...]" header line
+ * BuildTreeResult()/BuildMenuResult() both start with. */
+static void AppendWindowHeaderLine(const char *title, const char *screenTitle,
+                                    WORD left, WORD top, WORD width, WORD height,
+                                    char *buf, size_t cap)
+{
+    buf[0] = '\0';
+    snprintf(buf, cap, "window \"");
+    snprintf(buf + strlen(buf), cap - strlen(buf), "%s",
+             title != NULL ? EscapeQuotes(title) : "(untitled)");
+    snprintf(buf + strlen(buf), cap - strlen(buf), "\" screen=\"");
+    snprintf(buf + strlen(buf), cap - strlen(buf), "%s", EscapeQuotes(screenTitle));
+    snprintf(buf + strlen(buf), cap - strlen(buf), "\" [%d,%d %dx%d]\n",
+             left, top, width, height);
+}
+
 static void BuildTreeResult(const AmipWindowModel *model, char *buf, size_t cap)
 {
     const AmipGadgetModel *gadget;
 
-    buf[0] = '\0';
-    snprintf(buf, cap, "window \"%s\" screen=\"%s\" [%d,%d %dx%d]\n",
-             model->title != NULL ? (const char *)model->title : "(untitled)",
-             model->screenTitle != NULL ? (const char *)model->screenTitle : "",
-             model->left, model->top, model->width, model->height);
+    AppendWindowHeaderLine(model->title != NULL ? (const char *)model->title : NULL,
+                            (const char *)model->screenTitle,
+                            model->left, model->top, model->width, model->height,
+                            buf, cap);
 
     for (gadget = model->gadgets; gadget != NULL; gadget = gadget->next) {
         AppendGadgetLine(buf, cap, gadget);
@@ -184,8 +245,11 @@ static void AppendMenuItemLine(char *buf, size_t cap, const AmipMenuItemModel *i
         snprintf(buf + used, cap - used, "/%ld", (long)item->subNum);
     }
     used = strlen(buf);
-    snprintf(buf + used, cap - used, " text=\"%s\"",
-             item->text != NULL ? (const char *)item->text : "");
+    snprintf(buf + used, cap - used, " text=\"");
+    used = strlen(buf);
+    snprintf(buf + used, cap - used, "%s", EscapeQuotes((const char *)item->text));
+    used = strlen(buf);
+    snprintf(buf + used, cap - used, "\"");
     if (item->hasShortcut) {
         used = strlen(buf);
         snprintf(buf + used, cap - used, " shortcut=%c", (char)item->shortcut);
@@ -200,11 +264,10 @@ static void BuildMenuResult(const AmipWindowModel *window, const AmipMenuModel *
 {
     const AmipMenuModel *menu;
 
-    buf[0] = '\0';
-    snprintf(buf, cap, "window \"%s\" screen=\"%s\" [%d,%d %dx%d]\n",
-             window->title != NULL ? (const char *)window->title : "(untitled)",
-             window->screenTitle != NULL ? (const char *)window->screenTitle : "",
-             window->left, window->top, window->width, window->height);
+    AppendWindowHeaderLine(window->title != NULL ? (const char *)window->title : NULL,
+                            (const char *)window->screenTitle,
+                            window->left, window->top, window->width, window->height,
+                            buf, cap);
 
     for (menu = menus; menu != NULL; menu = menu->next) {
         const AmipMenuItemModel *item;
@@ -213,9 +276,11 @@ static void BuildMenuResult(const AmipWindowModel *window, const AmipMenuModel *
         if (used >= cap - 1) {
             break;
         }
-        snprintf(buf + used, cap - used, "menu num=%ld title=\"%s\" enabled=%d\n",
-                 (long)menu->menuNum, menu->title != NULL ? (const char *)menu->title : "",
-                 menu->enabled);
+        snprintf(buf + used, cap - used, "menu num=%ld title=\"", (long)menu->menuNum);
+        used = strlen(buf);
+        snprintf(buf + used, cap - used, "%s", EscapeQuotes((const char *)menu->title));
+        used = strlen(buf);
+        snprintf(buf + used, cap - used, "\" enabled=%d\n", menu->enabled);
 
         for (item = menu->items; item != NULL; item = item->next) {
             const AmipMenuItemModel *sub;
@@ -626,7 +691,7 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                  * Title isn't a stable screen identity. */
                 snprintf(g_treeBuf + used, sizeof(g_treeBuf) - used,
                          "screen title=\"%s\" [%d,%d %dx%d] frontmost=%d\n",
-                         screen->DefaultTitle != NULL ? (const char *)screen->DefaultTitle : "",
+                         EscapeQuotes((const char *)screen->DefaultTitle),
                          screen->LeftEdge, screen->TopEdge, screen->Width, screen->Height,
                          screen == IntuitionBase->FirstScreen ? 1 : 0);
             }

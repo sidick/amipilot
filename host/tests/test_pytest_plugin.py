@@ -103,9 +103,13 @@ class TestBootCopperline:
     def test_raises_timeout_if_info_file_never_appears(self, tmp_path, monkeypatch):
         (tmp_path / "cfg.toml").write_text("")
 
+        instances = []
+
         class HangingProc:
             def __init__(self, *a, **k):
                 self.terminated = False
+                self.waited = False
+                instances.append(self)
 
             def poll(self):
                 return None  # still running, never writes the info file
@@ -113,10 +117,27 @@ class TestBootCopperline:
             def terminate(self):
                 self.terminated = True
 
+            def wait(self, timeout=None):
+                # Simulates a process that exits promptly once
+                # terminate()d -- confirms _boot_copperline() actually
+                # reaps it on this path (not just calling terminate()
+                # and leaving a zombie for this process's own lifetime,
+                # since nothing else would ever wait() on it otherwise).
+                if not self.terminated:
+                    raise subprocess.TimeoutExpired(cmd="hanging", timeout=timeout)
+                self.waited = True
+
         monkeypatch.setattr(subprocess, "Popen", HangingProc)
         request = _request(tmp_path)
         with pytest.raises(TimeoutError, match="control-info file"):
             _boot_copperline(request, FakeTmpPathFactory(tmp_path))
+
+        assert instances[0].terminated
+        assert instances[0].waited, (
+            "copperline_proc.wait() must be called after terminate() on the "
+            "timeout path, or the process is never reaped and leaks as a "
+            "zombie for this pytest process's own lifetime"
+        )
 
 
 class TestConnectWithRetry:

@@ -12,7 +12,7 @@ from unittest import mock
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from amipilot.client import ActionFailed, Amipilot, CommandError, NotFound  # noqa: E402
-from amipilot.wire import WireClient  # noqa: E402
+from amipilot.wire import WireClient, WireError  # noqa: E402
 
 
 class FakeTransport:
@@ -23,6 +23,7 @@ class FakeTransport:
         self._replies = list(replies)
         self.sent: list[bytes] = []
         self._buf = b""
+        self.closed = False
 
     def sendall(self, data: bytes) -> None:
         self.sent.append(data)
@@ -33,7 +34,7 @@ class FakeTransport:
         return data
 
     def close(self) -> None:
-        pass
+        self.closed = True
 
 
 def client_with(*replies: bytes) -> Amipilot:
@@ -350,6 +351,16 @@ class Connect(unittest.TestCase):
     """Amipilot.connect() (the single-attempt path, distinct from
     connect_with_retry()'s own retry loop) sends AUTH the same way."""
 
+    def test_malformed_handshake_closes_socket(self):
+        # A WireError from handshake() itself (not the AUTH step) must
+        # still close the just-opened socket rather than leaking it.
+        garbage_payload = b"not a valid VERSION payload\n"
+        c = client_with(b"RC 0 %d\n%s" % (len(garbage_payload), garbage_payload))
+        with mock.patch.object(WireClient, "connect", lambda *a, **kw: c._wire):
+            with self.assertRaises(WireError):
+                Amipilot.connect("127.0.0.1", 1234)
+        self.assertTrue(c._wire._t.closed)
+
     def test_sends_auth_with_default_password(self):
         version_payload = (
             b"AMIPILOT 0.3 PROTOCOL 1\n"
@@ -520,6 +531,46 @@ class ConnectWithRetry(unittest.TestCase):
                                              password="wrong")
 
         self.assertTrue(fake_sock.closed)
+
+    def test_malformed_handshake_closes_socket_without_retrying(self):
+        # A WireError (malformed VERSION payload) is not the "far end
+        # not ready yet" condition this retry loop exists for -- it
+        # must close the socket and propagate immediately, not spin
+        # until deadline_seconds like a genuine transient failure would.
+        garbage_payload = b"not a valid VERSION payload\n"
+        fake_sock = FakeSocket([b"RC 0 %d\n%s" % (len(garbage_payload), garbage_payload)])
+
+        with mock.patch.object(socket, "create_connection",
+                                lambda addr, timeout=10.0: fake_sock), \
+             mock.patch.object(time, "sleep", lambda _s: None):
+            with self.assertRaises(WireError):
+                Amipilot.connect_with_retry("127.0.0.1", 1234, deadline_seconds=5)
+
+        self.assertTrue(fake_sock.closed)
+
+    def test_transient_oserror_during_auth_is_retried(self):
+        # AUTH's own round trip is just as exposed to the "bytes
+        # silently dropped, not buffered" failure mode as VERSION was
+        # -- confirm it gets the same retry-on-the-same-connection
+        # treatment, not an uncaught crash. FakeSocket.recv() raises
+        # TimeoutError (an OSError) once its queued chunks run out, so
+        # queuing only the first attempt's VERSION reply (no AUTH
+        # reply behind it) simulates AUTH's response never arriving
+        # that attempt, matching real socket.settimeout() expiry.
+        fake_sock = FakeSocket([
+            b"RC 0 %d\n%s" % (len(VERSION_PAYLOAD), VERSION_PAYLOAD),  # attempt 1: VERSION ok
+            # (attempt 1's AUTH read times out here -- no chunk queued)
+            b"RC 0 %d\n%s" % (len(VERSION_PAYLOAD), VERSION_PAYLOAD),  # attempt 2: VERSION ok
+            b"RC 0 0\n",                                               # attempt 2: AUTH ok
+        ])
+
+        with mock.patch.object(socket, "create_connection",
+                                lambda addr, timeout=10.0: fake_sock), \
+             mock.patch.object(time, "sleep", lambda _s: None):
+            client = Amipilot.connect_with_retry("127.0.0.1", 1234, deadline_seconds=5)
+
+        self.assertEqual(client.info.protocol, 1)
+        self.assertFalse(fake_sock.closed)
 
 
 if __name__ == "__main__":
