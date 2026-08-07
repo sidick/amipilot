@@ -51,7 +51,11 @@ this, not a private hack — and maps known classes to a role:
 `integer.gadget`, `radiobutton.gadget`, `chooser.gadget`,
 `scroller.gadget`, `slider.gadget`, `listbrowser.gadget`. An unrecognised
 class still gets its real name reported (`class="..."`,
-`role=custom`) rather than a blank field.
+`role=custom`) rather than a blank field. A gadget whose `GadgetType`
+bits *claim* `GTYP_CUSTOMGADGET` but doesn't actually carry a real
+BOOPSI object header (confirmed against a real, OS-shipped stock
+application) degrades the same way — `role=custom`, no class or
+label — rather than trusting the claim and dereferencing garbage.
 
 ## Documented gaps
 

@@ -124,6 +124,74 @@ run_fixture "gadtools-app" "GTApp" "GadTools" "inspect-gadtools.txt" "marker-gt.
 run_fixture "classact-app" "CAApp" "ClassAct" "inspect-classact.txt" "marker-ca.txt" \
 	'class="layout.gadget" label="" [4,11 220x130]'
 
+# --- WBPattern regression check (phase 0.5, a real hang found and fixed) --
+# AmigaOS 3.2's stock SYS:Prefs/WBPattern has custom-drawn Preview/Sketch
+# boxes (GadgetID 23/24) whose GadgetType bits claim GTYP_CUSTOMGADGET but
+# which don't actually carry a real BOOPSI _Object header -- OCLASS()
+# returns a bogus class pointer for them, and blindly dispatching
+# GetAttr()/DoMethod() through it wedged the whole machine (confirmed via
+# GDB against Copperline's --gdb remote server: the blocked task's own
+# saved PC was inside a ROM trampoline, reached via that garbage class
+# pointer -- see the walk.c comment at the TypeOfMem() check this added).
+# Not a hand-written fixture -- reaches SYS:Prefs/WBPattern directly off
+# the mounted Workbench: volume, same as run_stock_app_check reaches
+# SYS:Prefs/Time. Asserts BOTH that AmiInspect returns at all (the crux
+# of the regression -- a hang here fails via the marker-never-appears
+# path, same signal run_fixture() uses above) and that gadget 23
+# degrades to role=custom rather than being silently misclassified.
+run_wbpattern_check() {
+	echo "run.sh: WBPattern"
+
+	rm -f "$BUILD/inspect-wbpattern.txt" "$BUILD/marker-wbp.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+Run >NIL: SYS:Prefs/WBPattern
+Wait 10
+SRC:build/AmiInspect WINDOW=WBPattern >SRC:build/inspect-wbpattern.txt
+Echo "DONE" >SRC:build/marker-wbp.txt
+EOF
+
+	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
+	rm -f "$info"
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
+		--fast 8M --noaudio --control :0 --control-info "$info" \
+		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
+	COPPERLINE_PID=$!
+
+	tries=0
+	while [ ! -f "$info" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 100 ]; then
+			echo "run.sh: FAIL (WBPattern): copperline never wrote $info"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			return
+		fi
+		sleep 0.1
+	done
+
+	"$COPPERLINE_CTL" --info "$info" run_until '{"seconds": 30}' > /dev/null
+	kill "$COPPERLINE_PID" 2>/dev/null || true
+	COPPERLINE_PID=""
+	rm -f "$info"
+
+	if [ ! -f "$BUILD/marker-wbp.txt" ]; then
+		echo "run.sh: FAIL (WBPattern): marker-wbp.txt never appeared -- AmiInspect hung or crashed"
+		echo "run.sh:   see $REPO_ROOT/build/.copperline-log-$$.txt"
+		FAILED=1
+		return
+	fi
+
+	if grep -qF 'gadget id=23 role=custom class="" label=""' "$BUILD/inspect-wbpattern.txt" 2>/dev/null; then
+		echo "run.sh: PASS (WBPattern)"
+	else
+		echo "run.sh: FAIL (WBPattern): expected line not found: gadget id=23 role=custom class=\"\" label=\"\""
+		echo "run.sh:   --- actual output ---"
+		sed 's/^/run.sh:   /' "$BUILD/inspect-wbpattern.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+	fi
+}
+
 # --- action-engine click check (phase 0.2) --------------------------------
 # Boots gadtools-app, clicks its Connect button (GA_ID=1) via AmiClickTest
 # (the action engine's genuine input.device injection), and asserts the
@@ -1062,6 +1130,7 @@ EOF
 	fi
 }
 
+run_wbpattern_check
 run_click_check
 run_type_check
 run_arexx_check
@@ -1079,6 +1148,7 @@ if [ "$FAILED" -eq 0 ]; then
 	rm -f "$BUILD"/.copperline-ctl-info-*.json "$BUILD"/.copperline-log-*.txt \
 		"$BUILD"/inspect-gadtools.txt "$BUILD"/inspect-classact.txt \
 		"$BUILD"/marker-gt.txt "$BUILD"/marker-ca.txt \
+		"$BUILD"/inspect-wbpattern.txt "$BUILD"/marker-wbp.txt \
 		"$BUILD"/click-result.txt "$BUILD"/inspect-after-click.txt \
 		"$BUILD"/marker-click.txt \
 		"$BUILD"/type-result.txt "$BUILD"/inspect-after-type.txt \
