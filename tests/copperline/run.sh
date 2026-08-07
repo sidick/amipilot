@@ -844,6 +844,92 @@ EOF
 	fi
 }
 
+# --- golden-tree fixture check (phase 0.5, docs/implementation-plan.md's
+# "Golden trees": "a saved dump doubles as a structural fixture") --------
+# Both fixtures run together in one boot (only their windows' baseline
+# structure is asserted, no interaction needed) so a single TREE round
+# trip per fixture is enough. tests/copperline/golden-test.py compares
+# each live tree against its checked-in fixtures/<app>/<App>.golden via
+# amipilot.golden.assert_golden() -- a mismatch here is real UI drift
+# this check exists to catch, matching CLASSIFY-style checks above but
+# for the whole tree's shape at once rather than one asserted line.
+# See README.md's "Golden-tree fixtures and Locale" section: these two
+# golden files are locale-invariant because both fixtures hardcode
+# plain C string labels/titles (no locale.library catalog) -- not a
+# property golden trees have in general, for a real localized app.
+run_golden_check() {
+	echo "run.sh: golden-tree fixtures"
+
+	rm -f "$BUILD/golden-result.txt" "$BUILD/marker-golden-ready.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+Run >NIL: SRC:build/fixtures/GTApp
+Run >NIL: SRC:build/fixtures/CAApp
+Wait 5
+Run >NIL: SRC:build/AmiPilotServer SERIAL
+Wait 5
+Echo "READY" >SRC:build/marker-golden-ready.txt
+EOF
+
+	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
+	rm -f "$info"
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
+		--fast 8M --noaudio --serial tcp --control :0 --control-info "$info" \
+		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
+	COPPERLINE_PID=$!
+
+	tries=0
+	while [ ! -f "$info" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 100 ]; then
+			echo "run.sh: FAIL (golden): copperline never wrote $info"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			return
+		fi
+		sleep 0.1
+	done
+
+	"$COPPERLINE_CTL" --info "$info" run_until '{"seconds": 600}' > /dev/null 2>&1 &
+
+	tries=0
+	while [ ! -f "$BUILD/marker-golden-ready.txt" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 120 ]; then
+			echo "run.sh: FAIL (golden): guest never became ready -- crash or hang"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			rm -f "$info"
+			return
+		fi
+		sleep 0.5
+	done
+
+	python3 "$REPO_ROOT/tests/copperline/golden-test.py" 127.0.0.1:1234 \
+		> "$BUILD/golden-result.txt" 2>&1 || true
+
+	kill "$COPPERLINE_PID" 2>/dev/null || true
+	COPPERLINE_PID=""
+	rm -f "$info"
+
+	ok=1
+	for pattern in 'GOLDEN-GTAPP MATCH' 'GOLDEN-CAAPP MATCH'; do
+		if ! grep -qF "$pattern" "$BUILD/golden-result.txt" 2>/dev/null; then
+			echo "run.sh: FAIL (golden): expected line not found: $pattern"
+			ok=0
+		fi
+	done
+
+	if [ "$ok" -eq 1 ]; then
+		echo "run.sh: PASS (golden-tree fixtures)"
+	else
+		echo "run.sh:   --- actual output ---"
+		sed 's/^/run.sh:   /' "$BUILD/golden-result.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+	fi
+}
+
 # --- pytest release gate (phase 0.3, host/amipilot/pytest_plugin.py) ------
 # The literal phase 0.3 release gate (docs/implementation-plan.md): "a
 # host pytest clicks a button and asserts a label changed,
@@ -896,6 +982,7 @@ run_launch_check
 run_fs_check
 run_menu_check
 run_screens_check
+run_golden_check
 run_pytest_release_gate_check
 
 if [ "$FAILED" -eq 0 ]; then
@@ -913,6 +1000,7 @@ if [ "$FAILED" -eq 0 ]; then
 		"$BUILD"/fs-result.txt "$BUILD"/marker-fs-ready.txt \
 		"$BUILD"/menu-result.txt "$BUILD"/marker-menu-ready.txt \
 		"$BUILD"/screens-result.txt "$BUILD"/marker-screens-ready.txt \
+		"$BUILD"/golden-result.txt "$BUILD"/marker-golden-ready.txt \
 		"$BUILD"/pytest-result.txt
 	echo "run.sh: all fixtures PASS"
 	exit 0

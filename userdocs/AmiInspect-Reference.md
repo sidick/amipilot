@@ -56,6 +56,84 @@ window "<title>" [<left>,<top> <width>x<height>]
   offsets from the window's right/bottom edge — that's correct, not a
   bug).
 
+## Drafting a manifest from its output
+
+`AmiInspect`'s `id=`/`role=`/`label=` columns are exactly the raw
+material a [manifest](https://github.com/sidick/amipilot/blob/main/manifest/SPEC.md)
+needs — a first draft is a direct transcription, not a rewrite:
+
+```
+> AmiInspect WINDOW="AmiPilot GadTools Fixture"
+window "AmiPilot GadTools Fixture" [0,11 400x150]
+  gadget id=1 role=button class="" label="_Connect" [10,10 80x20]
+  gadget id=2 role=string class="" label="Host" value="" [10,40 200x20]
+  gadget id=3 role=checkbox class="" label="_Enabled" [10,70 100x20]
+```
+
+becomes:
+
+```
+MANIFEST 1
+APP GTApp
+WINDOW main "AmiPilot GadTools Fixture"
+GADGET connect_button main 1
+GADGET host_field main 2
+GADGET enabled_checkbox main 3
+```
+
+— the window title (or a stable, less brittle substring of it) becomes
+the `WINDOW` record's title-substring field, and each `gadget id=<n>`
+line becomes one `GADGET <logical-name> <window-name> <n>` record,
+with a logical name you choose (lowercase, `[a-z0-9_]+`) based on the
+gadget's `label=`/`role=`. Any gadget missing from the tree entirely
+(most often a `layout.gadget`'s nested children — see
+[Locator Tiers and Limits](Locator-Tiers-and-Limits.md)) can't be
+named this way; there's nothing to transcribe.
+
+The host-side equivalent, `amipilot dump <window> --format python`
+(see `host/README.md`), automates the tedious part of this by
+printing one `# <slug> = <id>` suggestion per gadget straight from a
+live `TREE`, generated from the same `label=`/`role=` data —
+copy/paste starting material for the `GADGET` records above, not a
+finished manifest (it still needs the `MANIFEST`/`APP`/`WINDOW`
+header lines and a human decision on naming).
+
+Whether the result ships as the application's own manifest or stays a
+standalone file you keep for your own scripts against an app you
+don't control, the format is identical — see
+[the manifest spec's "Quirk profiles" section](https://github.com/sidick/amipilot/blob/main/manifest/SPEC.md#quirk-profiles-the-same-format-for-apps-you-dont-control)
+for the latter.
+
+## Golden trees (catching UI drift, not just clicking)
+
+A saved dump doubles as a structural fixture: "this app's UI still
+has this shape" as a one-line assertion, catching an upstream UI
+change before a manifest's `GA_ID`s or a quirk profile's locators
+start failing in a confusing way. On the host side (`host/README.md`,
+`amipilot.golden`):
+
+```sh
+amipilot dump "AmiPilot GadTools Fixture" --golden GTApp.golden
+# first run: "amipilot dump: wrote GTApp.golden"
+# every run after, unchanged: "amipilot dump: GTApp.golden matches"
+# after a real UI change: exits 1 with a unified diff on stderr
+```
+
+or, inside a test, `Amipilot.assert_tree_matches(window_pattern,
+golden_path)` does the same thing as one call. Regenerate deliberately
+with `--update-golden` (or `update=True`) once a change is confirmed
+intentional — a golden file is meant to fail loudly on drift, not
+silently absorb it.
+
+**Locale is part of a golden file's environment.** The saved text
+includes the window's title and screen name verbatim, and — for a
+real, catalog-driven application — its gadget labels too; any of
+these can differ under a different system Locale preference with no
+actual UI change involved. A golden file taken on one machine isn't
+guaranteed to reproduce on another unless both share the same Locale
+(see `tests/copperline/README.md`'s own note on the fixtures this
+project ships golden files for).
+
 ## Exit codes
 
 | Code | Meaning |
