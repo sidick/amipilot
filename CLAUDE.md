@@ -33,9 +33,26 @@ checked-in golden files for both fixtures
 `tests/copperline/README.md`'s "Golden-tree fixtures and Locale"
 section for the real reproducibility caveat found while building
 this (window/screen titles, and a real app's catalog-driven labels,
-aren't Locale-invariant). Remaining 0.5 scope: the MUI-ARexx bridge
-tier (deferred -- needs a MUI development environment not currently
-available) and the stock-app conformance set.
+aren't Locale-invariant). The stock-app conformance set is real too:
+`tests/copperline/stock-app-test.py` (wired into `run.sh`'s
+`run_stock_app_check`) drives AmigaOS 3.2's own `SYS:Prefs/Time` --
+launched over the wire, not a hand-written fixture -- end to end via
+tier-2 `ROLE=`/`INDEX=` locators discovered purely from AmiInspect/
+`amipilot dump` output; see its own header for what was actually
+tried and confirmed live (its year field and "Save" button turned out
+to be genuinely inert under this profile's `rtc: none` config -- an
+honest finding, recorded as a quirk profile at
+`tests/copperline/Time.manifest`, not silently worked around) and
+`host/amipilot/client.py`'s `connect_with_retry()` docstring for a
+real bug this work found and fixed along the way: the method left a
+returned client's socket read timeout clamped to a leftover value
+from its own retry loop (as little as 0.1s), silently breaking any
+`WAITFOR`/`CLICK(expect=...)` whose `TIMEOUT=` exceeded it. Also see
+issue #36: `AmiInspect` genuinely hangs walking a different stock
+app's window (`SYS:Prefs/WBPattern`), found the same way -- a real,
+unfixed bug, not yet root-caused. Remaining 0.5 scope: the MUI-ARexx
+bridge tier (deferred -- needs a MUI development environment not
+currently available).
 `intuition-model/` (the walker library) and `amiinspect/` (the Shell
 command) are real, building, and verified on-target. `server/` is
 real: the action engine (`server/src/action.c`, click/type/geometry/

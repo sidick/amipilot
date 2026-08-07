@@ -704,9 +704,10 @@ class FakeSocket:
         self._chunks = list(chunks)
         self.closed = False
         self.sent: list[bytes] = []
+        self.timeouts: list[float] = []
 
-    def settimeout(self, _t):
-        pass
+    def settimeout(self, t):
+        self.timeouts.append(t)
 
     def sendall(self, data):
         self.sent.append(data)
@@ -875,6 +876,29 @@ class ConnectWithRetry(unittest.TestCase):
 
         self.assertEqual(client.info.protocol, 1)
         self.assertFalse(fake_sock.closed)
+
+    def test_returned_client_socket_timeout_is_reset_to_connect_timeout(self):
+        # Regression test: the retry loop below shrinks the socket's
+        # read timeout on every iteration (down to as little as 0.1s
+        # near deadline_seconds) so one slow handshake attempt can't
+        # itself blow past the deadline -- but that's a socket-level
+        # setting, so a client returned without resetting it first
+        # would carry that leftover tiny timeout into every future
+        # command. Confirmed the hard way: a real CLICK ...
+        # EXPECT=NOWINDOW TIMEOUT=10, genuinely answered by the server
+        # in ~10s, still raised a raw socket TimeoutError instead of
+        # the clean RC-15 Timeout exception, because connect_with_retry
+        # never restored the timeout before handing the client back.
+        fake_sock = FakeSocket([
+            b"RC 0 %d\n%s" % (len(VERSION_PAYLOAD), VERSION_PAYLOAD),
+            b"RC 0 0\n",
+        ])
+        with mock.patch.object(socket, "create_connection",
+                                lambda addr, timeout=10.0: fake_sock):
+            Amipilot.connect_with_retry(
+                "127.0.0.1", 1234, deadline_seconds=5, connect_timeout=15
+            )
+        self.assertEqual(fake_sock.timeouts[-1], 15)
 
 
 class AssertTreeMatches(unittest.TestCase):

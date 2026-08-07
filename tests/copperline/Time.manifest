@@ -1,0 +1,40 @@
+; Quirk profile for AmigaOS 3.2's stock SYS:Prefs/Time -- see
+; manifest/SPEC.md's "Quirk profiles" section: same format/parser as
+; an app-shipped manifest, community-authored here since we don't
+; control Time Preferences' own source. Every GA_ID and note below was
+; discovered live via AmiInspect/amipilot dump against a real running
+; window under Copperline (this repo's copperline.local.toml,
+; AmigaOS 3.2.3, A1200/AGA, `rtc: none`) -- see
+; tests/copperline/stock-app-test.py's own header for the full story.
+MANIFEST 1
+APP TimePrefs
+WINDOW main "Time Preferences"
+
+; quirk: the year string field never accepts typed input, even after
+; an explicit click to focus it first -- confirmed live, not assumed.
+; This machine profile has no RTC hardware (`rtc: none`); the likely
+; explanation is that Time Preferences disables direct date/time entry
+; without one, though that's inferred from behavior, not from source.
+GADGET year_field main 16
+
+; quirk: buttons are PLACETEXT_IN (baked into rendered imagery,
+; GadgetText empty) -- the same, already-documented BUTTON_KIND limit
+; fixtures/gadtools-app hits. LABEL= can't address any of them; use
+; GA_ID (below) or ROLE=button INDEX=<n> instead.
+; quirk: of the three, only "use_button" was confirmed live to close
+; the window. Clicking "save_button" (leftmost, conventionally "Save")
+; does nothing detectable within a 10s wait -- the window stays open
+; and no ENVARC:Sys/time.prefs appears -- consistent with the same
+; `rtc: none` theory above but not confirmed by source. "cancel_button"
+; (rightmost) was not tested.
+GADGET save_button main 2
+GADGET use_button main 8
+GADGET cancel_button main 9
+
+; quirk: both sliders drag fine via DRAG (no tier-2 form exists for
+; DRAG -- GA_ID is the only locator), but neither's resulting position
+; is readable back through GETTEXT (only string/integer gadgets expose
+; a value=) -- an honest limit of what's observable here, not
+; something specific to this app.
+GADGET hours_slider main 15
+GADGET minutes_slider main 14
