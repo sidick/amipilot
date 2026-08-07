@@ -10,6 +10,7 @@ import unittest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from amipilot.wire import (  # noqa: E402
+    MAX_LINE,
     PROTOCOL,
     ProtocolMismatch,
     Reply,
@@ -82,6 +83,28 @@ class CommandFraming(unittest.TestCase):
         client = WireClient(FakeTransport(b""))
         with self.assertRaises(ValueError):
             client.command("TREE W\nQUIT")
+
+    def test_command_at_max_line_is_sent(self):
+        # Exactly MAX_LINE bytes including the '\n' terminator must
+        # still go through -- this is a boundary check on the
+        # too-long rejection below, not a truncation test.
+        t = FakeTransport(b"RC 0 0\n")
+        client = WireClient(t)
+        command = "TREE " + "x" * (MAX_LINE - 1 - len("TREE "))
+        self.assertEqual(len(command) + 1, MAX_LINE)
+        client.command(command)
+        self.assertEqual(t.sent, command.encode("latin-1") + b"\n")
+
+    def test_command_over_max_line_rejected_locally(self):
+        # Explicit, local rejection -- not a silent truncation that
+        # the server would otherwise chop into a shorter, different,
+        # unintended command (server/WIRE.md's 512-byte request-line
+        # cap; see AmipSerialLastLineOverflowed()'s doc comment in
+        # server/include/serial.h for the server-side half of this).
+        client = WireClient(FakeTransport(b""))
+        command = "TREE " + "x" * MAX_LINE
+        with self.assertRaises(ValueError):
+            client.command(command)
 
 
 class Handshake(unittest.TestCase):

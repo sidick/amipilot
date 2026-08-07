@@ -43,13 +43,25 @@ sides stay binary-safe with zero escaping and a 68000-friendly parser.
 
 One command per line, terminated by LF (`\n`). A CR before the LF is
 stripped (CRLF tolerated); empty lines are ignored. Maximum request line
-is 512 bytes including the terminator — longer lines are truncated and
-will normally fail parsing (RC 10).
+is 512 bytes including the terminator — the host client (`host/
+amipilot/wire.py`'s `MAX_LINE`) rejects an oversized command locally
+before ever sending it; a line that reaches this length on the wire
+regardless (e.g. a non-Python client) is rejected explicitly by the
+server with `RC 10` and an "argument too long"/"request line too
+long" message, **not silently truncated into a shorter, different
+command** — a truncated-but-still-well-formed line would otherwise be
+indistinguishable from a genuinely shorter one, which is a
+correctness risk (acting on the wrong path/pattern), not just a
+cosmetic error.
 
 The command grammar is exactly the ARexx port's verb set — same
 keywords, same arguments, same `@name` manifest locators, same quoting
-rules (see `server/README.md` and `userdocs/`). The wire adds no verbs
-of its own except that `VERSION` (below) is its handshake.
+rules (see `server/README.md` and `userdocs/`). A quoted argument may
+contain a literal `"` or `\` by escaping it as `\"`/`\\` — the same
+backslash-escaping convention the server's own text replies already
+use for fields that might contain one (a filename/title/label);
+`host/amipilot`'s `_quote()` applies it automatically. The wire adds
+no verbs of its own except that `VERSION` (below) is its handshake.
 
 ## Responses
 

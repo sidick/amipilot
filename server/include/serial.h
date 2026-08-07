@@ -43,9 +43,20 @@ ULONG AmipSerialSigMask(const AmipSerial *serial);
  * complete line is buffered. Call repeatedly until NULL after a signal:
  * one chunk drain can complete several lines. The returned pointer is
  * valid until the next AmipSerialNextLine() call. Lines longer than the
- * wire's 512-byte request cap are truncated (the parser then rejects
- * them, which is the spec'd RC 10 outcome, not a transport error). */
+ * wire's 512-byte request cap are truncated -- check
+ * AmipSerialLastLineOverflowed() before parsing a returned line, since
+ * a truncated-but-still-parseable line would otherwise silently run as
+ * a different, unintended command rather than fail. */
 const char *AmipSerialNextLine(AmipSerial *serial);
+
+/* True iff the line most recently returned by AmipSerialNextLine() was
+ * truncated to fit the 512-byte request cap -- meaning it is NOT the
+ * line the sender actually intended, just as much of it as fit. The
+ * caller should reject it outright (an explicit "line too long" RC 10)
+ * rather than hand it to the parser, which might otherwise happily
+ * parse the chopped text as a shorter, different, well-formed command
+ * -- a correctness risk, not just a cosmetic one. */
+BOOL AmipSerialLastLineOverflowed(const AmipSerial *serial);
 
 /* Synchronously writes len bytes. Returns FALSE if the write failed
  * (io_Error non-zero) -- rare enough that the caller just logs it. */

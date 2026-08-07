@@ -85,6 +85,21 @@ class Quoting(unittest.TestCase):
         with self.assertRaises(ValueError):
             c.launch("SRC:build/fixtures/GTApp\nQUIT")
 
+    def test_pattern_with_embedded_quote_is_escaped(self):
+        # A real AmigaDOS name can legitimately contain a literal '"'
+        # (e.g. a `12" disk` comment/name) -- the server's own
+        # read_token() (arexx_cmd.c) now understands the same
+        # backslash-escaping its reply side already emits, so this
+        # must be escaped and quoted, not rejected.
+        c = client_with(b"RC 0 0\n")
+        c.fs_mkdir('Work:12" disk')
+        self.assertEqual(c._wire._t.sent[0], b'FSMKDIR "Work:12\\" disk"\n')
+
+    def test_pattern_with_backslash_is_escaped(self):
+        c = client_with(b"RC 0 0\n")
+        c.fs_mkdir("Work:back\\slash")
+        self.assertEqual(c._wire._t.sent[0], b'FSMKDIR "Work:back\\\\slash"\n')
+
     def test_fs_verbs_quote_spaced_paths(self):
         c = client_with(b"RC 0 0\n", b"RC 0 0\n", b"RC 0 0\n")
         c.fs_mkdir("Work:My Dir")

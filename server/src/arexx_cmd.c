@@ -38,27 +38,49 @@ static const char *skip_ws(const char *p)
 }
 
 /* Reads one token starting at p. A leading '"' reads a quoted token up
- * to the closing '"' (no embedded-quote escaping -- not needed for this
- * command set's simple templates); otherwise reads up to the next
- * whitespace. Copies into dst (cap bytes, NUL-terminated, silently
- * truncates if needed) and returns a pointer just past the token. */
-static const char *read_token(const char *p, char *dst, size_t cap)
+ * to the closing '"', with backslash-escaping: '\"' -> literal '"',
+ * '\\' -> literal '\', matching the escaping the server's own reply
+ * side already applies (EscapeQuotesInto()/EscapeQuotes() in fs.c/
+ * amipilotserver/main.c) -- without this, a name/path the server can
+ * safely REPORT (via FSLIST/TREE/etc.) could never be SENT back as an
+ * argument, since a bare '"' inside it would end the token early. A
+ * lone trailing backslash (no following char) is kept literal, same
+ * as the host's own unescape() in model.py. Otherwise (no leading
+ * '"') reads up to the next whitespace, no escaping (unquoted tokens
+ * are for simple values -- window patterns rarely need one, and
+ * quoting is always available when they do).
+ *
+ * Copies into dst (cap bytes, NUL-terminated). If the token as
+ * written would not fit, dst still gets a truncated-but-valid
+ * C string (never overflowed), but *truncated (if non-NULL) is set
+ * to 1 so the caller can treat this as an explicit error rather than
+ * silently acting on a chopped value -- see AmipArexxParse's use of
+ * this. Returns a pointer just past the token in the source line. */
+static const char *read_token(const char *p, char *dst, size_t cap, int *truncated)
 {
     size_t n = 0;
+    int trunc = 0;
+
     if (*p == '"') {
         p++;
         while (*p && *p != '"') {
-            if (n + 1 < cap) dst[n++] = *p;
+            char c = *p;
+            if (c == '\\' && (p[1] == '"' || p[1] == '\\')) {
+                c = p[1];
+                p++;
+            }
+            if (n + 1 < cap) { dst[n++] = c; } else { trunc = 1; }
             p++;
         }
         if (*p == '"') p++;
     } else {
         while (*p && *p != ' ' && *p != '\t') {
-            if (n + 1 < cap) dst[n++] = *p;
+            if (n + 1 < cap) { dst[n++] = *p; } else { trunc = 1; }
             p++;
         }
     }
     dst[n] = '\0';
+    if (truncated != NULL) *truncated = trunc;
     return p;
 }
 
@@ -69,16 +91,33 @@ static const char *read_token(const char *p, char *dst, size_t cap)
  * <value> into dst (cap bytes) and advances *pp past it plus any
  * following whitespace if the prefix is present; leaves *pp and dst
  * untouched otherwise (dst already reads as "" from AmipArexxParse's
- * own memset). */
-static void parse_optional_screen_prefix(const char **pp, char *dst, size_t cap)
+ * own memset). *truncated is set the same way read_token's own is. */
+static void parse_optional_screen_prefix(const char **pp, char *dst, size_t cap,
+                                         int *truncated)
 {
     const char *p = *pp;
 
+    if (truncated != NULL) *truncated = 0;
     if (ci_streq_prefix(p, "SCREEN=")) {
         p += 7; /* strlen("SCREEN=") */
-        p = read_token(p, dst, cap);
+        p = read_token(p, dst, cap, truncated);
         *pp = skip_ws(p);
     }
+}
+
+/* Marks a truncated argument as an explicit parse failure (argTooLong)
+ * rather than letting the caller silently proceed on a chopped value
+ * -- see arexx_cmd.h's doc comment on argTooLong for why this matters
+ * beyond cosmetics. Returns 1 (so callers can `if (fail_if_trunc(...))
+ * return -1;`) when trunc is set, 0 otherwise. */
+static int fail_if_trunc(int trunc, AmipArexxParsed *out)
+{
+    if (trunc) {
+        out->argTooLong = 1;
+        out->type = AMIP_AREXX_CMD_UNKNOWN;
+        return 1;
+    }
+    return 0;
 }
 
 int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
@@ -93,7 +132,11 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
     out->type = AMIP_AREXX_CMD_UNKNOWN;
 
     p = skip_ws(cmdline);
-    p = read_token(p, kw, sizeof(kw));
+    /* kw's own truncation isn't checked -- a keyword longer than the
+     * longest real one (7 chars, "MANIFEST"/"FSDELETE") just fails
+     * every ci_streq() below and falls through to the existing
+     * "unknown command" path, which is already the correct outcome. */
+    p = read_token(p, kw, sizeof(kw), NULL);
 
     if      (ci_streq(kw, "TREE"))     out->type = AMIP_AREXX_CMD_TREE;
     else if (ci_streq(kw, "CLICK"))    out->type = AMIP_AREXX_CMD_CLICK;
@@ -126,32 +169,38 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
         out->type == AMIP_AREXX_CMD_FSDELETE ||
         out->type == AMIP_AREXX_CMD_FSGET ||
         out->type == AMIP_AREXX_CMD_AUTH) {
+        int trunc;
         p = skip_ws(p);
         if (*p == '\0') {
             out->type = AMIP_AREXX_CMD_UNKNOWN;
             return -1;
         }
-        read_token(p, out->path, sizeof(out->path));
+        read_token(p, out->path, sizeof(out->path), &trunc);
+        if (fail_if_trunc(trunc, out)) return -1;
         return 0;
     }
 
     if (out->type == AMIP_AREXX_CMD_MENUPICK) {
         char numbuf[16];
+        int trunc;
 
         p = skip_ws(p);
-        parse_optional_screen_prefix(&p, out->screenPattern, sizeof(out->screenPattern));
+        parse_optional_screen_prefix(&p, out->screenPattern, sizeof(out->screenPattern), &trunc);
+        if (fail_if_trunc(trunc, out)) return -1;
         if (*p == '\0') {
             out->type = AMIP_AREXX_CMD_UNKNOWN;
             return -1;
         }
-        p = read_token(p, out->windowPattern, sizeof(out->windowPattern));
+        p = read_token(p, out->windowPattern, sizeof(out->windowPattern), &trunc);
+        if (fail_if_trunc(trunc, out)) return -1;
 
         p = skip_ws(p);
         if (*p == '\0') {
             out->type = AMIP_AREXX_CMD_UNKNOWN;
             return -1;
         }
-        p = read_token(p, numbuf, sizeof(numbuf));
+        p = read_token(p, numbuf, sizeof(numbuf), &trunc);
+        if (fail_if_trunc(trunc, out)) return -1;
         out->menuNum = strtol(numbuf, NULL, 10);
 
         p = skip_ws(p);
@@ -159,13 +208,15 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
             out->type = AMIP_AREXX_CMD_UNKNOWN;
             return -1;
         }
-        p = read_token(p, numbuf, sizeof(numbuf));
+        p = read_token(p, numbuf, sizeof(numbuf), &trunc);
+        if (fail_if_trunc(trunc, out)) return -1;
         out->itemNum = strtol(numbuf, NULL, 10);
 
         out->subNum = -1;
         p = skip_ws(p);
         if (*p != '\0') {
-            read_token(p, numbuf, sizeof(numbuf));
+            read_token(p, numbuf, sizeof(numbuf), &trunc);
+            if (fail_if_trunc(trunc, out)) return -1;
             out->subNum = strtol(numbuf, NULL, 10);
         }
         return 0;
@@ -197,7 +248,15 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
         }
         /* Verbatim rest-of-line, same as TYPE's text -- the command
          * line is Shell syntax handed to SystemTagList() as-is, not
-         * re-tokenized by this parser. */
+         * re-tokenized by this parser. Rejected outright (not
+         * silently chopped) if it doesn't fit -- a truncated Shell
+         * command line is a different, unintended command, not a
+         * cosmetic loss. */
+        if (strlen(p) >= sizeof(out->command)) {
+            out->argTooLong = 1;
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
         strncpy(out->command, p, sizeof(out->command) - 1);
         out->command[sizeof(out->command) - 1] = '\0';
         return 0;
@@ -209,21 +268,27 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
      * form (a "SCREEN=x @name" combination is syntactically accepted
      * but the screen filter is simply not applied to the "@name"
      * form -- documented non-goal in arexx_cmd.h, not an error). */
-    p = skip_ws(p);
-    parse_optional_screen_prefix(&p, out->screenPattern, sizeof(out->screenPattern));
-    if (*p == '\0') {
-        out->type = AMIP_AREXX_CMD_UNKNOWN;
-        return -1;
-    }
-    if (*p == '@' && out->type != AMIP_AREXX_CMD_TREE && out->type != AMIP_AREXX_CMD_MENU) {
-        p++;
-        p = read_token(p, out->manifestName, sizeof(out->manifestName));
-        if (out->manifestName[0] == '\0') {
+    {
+        int trunc;
+        p = skip_ws(p);
+        parse_optional_screen_prefix(&p, out->screenPattern, sizeof(out->screenPattern), &trunc);
+        if (fail_if_trunc(trunc, out)) return -1;
+        if (*p == '\0') {
             out->type = AMIP_AREXX_CMD_UNKNOWN;
             return -1;
         }
-    } else {
-        p = read_token(p, out->windowPattern, sizeof(out->windowPattern));
+        if (*p == '@' && out->type != AMIP_AREXX_CMD_TREE && out->type != AMIP_AREXX_CMD_MENU) {
+            p++;
+            p = read_token(p, out->manifestName, sizeof(out->manifestName), &trunc);
+            if (fail_if_trunc(trunc, out)) return -1;
+            if (out->manifestName[0] == '\0') {
+                out->type = AMIP_AREXX_CMD_UNKNOWN;
+                return -1;
+            }
+        } else {
+            p = read_token(p, out->windowPattern, sizeof(out->windowPattern), &trunc);
+            if (fail_if_trunc(trunc, out)) return -1;
+        }
     }
 
     if (out->type == AMIP_AREXX_CMD_TREE || out->type == AMIP_AREXX_CMD_MENU) {
@@ -234,12 +299,14 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
      * "@name" form already carries the whole locator. */
     if (out->manifestName[0] == '\0') {
         char idbuf[16];
+        int trunc;
         p = skip_ws(p);
         if (*p == '\0') {
             out->type = AMIP_AREXX_CMD_UNKNOWN;
             return -1;
         }
-        p = read_token(p, idbuf, sizeof(idbuf));
+        p = read_token(p, idbuf, sizeof(idbuf), &trunc);
+        if (fail_if_trunc(trunc, out)) return -1;
         out->gadgetId = strtol(idbuf, NULL, 10);
     }
 
@@ -250,11 +317,21 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
             return -1;
         }
         if (*p == '"') {
-            read_token(p, out->text, sizeof(out->text));
+            int trunc;
+            read_token(p, out->text, sizeof(out->text), &trunc);
+            if (fail_if_trunc(trunc, out)) return -1;
         } else {
             /* Verbatim rest-of-line, not re-tokenized -- lets a plain
              * "TYPE GadTools 2 hello world" type the space without
-             * needing to quote it. */
+             * needing to quote it. Rejected outright, not silently
+             * chopped, same reasoning as LAUNCH's command line above
+             * -- a truncated string is a different, unintended value
+             * to type, not just a shorter one. */
+            if (strlen(p) >= sizeof(out->text)) {
+                out->argTooLong = 1;
+                out->type = AMIP_AREXX_CMD_UNKNOWN;
+                return -1;
+            }
             strncpy(out->text, p, sizeof(out->text) - 1);
             out->text[sizeof(out->text) - 1] = '\0';
         }

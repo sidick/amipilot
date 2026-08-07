@@ -90,6 +90,14 @@ struct Library *SocketBase = NULL;
 #define AMIP_RESULT_BUF_SIZE 320
 #define AMIP_MANIFEST_FILE_MAX 8192
 
+/* Explicit, not silent: a request line that hit the wire's 512-byte
+ * cap (server/WIRE.md) is rejected outright by the serial/TCP
+ * dispatch loops below rather than handed to AmipArexxParse(), since
+ * a truncated-but-still-parseable line could otherwise silently run
+ * as a shorter, different, unintended command. */
+#define AMIP_LINE_TOO_LONG_MSG \
+    "request line too long (max 512 bytes including the terminator)"
+
 /* The currently-loaded manifest (MANIFEST command). One at a time --
  * loading a new one replaces the old, matching how a test session
  * actually works (one application under test at a time); driving two
@@ -706,8 +714,22 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
 
         case AMIP_AREXX_CMD_UNKNOWN:
         default:
-            strncpy(g_resultBuf, "unknown command or bad arguments",
-                    sizeof(g_resultBuf) - 1);
+            /* argTooLong is a more specific parse failure than the
+             * generic case below -- an argument that didn't fit its
+             * field would otherwise have been silently truncated and
+             * acted on (arexx_cmd.c's read_token() doc comment covers
+             * why that's a real correctness risk, not just cosmetic),
+             * so this is reported explicitly rather than folded into
+             * "bad arguments". */
+            if (cmd->argTooLong) {
+                strncpy(g_resultBuf,
+                        "argument too long -- rejected outright rather "
+                        "than silently truncated",
+                        sizeof(g_resultBuf) - 1);
+            } else {
+                strncpy(g_resultBuf, "unknown command or bad arguments",
+                        sizeof(g_resultBuf) - 1);
+            }
             result = g_resultBuf;
             rc = AMIP_AREXX_RC_ERROR;
             break;
@@ -1024,9 +1046,20 @@ static int RealMain(void)
                                            * AUTH -- physical cable is
                                            * its own trust boundary. */
 
-                AmipArexxParse(lineIn, &cmd);
-                rc = HandleCommand(&cmd, &result, &payloadLen, &running,
-                                    FALSE, &authIgnored);
+                /* A truncated line is REJECTED OUTRIGHT, never handed
+                 * to the parser -- a chopped-but-still-well-formed
+                 * line could otherwise parse as a different,
+                 * unintended command instead of failing (see
+                 * AmipSerialLastLineOverflowed()'s own doc comment). */
+                if (AmipSerialLastLineOverflowed(serial)) {
+                    rc = AMIP_AREXX_RC_ERROR;
+                    result = AMIP_LINE_TOO_LONG_MSG;
+                    payloadLen = (ULONG)strlen(result);
+                } else {
+                    AmipArexxParse(lineIn, &cmd);
+                    rc = HandleCommand(&cmd, &result, &payloadLen, &running,
+                                        FALSE, &authIgnored);
+                }
 
                 snprintf(header, sizeof(header), "RC %d %lu\n",
                          rc, (unsigned long)payloadLen);
@@ -1057,10 +1090,16 @@ static int RealMain(void)
                 ULONG payloadLen;
                 BOOL authState = AmipTcpIsAuthenticated(tcp);
 
-                AmipArexxParse(lineIn, &cmd);
-                rc = HandleCommand(&cmd, &result, &payloadLen, &running,
-                                    TRUE, &authState);
-                AmipTcpSetAuthenticated(tcp, authState);
+                if (AmipTcpLastLineOverflowed(tcp)) {
+                    rc = AMIP_AREXX_RC_ERROR;
+                    result = AMIP_LINE_TOO_LONG_MSG;
+                    payloadLen = (ULONG)strlen(result);
+                } else {
+                    AmipArexxParse(lineIn, &cmd);
+                    rc = HandleCommand(&cmd, &result, &payloadLen, &running,
+                                        TRUE, &authState);
+                    AmipTcpSetAuthenticated(tcp, authState);
+                }
 
                 snprintf(header, sizeof(header), "RC %d %lu\n",
                          rc, (unsigned long)payloadLen);

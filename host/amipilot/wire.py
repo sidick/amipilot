@@ -24,6 +24,15 @@ from dataclasses import dataclass, field
 #: The one protocol version this client speaks (WIRE.md "Versioning").
 PROTOCOL = 1
 
+#: Maximum request line, INCLUDING the trailing '\n' terminator --
+#: server/WIRE.md's own cap (enforced server-side by AMIP_SER_LINE/
+#: AMIP_TCP_LINE, both 512, serial.c/tcp.c). Checked here so an
+#: oversized command fails fast, explicitly, on the host -- rather
+#: than being silently truncated on the wire into a shorter, different,
+#: unintended command (see AmipSerialLastLineOverflowed()'s doc
+#: comment in server/include/serial.h for why that matters).
+MAX_LINE = 512
+
 # The server's RC policy (server/include/arexx_cmd.h).
 RC_OK = 0
 RC_WARN = 5
@@ -88,6 +97,11 @@ class WireClient:
             line = line.encode("latin-1")
         if b"\n" in line or b"\r" in line:
             raise ValueError("command line must not contain a line terminator")
+        if len(line) + 1 > MAX_LINE:
+            raise ValueError(
+                f"command line too long ({len(line) + 1} bytes including "
+                f"the terminator, server max {MAX_LINE}): {line[:64]!r}..."
+            )
         self._t.sendall(line + b"\n")
 
         header = self._read_line()

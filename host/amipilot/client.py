@@ -7,9 +7,14 @@ still 0.4+ scope, not invented here ahead of the server actually
 offering them).
 
 Quoting matches the ARexx port's own command grammar (arexx_cmd.c):
-window-pattern arguments containing a space must be double-quoted; a
-pattern's own internal quotes are not supported (the server-side parser
-has no escaping) -- same limitation, not a new one.
+window-pattern/path arguments containing a space, a literal '"', or a
+literal '\' are double-quoted with '"' -> '\"' and '\' -> '\\' escaped
+first -- the same backslash-escaping convention the server's own reply
+side already uses (EscapeQuotesInto()/EscapeQuotes() in fs.c/
+amipilotserver/main.c, unescaped host-side by model.py's unescape()),
+now matched by the input side (arexx_cmd.c's read_token()) so a name
+the server can safely REPORT can also be safely SENT back as an
+argument.
 """
 
 from __future__ import annotations
@@ -50,11 +55,14 @@ _ERROR_CLASSES = {RC_WARN: NotFound, RC_ERROR: CommandError, RC_FAIL: ActionFail
 
 
 def _quote(s: str) -> str:
-    if " " in s or "\t" in s:
-        if '"' in s:
-            raise ValueError(f"cannot quote a pattern containing '\"': {s!r}")
-        return f'"{s}"'
-    return s
+    """Wraps `s` in double quotes if it needs them (contains a space,
+    tab, '"', or '\\'), escaping '\\' -> '\\\\' and '"' -> '\\"' first
+    so the server's read_token() (arexx_cmd.c) can decode it back to
+    the original value exactly -- see this module's docstring."""
+    if not any(c in s for c in ' \t"\\'):
+        return s
+    escaped = s.replace("\\", "\\\\").replace('"', '\\"')
+    return f'"{escaped}"'
 
 
 def _screen_prefix(screen: str | None) -> str:

@@ -427,7 +427,15 @@ int AmipFsMkdir(const char *path, const char **resultOut, ULONG *outLen)
         return AMIP_AREXX_RC_ERROR;
     }
     if (parentLen >= (int)sizeof(parentBuf)) {
-        parentLen = (int)sizeof(parentBuf) - 1;
+        /* Rejected outright, not silently chopped -- `path` already
+         * came through AMIP_AREXX_MAX_PATH (256, arexx_cmd.h), the
+         * same size as parentBuf, so this is defense in depth rather
+         * than a normally-reachable path; but a truncated parent
+         * directory is a DIFFERENT, unintended location, not just a
+         * shorter one, so silently acting on it would be a real
+         * correctness risk if that invariant ever changed. */
+        SetErr(resultOut, outLen, "path too long");
+        return AMIP_AREXX_RC_ERROR;
     }
     memcpy(parentBuf, path, (size_t)parentLen);
     parentBuf[parentLen] = '\0';
