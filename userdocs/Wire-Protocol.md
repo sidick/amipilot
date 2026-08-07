@@ -20,7 +20,7 @@ in the repository.
 
 `SERIAL` and `TCP` are independent — enable either or both. Options
 (ReadArgs template `SERIAL/S,SERDEVICE/K,SERUNIT/K/N,BAUD/K/N,TCP/S,
-TCPPORT/K/N,FSROOT/K/M`):
+TCPPORT/K/N,FSROOT/K/M,TCPALLOW/K,TCPPASSWORD/K`):
 
 | Argument | Default | Meaning |
 |----------|---------|---------|
@@ -31,6 +31,8 @@ TCPPORT/K/N,FSROOT/K/M`):
 | `TCP` | off | Enable the TCP transport (bsdsocket.library) |
 | `TCPPORT` | *(required with `TCP`)* | Listen port |
 | `FSROOT` | off (file API disabled) | Grants a directory to the file API (see [File API](#file-api) below). Repeatable — `FSROOT=Work:a FSROOT=Work:b` grants both. The directory must already exist; it's locked once at startup and held for the server's whole run. |
+| `TCPALLOW` | off (every source accepted) | A source-IP/CIDR allowlist for `TCP`, comma-separated for multiple entries in this one value (`TCPALLOW=192.168.1.0/24,10.0.0.5`) — **not** repeatable like `FSROOT`, see [Securing TCP](#securing-tcp) for why. |
+| `TCPPASSWORD` | `amipilot` (public default) | The password the `AUTH` verb checks, `TCP` only. See [Securing TCP](#securing-tcp) — this is not real security on its own. |
 
 The serial line is 8N1 with xon/xoff **disabled** (responses are
 binary-safe; software flow control would corrupt them). TCP is
@@ -69,10 +71,10 @@ A quick manual session over the Copperline bridge:
 ```
 $ nc 127.0.0.1 1234
 VERSION
-RC 0 156
+RC 0 161
 AMIPILOT 0.3 PROTOCOL 1
 STABLE VERSION
-EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH FSLIST FSSTAT FSMKDIR FSDELETE FSGET MENU MENUPICK SCREENS QUIT
+EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH FSLIST FSSTAT FSMKDIR FSDELETE FSGET MENU MENUPICK SCREENS AUTH QUIT
 GETTEXT GadTools 2
 RC 0 10
 aminet.net
@@ -326,3 +328,47 @@ deliberately no server-side blocking wait verb: `AmiPilotServer`
 services one command at a time, so a verb that blocks server-side for
 a timeout would stall the whole server — including `QUIT` — for that
 whole duration.
+
+## Securing TCP
+
+**AmiPilot's TCP transport is meant for a trusted LAN or a direct
+machine-to-machine link — never expose it on an open/internet-facing
+port.** This server can run arbitrary shell commands (`LAUNCH`),
+read/write files inside a granted `FSROOT`, and inject GUI input;
+that's real exposure on any network it's reachable from. Two
+independent, opt-in, combinable options narrow who can connect and
+what they can do without one:
+
+- **`TCPALLOW=<ip-or-cidr>[,<ip-or-cidr>...]`** — a source-address
+  allowlist, e.g. `TCPALLOW=192.168.1.0/24,10.0.0.5`. A single value,
+  comma-separated for more than one entry (not repeatable like
+  `FSROOT` — AmigaDOS's `ReadArgs()` only allows one repeatable `/M`
+  keyword per template, and `FSROOT` already uses it). With none
+  granted, every source is accepted — today's unchanged default. A
+  rejected connection is closed immediately, with no reply ever sent.
+- **`TCPPASSWORD=<value>`** gates a new `AUTH <password>` verb — TCP
+  only, not ARexx or serial.device. If omitted, defaults to
+  `"amipilot"`, which `Amipilot.connect()`/`connect_with_retry()`
+  already send automatically, so TCP keeps working with zero config
+  changes on either side.
+
+```python
+from amipilot import Amipilot, CommandError
+
+# Matches a server started with TCPPASSWORD=correct-horse-battery-staple
+try:
+    client = Amipilot.connect("192.168.1.50", 6800, password="correct-horse-battery-staple")
+except CommandError:
+    ...  # wrong password
+```
+
+**Neither option is real security, and you should say so to anyone
+relying on this.** The default password is public — it's in this
+open-source repository. There's no TLS, so even a custom password
+crosses the wire in cleartext, sniffable by anything on the same
+network segment. There's no rate-limiting or lockout on repeated
+`AUTH` guesses. `TCPALLOW`/`TCPPASSWORD` raise the bar above "wide
+open to anyone," the same way a router's default admin password does
+— nothing more. `AmiPilotServer` prints a warning to this effect every
+time `TCP` is enabled, precisely so this isn't something you only find
+out by reading documentation.

@@ -21,16 +21,23 @@ real: the action engine (`server/src/action.c`, click/type/geometry/
 menu-pick) and `AmiPilotServer` (`server/src/amipilotserver/`), a
 commodity hosting both behind a genuine public ARexx port, the serial
 wire transport (`server/src/serial.c`), and (0.4) TCP
-(`server/src/tcp.c`, listen-mode only, no access control yet — a real,
-open gap, not yet addressed) — framing contract in `server/WIRE.md`.
-Phase 0.4 additions beyond TCP: `LAUNCH` (start a test subject over
-the wire), the allowlist-scoped file API (`FSLIST`/`FSSTAT`/
-`FSMKDIR`/`FSDELETE`/`FSGET`, `server/src/fs.c` — `FSPUT` deliberately
-deferred, needs a wire protocol addition), menu walking + shortcut-
-based selection (`MENU`/`MENUPICK`, `intuition-model`'s
-`AmipWalkMenuStrip()` — pointer-based selection for shortcut-less
-items not yet built), and multi-screen support (`SCREENS`/`SCREEN=`,
-keyed off `Screen->DefaultTitle`, not the live `Title` field). See
+(`server/src/tcp.c`, listen-mode only) — framing contract in
+`server/WIRE.md`. TCP now has opt-in hardening: `TCPALLOW` (a source-
+IP/CIDR allowlist, comma-separated single value — NOT `/M`, ReadArgs
+only allows one repeatable keyword per template and `FSROOT` already
+claims it) and `TCPPASSWORD` (gates the `AUTH` verb, defaults to the
+public `"amipilot"` the host client sends automatically). Neither is
+mandatory, and **neither makes this internet-safe** — no TLS, a
+public default password, no rate-limiting; LAN/trusted-network use
+only, see `server/README.md`'s TCP section. Phase 0.4 additions
+beyond TCP: `LAUNCH` (start a test subject over the wire), the
+allowlist-scoped file API (`FSLIST`/`FSSTAT`/`FSMKDIR`/`FSDELETE`/
+`FSGET`, `server/src/fs.c` — `FSPUT` deliberately deferred, needs a
+wire protocol addition), menu walking + shortcut-based selection
+(`MENU`/`MENUPICK`, `intuition-model`'s `AmipWalkMenuStrip()` —
+pointer-based selection for shortcut-less items not yet built), and
+multi-screen support (`SCREENS`/`SCREEN=`, keyed off
+`Screen->DefaultTitle`, not the live `Title` field). See
 `server/README.md` for the full verb set and what's verified for each.
 `manifest/` carries the manifest contract (`manifest/SPEC.md`, parsed
 by `server/src/manifest.c` — no screen-awareness yet, `SCREEN=` only
@@ -220,12 +227,11 @@ every `CreateGadget` tag list, or the `_` shortcut markers in labels
 render as literal underscores instead of underlined shortcuts.
 
 **`server/`, `host/`, `manifest/`, `tests/`** — see "Current state"
-above for what's real in each. Remaining phase 0.4 scope: drag,
-tier-2 semantic locators, and TCP access control (the listening port
-currently accepts any connection with no allowlist/auth — a real,
-flagged gap, not yet addressed). Read the corresponding `README.md`,
-`server/WIRE.md`, and the implementation plan's "Phases" section
-before starting work in any of these.
+above for what's real in each. Remaining phase 0.4 scope: drag and
+tier-2 semantic locators. (TCP access control — `TCPALLOW`/
+`TCPPASSWORD` — landed; see "Current state" above.) Read the
+corresponding `README.md`, `server/WIRE.md`, and the implementation
+plan's "Phases" section before starting work in any of these.
 
 ## House conventions (this repo and its siblings)
 

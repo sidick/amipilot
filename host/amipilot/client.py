@@ -65,6 +65,19 @@ def _screen_prefix(screen: str | None) -> str:
     return f"SCREEN={_quote(screen)} " if screen is not None else ""
 
 
+# SECURITY: this is a PUBLIC default (it's in this open-source repo,
+# and matches AmiPilotServer's own AMIP_TCP_DEFAULT_PASSWORD) -- it
+# exists only so TCP works out of the box with zero config changes
+# ("a token amount of security" against a blind/naive scan of an open
+# port), not to actually protect anything. There is no TLS on this
+# wire, so even a custom password crosses it in cleartext. Set a real
+# TCPPASSWORD server-side (and pass the matching `password=` here) for
+# any deployment that matters, and never expose AmiPilotServer's TCP
+# transport on an open/internet-facing port regardless -- see
+# server/README.md's TCP section.
+DEFAULT_TCP_PASSWORD = "amipilot"
+
+
 class Amipilot:
     """Wraps a connected WireClient. Construct via `Amipilot.connect()`
     or wrap an already-open `WireClient` directly."""
@@ -74,14 +87,30 @@ class Amipilot:
         self.info: ServerInfo | None = None
 
     @classmethod
-    def connect(cls, host: str, port: int, timeout: float = 10.0) -> "Amipilot":
+    def connect(
+        cls, host: str, port: int, timeout: float = 10.0, *, password: str = DEFAULT_TCP_PASSWORD
+    ) -> "Amipilot":
         """A single connection attempt -- raises immediately on
         failure. Use `connect_with_retry()` instead for a link that
         may still be settling (a guest mid-boot, a fresh emulator
         bridge, a real cable with noise): raw connect/recv errors
-        there are common and expected, not exceptional."""
+        there are common and expected, not exceptional.
+
+        Sends `AUTH {password}` right after the VERSION handshake, for
+        every transport -- a harmless extra round trip on ARexx/
+        serial.device, where nothing gates on it, but required for
+        TCP unless the server was started without a TCPPASSWORD gate
+        (it isn't, by default -- see DEFAULT_TCP_PASSWORD's own
+        docstring: this is not real security, just a sane non-empty
+        starting point). Raises CommandError (RC 10) if the password
+        is wrong."""
         client = cls(WireClient.connect(host, port, timeout=timeout))
         client.handshake()
+        try:
+            client._run(f"AUTH {_quote(password)}")
+        except CommandError:
+            client.close()
+            raise
         return client
 
     @classmethod
@@ -91,6 +120,8 @@ class Amipilot:
         port: int,
         deadline_seconds: float = 60.0,
         connect_timeout: float = 5.0,
+        *,
+        password: str = DEFAULT_TCP_PASSWORD,
     ) -> "Amipilot":
         """Tolerates two real, confirmed-live failure modes a fresh
         or flaky link can show (server/WIRE.md's transport is young
@@ -138,9 +169,18 @@ class Amipilot:
             sock.settimeout(min(max(deadline - time.monotonic(), 0.1), 3.0))
             try:
                 client.handshake()
-                return client
             except OSError as e:
                 last_error = e
+                continue
+            try:
+                client._run(f"AUTH {_quote(password)}")
+            except CommandError:
+                # A wrong password is a real, non-retryable error, not
+                # a transient connection hiccup -- but the socket is
+                # still open at this point and would otherwise leak.
+                client.close()
+                raise
+            return client
 
         sock.close()
         raise TimeoutError(

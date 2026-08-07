@@ -270,6 +270,16 @@ static BOOL FindGadgetText(struct Window *window, ULONG gadgetId, char *buf, siz
 static char g_resultBuf[AMIP_RESULT_BUF_SIZE];
 static char g_treeBuf[AMIP_TREE_BUF_SIZE];
 
+#define AMIP_TCP_PASSWORD_MAX 64
+/* SECURITY: "amipilot" is a PUBLIC default (it's in this open-source
+ * repo) -- it exists only to give TCP a sane, non-empty starting
+ * point ("a token amount of security" against a blind/naive scan of
+ * an open port), not to actually protect anything. Set a real
+ * TCPPASSWORD for any deployment that matters. See tcp.h's own
+ * SECURITY note and server/README.md's TCP section. */
+#define AMIP_TCP_DEFAULT_PASSWORD "amipilot"
+static char g_tcpPassword[AMIP_TCP_PASSWORD_MAX] = AMIP_TCP_DEFAULT_PASSWORD;
+
 /* Executes one parsed command -- the single dispatch both transports
  * share (ARexx RESULT string and wire payload are the same bytes; see
  * server/WIRE.md). Returns the AMIP_AREXX_RC_* code, points *resultOut
@@ -284,7 +294,8 @@ static char g_treeBuf[AMIP_TREE_BUF_SIZE];
  * empty FSGET result, since a buffer that starts with a NUL byte
  * strlen()s to 0 either way. */
 static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
-                         ULONG *resultLenOut, BOOL *runningOut)
+                         ULONG *resultLenOut, BOOL *runningOut,
+                         BOOL requiresAuth, BOOL *authenticated)
 {
     int rc = AMIP_AREXX_RC_OK;
     const char *result = NULL;
@@ -292,6 +303,39 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
     *resultLenOut = 0;
 
     g_resultBuf[0] = '\0';
+
+    /* AUTH is handled before anything else, including the auth gate
+     * below -- otherwise a client could never authenticate at all.
+     * Parseable and answerable on every transport (one grammar), but
+     * only meaningful where requiresAuth is set (TCP's own dispatch
+     * loop); ARexx/serial.device pass requiresAuth=FALSE and never
+     * check *authenticated, so AUTH there is compared but inert. */
+    if (cmd->type == AMIP_AREXX_CMD_AUTH) {
+        if (strcmp(cmd->path, g_tcpPassword) == 0) {
+            *authenticated = TRUE;
+            *resultOut = NULL;
+            return AMIP_AREXX_RC_OK;
+        }
+        strncpy(g_resultBuf, "authentication failed: wrong password",
+                sizeof(g_resultBuf) - 1);
+        *resultLenOut = (ULONG)strlen(g_resultBuf);
+        *resultOut = g_resultBuf;
+        return AMIP_AREXX_RC_ERROR;
+    }
+
+    /* On TCP, until AUTH has succeeded, every command except VERSION
+     * (needed to feature-test before authenticating) and QUIT (so a
+     * confused client can always disconnect cleanly) is refused
+     * without being dispatched at all. */
+    if (requiresAuth && !*authenticated
+        && cmd->type != AMIP_AREXX_CMD_VERSION
+        && cmd->type != AMIP_AREXX_CMD_QUIT) {
+        strncpy(g_resultBuf, "not authenticated -- send AUTH <password> first",
+                sizeof(g_resultBuf) - 1);
+        *resultLenOut = (ULONG)strlen(g_resultBuf);
+        *resultOut = g_resultBuf;
+        return AMIP_AREXX_RC_ERROR;
+    }
 
     /* "@name" locator: resolve against the loaded manifest into the
      * same windowPattern/gadgetId fields the classic form fills, so the
@@ -340,7 +384,7 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                      "STABLE VERSION\n"
                      "EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH "
                      "FSLIST FSSTAT FSMKDIR FSDELETE FSGET MENU MENUPICK "
-                     "SCREENS QUIT\n");
+                     "SCREENS AUTH QUIT\n");
             result = g_resultBuf;
             break;
 
@@ -627,12 +671,33 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
  * "never assumed" rule): with no FSROOT, every FS* verb returns RC 10.
  * "FSROOT T: RAM:" grants both in one command (see ReadArgs()'s own
  * /M semantics: any number of space-separated values after the one
- * keyword occurrence, not a repeated keyword). */
+ * keyword occurrence, not a repeated keyword).
+ *
+ * SECURITY (see tcp.h's own SECURITY note -- this transport is for a
+ * trusted LAN, never an open/internet-facing port): TCPALLOW grants a
+ * source-IP/CIDR allowlist for the TCP transport only. A single /K
+ * value, NOT /M -- ReadArgs()'s template grammar allows at most one
+ * /M keyword per template, and FSROOT already claims that slot,
+ * confirmed live (a second /M keyword makes ReadArgs() fail with
+ * ERROR_BAD_TEMPLATE on EVERY invocation, not just when TCPALLOW is
+ * used -- caught via Amiberry verification, 2026-08-07). Multiple
+ * entries are comma-separated in the one value instead:
+ * "TCPALLOW=192.168.1.0/24,10.0.0.5". With none granted, every source
+ * is accepted, unchanged from this transport's original behavior.
+ * TCPPASSWORD sets the password the AUTH verb checks (also TCP-only --
+ * ARexx and serial.device keep their existing implicit trust
+ * boundaries); if omitted, AMIP_TCP_DEFAULT_PASSWORD ("amipilot", a
+ * PUBLIC value checked into this repo) applies, which the bundled
+ * host client already sends automatically -- a sane non-empty
+ * starting point, not real protection. Neither option is mandatory;
+ * both are independent and combinable. */
 #define AMIP_ARG_TEMPLATE \
-    "SERIAL/S,SERDEVICE/K,SERUNIT/K/N,BAUD/K/N,TCP/S,TCPPORT/K/N,FSROOT/K/M"
+    "SERIAL/S,SERDEVICE/K,SERUNIT/K/N,BAUD/K/N,TCP/S,TCPPORT/K/N,FSROOT/K/M," \
+    "TCPALLOW/K,TCPPASSWORD/K"
 enum {
     ARG_SERIAL, ARG_SERDEVICE, ARG_SERUNIT, ARG_BAUD,
     ARG_TCP, ARG_TCPPORT, ARG_FSROOT,
+    ARG_TCPALLOW, ARG_TCPPASSWORD,
     ARG_COUNT
 };
 
@@ -640,7 +705,7 @@ static int RealMain(void)
 {
     struct MsgPort *arexxPort;
     struct RDArgs *rdargs;
-    LONG argArray[ARG_COUNT] = { 0, 0, 0, 0, 0, 0, 0 };
+    LONG argArray[ARG_COUNT] = { 0, 0, 0, 0, 0, 0, 0, 0, 0 };
     AmipSerial *serial = NULL;
     AmipTcp *tcp = NULL;
     char portName[32];
@@ -742,6 +807,68 @@ static int RealMain(void)
             goto cleanup;
         }
         printf("AmiPilotServer: wire on TCP port %ld\n", (long)port);
+
+        /* A bad TCPALLOW entry is a config mistake, not a soft-degrade
+         * case -- fatal now, same posture FSROOT's own grant loop
+         * (below) uses for a bad root. TCPALLOW is a single /K value
+         * (see this section's own comment above AMIP_ARG_TEMPLATE for
+         * why, not /M), so multiple entries are comma-separated in
+         * one string and split here rather than via ReadArgs()
+         * itself. */
+        if (argArray[ARG_TCPALLOW] != 0) {
+            char allowBuf[256];
+            char *tokenStart;
+
+            strncpy(allowBuf, (const char *)argArray[ARG_TCPALLOW], sizeof(allowBuf) - 1);
+            allowBuf[sizeof(allowBuf) - 1] = '\0';
+
+            tokenStart = allowBuf;
+            for (;;) {
+                char *comma = strchr(tokenStart, ',');
+                char allowErr[80];
+
+                if (comma != NULL) {
+                    *comma = '\0';
+                }
+                if (!AmipTcpAllow(tcp, tokenStart, allowErr, sizeof(allowErr))) {
+                    fprintf(stderr, "AmiPilotServer: TCPALLOW %s failed: %s\n",
+                            tokenStart, allowErr);
+                    AmipTcpClose(tcp);
+                    AmipSerialClose(serial);
+                    FreeArgs(rdargs);
+                    AmipArexxClose(arexxPort);
+                    AmipActionShutdown();
+                    goto cleanup;
+                }
+                printf("AmiPilotServer: TCP allowlist grants %s\n", tokenStart);
+                if (comma == NULL) {
+                    break;
+                }
+                tokenStart = comma + 1;
+            }
+        }
+
+        /* Never print the password itself, custom or default -- only
+         * whether it's been changed from the public default, so
+         * operator logs/screen-sharing can't leak it. */
+        if (argArray[ARG_TCPPASSWORD] != 0) {
+            strncpy(g_tcpPassword, (const char *)argArray[ARG_TCPPASSWORD],
+                    sizeof(g_tcpPassword) - 1);
+            g_tcpPassword[sizeof(g_tcpPassword) - 1] = '\0';
+            printf("AmiPilotServer: TCP password set (custom)\n");
+        } else {
+            printf("AmiPilotServer: TCP password set (default -- override with "
+                   "TCPPASSWORD=<value> for real protection)\n");
+        }
+
+        /* Per this repo's own SECURITY note (tcp.h): TCPALLOW/
+         * TCPPASSWORD raise the bar above "wide open," but neither
+         * makes this transport internet-safe -- no TLS, a public
+         * default password, no rate-limiting. This prints every time
+         * TCP is enabled, not just when the docs happen to get read. */
+        printf("AmiPilotServer: TCP is NOT safe to expose on an open/"
+               "internet-facing port -- LAN/trusted-network use only, "
+               "see server/README.md\n");
     }
 
     /* A bad FSROOT is a config mistake, not a soft-degrade case --
@@ -800,7 +927,11 @@ static int RealMain(void)
                                   * a NUL-terminated C string; only the
                                   * wire's binary-safe framing below
                                   * needs the explicit length (FSGET). */
-                int rc = HandleCommand(&cmd, &result, &resultLen, &running);
+                BOOL authIgnored = TRUE; /* ARexx never enforces AUTH --
+                                           * local machine, same implicit
+                                           * trust boundary as always. */
+                int rc = HandleCommand(&cmd, &result, &resultLen, &running,
+                                        FALSE, &authIgnored);
 
                 AmipArexxReply(handle, rc, result);
             }
@@ -824,9 +955,13 @@ static int RealMain(void)
                 char header[32];
                 int rc;
                 ULONG payloadLen;
+                BOOL authIgnored = TRUE; /* serial.device never enforces
+                                           * AUTH -- physical cable is
+                                           * its own trust boundary. */
 
                 AmipArexxParse(lineIn, &cmd);
-                rc = HandleCommand(&cmd, &result, &payloadLen, &running);
+                rc = HandleCommand(&cmd, &result, &payloadLen, &running,
+                                    FALSE, &authIgnored);
 
                 snprintf(header, sizeof(header), "RC %d %lu\n",
                          rc, (unsigned long)payloadLen);
@@ -855,9 +990,12 @@ static int RealMain(void)
                 char header[32];
                 int rc;
                 ULONG payloadLen;
+                BOOL authState = AmipTcpIsAuthenticated(tcp);
 
                 AmipArexxParse(lineIn, &cmd);
-                rc = HandleCommand(&cmd, &result, &payloadLen, &running);
+                rc = HandleCommand(&cmd, &result, &payloadLen, &running,
+                                    TRUE, &authState);
+                AmipTcpSetAuthenticated(tcp, authState);
 
                 snprintf(header, sizeof(header), "RC %d %lu\n",
                          rc, (unsigned long)payloadLen);

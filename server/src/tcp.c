@@ -29,6 +29,7 @@
  * architecturally unrelated implementations is real evidence this
  * design is correct, not an artifact of one emulator's behaviour.
  */
+#include <stdio.h>
 #include <string.h>
 
 #include <exec/types.h>
@@ -38,12 +39,29 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
+/* arpa/inet.h (inet_aton()/inet_ntoa()) is deliberately never included
+ * here at all -- not just to dodge a header landmine (an earlier
+ * version of this file explicitly included it and hit one: the
+ * ndk-include copy has no usable include guard against a second
+ * inclusion once proto/bsdsocket.h below has already transitively
+ * pulled it in, producing bizarre parse errors), but because
+ * inet_aton() itself turned out to be unsafe to call at all -- see
+ * ParseDottedQuad()'s own comment. This file parses dotted-quad
+ * addresses and formats them (FormatIp()) entirely by hand instead,
+ * needing neither of arpa/inet.h's functions nor the header itself. */
 
 #include "tcp.h"
 
 /* Sizing mirrors serial.c exactly -- see its own comment. */
 #define AMIP_TCP_RXBUF 1024
 #define AMIP_TCP_LINE  512
+
+#define AMIP_TCP_MAX_ALLOW 16
+
+typedef struct {
+    ULONG network; /* host byte order */
+    ULONG mask;
+} AmipTcpAllowEntry;
 
 struct AmipTcp {
     LONG listenSock;
@@ -56,6 +74,10 @@ struct AmipTcp {
     int lineLen;
     BOOL lineOverflow;
     char out[AMIP_TCP_LINE];
+
+    AmipTcpAllowEntry allow[AMIP_TCP_MAX_ALLOW];
+    int allowCount;
+    BOOL authenticated;
 };
 
 static void SetErr(char *errOut, int errCap, const char *msg)
@@ -124,16 +146,78 @@ void AmipTcpClose(AmipTcp *tcp)
     FreeMem(tcp, sizeof(*tcp));
 }
 
+/* TRUE if peerAddr matches at least one granted TCPALLOW entry, or if
+ * none have been granted at all (the default: accept every source,
+ * unchanged from this transport's original behavior). */
+static BOOL IsAllowedPeer(const AmipTcp *tcp, ULONG peerAddrHost)
+{
+    int i;
+
+    if (tcp->allowCount == 0) {
+        return TRUE;
+    }
+    for (i = 0; i < tcp->allowCount; i++) {
+        if ((peerAddrHost & tcp->allow[i].mask) == tcp->allow[i].network) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
+
+/* Renders a host-byte-order IPv4 address as "a.b.c.d" into buf (must
+ * be char[16] or larger) -- hand-rolled rather than inet_ntoa()
+ * because arpa/inet.h isn't safe to include a second time in this
+ * toolchain (see the header comment on this file's own includes). */
+static void FormatIp(ULONG addrHost, char *buf)
+{
+    sprintf(buf, "%u.%u.%u.%u",
+            (unsigned int)((addrHost >> 24) & 0xFF), (unsigned int)((addrHost >> 16) & 0xFF),
+            (unsigned int)((addrHost >> 8) & 0xFF), (unsigned int)(addrHost & 0xFF));
+}
+
 /* Accepts a new connection (replacing any existing one -- see tcp.h's
- * own comment on the single-active-client policy) and resets the line
- * buffer for it. */
+ * own comment on the single-active-client policy), checks it against
+ * any granted TCPALLOW entries, and resets the line buffer and
+ * per-connection auth state for it. A rejected peer is closed
+ * immediately, before ever becoming tcp->clientSock -- no reply is
+ * ever sent, so a disallowed connection can't be used to fingerprint
+ * this service (see tcp.h's own SECURITY note). */
 static void AcceptNew(AmipTcp *tcp)
 {
-    LONG newSock = accept(tcp->listenSock, NULL, NULL);
+    struct sockaddr_in peerAddr;
+    socklen_t peerLen = sizeof(peerAddr);
+    LONG newSock;
 
+    memset(&peerAddr, 0, sizeof(peerAddr));
+    newSock = accept(tcp->listenSock, (struct sockaddr *)&peerAddr, &peerLen);
     if (newSock < 0) {
         return;
     }
+
+    {
+        ULONG peerAddrHost = (ULONG)ntohl(peerAddr.sin_addr.s_addr);
+
+        if (!IsAllowedPeer(tcp, peerAddrHost)) {
+            char ipStr[16];
+
+            FormatIp(peerAddrHost, ipStr);
+            printf("AmiPilotServer: TCP connection from %s rejected (not in TCPALLOW)\n",
+                   ipStr);
+            /* Explicit flush -- this print is the whole point of
+             * rejecting rather than just silently dropping (operator
+             * visibility into who's knocking), and stdio's own
+             * buffering would otherwise hold it back until the server
+             * eventually exits (confirmed live: redirected to a log
+             * file, a rejection was genuinely rejected -- the client
+             * saw its connection reset with no reply -- but the log
+             * line itself didn't appear until the process ended,
+             * 2026-08-07). */
+            fflush(stdout);
+            CloseSocket(newSock);
+            return;
+        }
+    }
+
     if (tcp->clientSock >= 0) {
         CloseSocket(tcp->clientSock);
     }
@@ -142,6 +226,7 @@ static void AcceptNew(AmipTcp *tcp)
     tcp->rxCount = 0;
     tcp->lineLen = 0;
     tcp->lineOverflow = FALSE;
+    tcp->authenticated = FALSE;
 }
 
 /* Reads whatever is available into rxBuf (resetting it first -- the
@@ -259,4 +344,142 @@ BOOL AmipTcpWrite(AmipTcp *tcp, const void *data, ULONG len)
         len -= (ULONG)n;
     }
     return TRUE;
+}
+
+/* Splits "a.b.c.d/nn" at the '/', if present, into a dotted-quad part
+ * (copied into ipBuf, cap ipCap) and *prefixOut (0-32, defaulting to
+ * 32 -- an exact-address match -- when there's no '/'). Returns FALSE
+ * on a malformed prefix (not a 1-2 digit number in 0-32, or trailing
+ * garbage after it). */
+static BOOL SplitCidr(const char *spec, char *ipBuf, size_t ipCap, int *prefixOut)
+{
+    const char *slash = strchr(spec, '/');
+    size_t ipLen;
+
+    if (slash == NULL) {
+        strncpy(ipBuf, spec, ipCap - 1);
+        ipBuf[ipCap - 1] = '\0';
+        *prefixOut = 32;
+        return TRUE;
+    }
+
+    ipLen = (size_t)(slash - spec);
+    if (ipLen == 0 || ipLen >= ipCap) {
+        return FALSE;
+    }
+    memcpy(ipBuf, spec, ipLen);
+    ipBuf[ipLen] = '\0';
+
+    {
+        const char *p = slash + 1;
+        int prefix = 0;
+        int digits = 0;
+
+        if (*p == '\0') {
+            return FALSE;
+        }
+        while (*p != '\0') {
+            if (*p < '0' || *p > '9') {
+                return FALSE;
+            }
+            prefix = prefix * 10 + (*p - '0');
+            digits++;
+            if (digits > 2 || prefix > 32) {
+                return FALSE;
+            }
+            p++;
+        }
+        *prefixOut = prefix;
+    }
+    return TRUE;
+}
+
+/* Hand-rolled dotted-quad parser -- NOT inet_aton(). inet_aton() is a
+ * Roadshow-era extension at a high LVO offset (confirmed via this
+ * toolchain's own clib/bsdsocket_protos.h: -594, far beyond classic
+ * calls like socket()/bind() at -30/-36), not present in every real
+ * bsdsocket.library implementation. Confirmed the hard way, 2026-08-07:
+ * calling it under Amiberry's bsdsocket_emu (which forwards straight
+ * to the host OS's real socket API, per this project's own TCP
+ * verification notes in server/README.md) produced a genuine CPU trap
+ * (illegal instruction), not a clean "function not found" failure --
+ * reproduced in isolation with a 6-line standalone test program, so
+ * this isn't specific to AmiPilotServer's own code. inet_addr() (the
+ * classic, universally-available alternative) has its own problem:
+ * its failure return (INADDR_NONE, 0xFFFFFFFF) is indistinguishable
+ * from the valid address 255.255.255.255. Parsing four decimal octets
+ * ourselves needs no library call at all, so it has neither
+ * portability risk nor that ambiguity. */
+static BOOL ParseDottedQuad(const char *s, ULONG *outHost)
+{
+    ULONG octets[4];
+    const char *p = s;
+    int i;
+
+    for (i = 0; i < 4; i++) {
+        int val = 0;
+        int digits = 0;
+
+        if (*p < '0' || *p > '9') {
+            return FALSE;
+        }
+        while (*p >= '0' && *p <= '9') {
+            val = val * 10 + (*p - '0');
+            digits++;
+            if (digits > 3 || val > 255) {
+                return FALSE;
+            }
+            p++;
+        }
+        octets[i] = (ULONG)val;
+        if (i < 3) {
+            if (*p != '.') {
+                return FALSE;
+            }
+            p++;
+        }
+    }
+    if (*p != '\0') {
+        return FALSE;
+    }
+
+    *outHost = (octets[0] << 24) | (octets[1] << 16) | (octets[2] << 8) | octets[3];
+    return TRUE;
+}
+
+BOOL AmipTcpAllow(AmipTcp *tcp, const char *spec, char *errOut, int errCap)
+{
+    char ipBuf[32];
+    int prefix;
+    ULONG addrHost;
+    ULONG mask;
+
+    if (tcp->allowCount >= AMIP_TCP_MAX_ALLOW) {
+        SetErr(errOut, errCap, "too many TCPALLOW entries");
+        return FALSE;
+    }
+    if (!SplitCidr(spec, ipBuf, sizeof(ipBuf), &prefix)) {
+        SetErr(errOut, errCap, "malformed TCPALLOW entry (want a.b.c.d or a.b.c.d/nn, nn 0-32)");
+        return FALSE;
+    }
+    if (!ParseDottedQuad(ipBuf, &addrHost)) {
+        SetErr(errOut, errCap, "malformed TCPALLOW address");
+        return FALSE;
+    }
+
+    mask = (prefix == 0) ? 0UL : (0xFFFFFFFFUL << (32 - prefix));
+    tcp->allow[tcp->allowCount].network = addrHost & mask;
+    tcp->allow[tcp->allowCount].mask = mask;
+    tcp->allowCount++;
+    return TRUE;
+}
+
+BOOL AmipTcpIsAuthenticated(AmipTcp *tcp)
+{
+    return tcp->authenticated;
+}
+
+void AmipTcpSetAuthenticated(AmipTcp *tcp, BOOL authenticated)
+{
+    tcp->authenticated = authenticated;
 }

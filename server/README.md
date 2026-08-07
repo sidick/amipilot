@@ -65,6 +65,110 @@ Lands in phase 0.2 onward -- see
   outbound connectivity -- is proposed future work, see
   [amipilot#12](https://github.com/sidick/amipilot/issues/12).
 
+- **Securing TCP (phase 0.4, in progress):** `AmipTcpOpen()` binds
+  `INADDR_ANY` and accepts any source by default -- fine for a trusted
+  LAN, real exposure on anything else given this server can run
+  arbitrary shell commands (`LAUNCH`), read/write files inside a
+  granted `FSROOT`, and inject GUI input. Two independent, opt-in,
+  combinable knobs raise the bar:
+
+  - **`TCPALLOW=<ip-or-cidr>[,<ip-or-cidr>...]`** -- a single `/K`
+    value, comma-separated for multiple entries, e.g.
+    `TCPALLOW=192.168.1.0/24,10.0.0.5`. **Not `/M`**, unlike `FSROOT`
+    -- `ReadArgs()`'s template grammar allows at most one `/M` keyword
+    per template, and `FSROOT` already claims that slot; a second one
+    makes `ReadArgs()` fail with `ERROR_BAD_TEMPLATE` on *every*
+    invocation of `AmiPilotServer`, not just when `TCPALLOW` is used
+    -- caught live via Amiberry verification, not assumed. Addresses
+    are parsed by a small hand-rolled dotted-quad parser
+    (`ParseDottedQuad()`, `tcp.c`), deliberately **not** `inet_aton()`:
+    that call is a Roadshow-era bsdsocket extension at a high LVO
+    offset, absent from every real bsdsocket.library implementation,
+    and calling it under Amiberry's `bsdsocket_emu` produced a genuine
+    CPU trap (illegal instruction) rather than a clean failure --
+    reproduced in isolation with a 6-line standalone test program, so
+    this wasn't specific to this server's own code. `inet_addr()` (the
+    classic, portable alternative) was considered and rejected too:
+    its failure return (`INADDR_NONE`, `0xFFFFFFFF`) is indistinguishable
+    from the valid address `255.255.255.255`. Parsing four decimal
+    octets by hand needed no library call at all, sidestepping both
+    problems. With no `TCPALLOW` granted, every source is accepted,
+    unchanged from this transport's original behavior. A rejected
+    peer is closed immediately -- before ever becoming the active
+    client, no reply ever sent -- so a disallowed connection can't be
+    used to fingerprint this service.
+  - **`TCPPASSWORD=<value>`** gates the new `AUTH <password>` verb
+    (`server/WIRE.md`) -- TCP only, not ARexx or serial.device, which
+    keep their existing implicit trust boundaries (local machine,
+    physical cable). Defaults to `"amipilot"` when omitted (see
+    `AMIP_TCP_DEFAULT_PASSWORD`) -- the bundled host client
+    (`Amipilot.connect()`/`connect_with_retry()`) sends this
+    automatically, so TCP keeps working out of the box with zero
+    config changes on either side. Neither `TCPALLOW` nor
+    `TCPPASSWORD` is mandatory; `TCP TCPPORT=n` alone behaves exactly
+    as before this work.
+
+  **This is explicitly NOT real security, and neither knob makes TCP
+  safe to expose on an open/internet-facing port -- LAN or a direct
+  machine-to-machine link only.** The default password is public (it's
+  in this repo); there is no TLS, so even a custom password crosses
+  the wire in cleartext; and there is no rate-limiting or lockout on
+  repeated `AUTH` guesses. `AmiPilotServer` prints a warning to this
+  effect every time `TCP` is enabled, not just here. `TCPALLOW`/
+  `TCPPASSWORD` raise the bar above "wide open to anyone," nothing
+  more -- treat them as you would a router's default admin password.
+
+  **Verification, manual (same honest-limits precedent TCP's own
+  original verification already established just above -- no
+  automated `make test-target` check exists for the real TCP
+  transport at all, only for serial.device carried over Copperline's
+  `--serial tcp` bridge):** confirmed live via Amiberry
+  (`bsdsocket_emu=true`), driving the real wire protocol from a host
+  Python socket against `TCP TCPPORT=n TCPALLOW=... TCPPASSWORD=...`.
+  This verification pass is *why* the implementation looks the way it
+  does above, not an afterthought run once the code compiled -- it
+  caught three real bugs before merge, none of which showed up any
+  other way:
+
+  1. **`ReadArgs()` failed on every single invocation, TCP or not.**
+     The first `TCPALLOW/K/M` draft gave the template two `/M`
+     keywords (`FSROOT` already had the one AmigaDOS allows per
+     template) -- confirmed live as `ERROR_BAD_TEMPLATE` on startup,
+     not caught by the cross-compiler (a syntax-valid string literal,
+     wrong at the AmigaDOS level). Fixed by making `TCPALLOW` a plain
+     `/K` value with comma-separated entries instead (see above).
+  2. **`inet_aton()` trapped the CPU outright.** It's a Roadshow-era
+     bsdsocket extension at a high LVO offset, absent from other real
+     implementations; calling it under Amiberry's `bsdsocket_emu`
+     produced a genuine illegal-instruction exception, not a clean
+     "unsupported" failure -- reproduced in an isolated 6-line test
+     program to confirm it wasn't specific to this server's own code.
+     Fixed by parsing dotted-quad addresses by hand instead
+     (`ParseDottedQuad()`, `tcp.c`) -- no library call, so no
+     availability risk.
+  3. **Rejection/auth-failure reasons never reached the wire.** The
+     new early-return paths in `HandleCommand()` set the payload text
+     but not its length, so the TCP dispatch loop sent `RC 10` with a
+     silently empty payload -- confirmed by driving the actual bytes
+     over a socket and seeing `len=0` where a message was expected,
+     something a design read-through wouldn't have caught. Fixed by
+     setting `*resultLenOut` on those paths, same as the fall-through
+     tail already does for every other verb.
+
+  With those three fixed, confirmed working end to end: (a) an
+  unauthenticated connection has every non-`VERSION`/`AUTH`/`QUIT`
+  command rejected, *with* the correct reason text now arriving; (b)
+  `AUTH amipilot` (the default) succeeds and unlocks normal operation;
+  (c) a wrong password is rejected (with the correct reason text) and
+  doesn't unlock anything; (d) `TCPALLOW` set to a range excluding the
+  test machine causes the connection to be reset with no reply, while
+  a range including it connects and authenticates normally. A fourth,
+  smaller gap surfaced during (d) and was also fixed: the rejection
+  log line had no `fflush()`, so it sat in stdio's buffer instead of
+  reaching a redirected log file until the process eventually exited
+  -- confirmed by the client-side reset/no-reply happening correctly
+  while the log stayed empty until `AmiPilotServer` was killed.
+
 - **Program launch (phase 0.4, in progress):** `LAUNCH [STACK=n]
   <command-line...>` starts an AmigaDOS process from a connected
   session -- so a test can connect first, confirm nothing is running

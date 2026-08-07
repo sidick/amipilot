@@ -32,6 +32,7 @@ typedef enum {
     AMIP_AREXX_CMD_MENU,     /* MENU <window-pattern> */
     AMIP_AREXX_CMD_MENUPICK, /* MENUPICK <window-pattern> <menu-num> <item-num> [<sub-num>] */
     AMIP_AREXX_CMD_SCREENS,  /* SCREENS */
+    AMIP_AREXX_CMD_AUTH,     /* AUTH <password> */
     AMIP_AREXX_CMD_QUIT      /* QUIT */
 } AmipArexxCmdType;
 
@@ -65,7 +66,13 @@ typedef struct {
     char manifestName[AMIP_AREXX_MAX_NAME];    /* CLICK/TYPE/GETTEXT "@name" form;
                                                 * empty = classic form was used */
     char text[AMIP_AREXX_MAX_TEXT];             /* TYPE */
-    char path[AMIP_AREXX_MAX_PATH];             /* MANIFEST */
+    char path[AMIP_AREXX_MAX_PATH];             /* MANIFEST; also dual-purposed
+                                                  * for AUTH's <password> token,
+                                                  * same "single-token bucket"
+                                                  * FSLIST/FSSTAT/etc. already
+                                                  * share -- not worth a
+                                                  * dedicated field for one
+                                                  * more single-string verb */
     char command[AMIP_AREXX_MAX_COMMAND];       /* LAUNCH */
     long stackSize;                             /* LAUNCH; 0 = use CreateNewProc's
                                                   * own default (4000 bytes) */
@@ -124,6 +131,15 @@ typedef struct {
  * itself). Omitted = today's unchanged behavior: search every screen.
  *
  * SCREENS takes no arguments, like VERSION/QUIT.
+ *
+ * AUTH takes a single <password> argument, parsed exactly like
+ * MANIFEST's (into the same `path` field). Parseable and answerable
+ * on every transport -- one grammar, per this project's own design
+ * principle -- but only the TCP transport's own dispatch loop
+ * (server/src/amipilotserver/main.c) actually gates anything on
+ * whether it succeeded; on ARexx/serial.device it's accepted and
+ * compared but has no side effect, since neither of those transports
+ * ever enforces the auth flag HandleCommand() tracks.
  *
  * Returns 0 on success, -1 on an unknown command or a missing required
  * argument (map to AMIP_AREXX_RC_ERROR) -- out->type is
