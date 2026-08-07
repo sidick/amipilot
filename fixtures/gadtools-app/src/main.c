@@ -20,6 +20,17 @@
  * verifiable via the existing GETTEXT path without a new assertion
  * mechanism.
  *
+ * Also carries a horizontal SLIDER_KIND gadget (Volume, range 0..100,
+ * starts at 0) -- AmiPilot's first DRAG target (phase 0.4). Its
+ * IDCMP_GADGETUP handler writes "slider=<level>" into the Host string
+ * gadget using the level GadTools itself reports in the event's own
+ * Code field (its documented contract for SLIDER_KIND/PROP_KIND, no
+ * separate GT_GetGadgetAttrs() round trip needed) -- the same
+ * observable-marker technique as Cancel/the menu items above, so a
+ * DRAG's effect is verifiable through the already-proven GETTEXT path
+ * and genuinely confirms the drag reached GadTools' real slider-
+ * tracking code, not just that input.device events were injected.
+ *
  * Also carries a menu strip (phase 0.4 MENU/MENUPICK conformance):
  * one "Project" menu with an "About" item (shortcut A, sets the Host
  * string gadget's text so a MENUPICK-by-shortcut round trip is
@@ -51,6 +62,7 @@ struct Library *GadToolsBase;
 #define GID_HOST     2
 #define GID_ENABLED  3
 #define GID_CANCEL   4
+#define GID_SLIDER   5
 
 #define MENUNUM_PROJECT   0
 #define ITEMNUM_ABOUT     0
@@ -154,6 +166,35 @@ int main(void)
     ng.ng_Flags = PLACETEXT_IN;
     gad = CreateGadget(BUTTON_KIND, gad, &ng, GT_Underscore, '_', TAG_DONE);
 
+    /* Horizontal slider (SLIDER_KIND, a propgclass gadget under the
+     * hood) -- AmiPilot's first drag target (phase 0.4 DRAG). Range
+     * 0..100, starts at 0. GA_RelVerify is REQUIRED for GadTools to
+     * ever send IDCMP_GADGETUP for a slider at all -- confirmed via
+     * gadtools.doc's own CreateGadgetA autodoc ("GA_RelVerify (BOOL) -
+     * If you want to hear each slider IDCMP_GADGETUP event (defaults
+     * to FALSE)"), and confirmed the hard way: a first attempt at this
+     * fixture omitted it and no IDCMP_GADGETUP ever arrived for the
+     * slider (verified live via Amiberry -- the Host field never
+     * updated after a real DRAG), not a walker/action-engine bug. The
+     * handler below writes the live level (the event's own Code field,
+     * GadTools' documented contract for a proportional gadget) into
+     * the Host string gadget, the same observable-marker technique the
+     * menu items and Cancel button above already use -- proves a drag
+     * genuinely reached GadTools' real slider-tracking code, not just
+     * that input.device events were injected. */
+    ng.ng_TopEdge += 24;
+    ng.ng_GadgetText = (UBYTE *)"Vo_lume";
+    ng.ng_GadgetID = GID_SLIDER;
+    ng.ng_Flags = PLACETEXT_ABOVE;
+    gad = CreateGadget(SLIDER_KIND, gad, &ng,
+                        GTSL_Min, 0,
+                        GTSL_Max, 100,
+                        GTSL_Level, 0,
+                        GTSL_MaxLevelLen, 3,
+                        GA_RelVerify, TRUE,
+                        GT_Underscore, '_',
+                        TAG_DONE);
+
     if (gad == NULL) {
         rc = RETURN_FAIL;
         goto cleanup;
@@ -171,7 +212,7 @@ int main(void)
 
     window = OpenWindowTags(NULL,
                              WA_Left, 40, WA_Top, 40,
-                             WA_Width, 220, WA_Height, 154,
+                             WA_Width, 220, WA_Height, 190,
                              WA_Title, (ULONG)"AmiPilot GadTools Fixture",
                              WA_Gadgets, (ULONG)glist,
                              WA_CloseGadget, TRUE,
@@ -217,6 +258,15 @@ int main(void)
                     } else if (((struct Gadget *)msg->IAddress)->GadgetID == GID_CANCEL) {
                         GT_SetGadgetAttrs(hostGad, window, NULL,
                                           GTST_String, (ULONG)"cancel clicked", TAG_DONE);
+                    } else if (((struct Gadget *)msg->IAddress)->GadgetID == GID_SLIDER) {
+                        /* GadTools' own documented contract for
+                         * SLIDER_KIND/PROP_KIND: IDCMP_GADGETUP's Code
+                         * field IS the new GTSL_Level -- no separate
+                         * GT_GetGadgetAttrs() round trip needed. */
+                        char levelText[16];
+                        sprintf(levelText, "slider=%d", (int)msg->Code);
+                        GT_SetGadgetAttrs(hostGad, window, NULL,
+                                          GTST_String, (ULONG)levelText, TAG_DONE);
                     }
                     break;
                 /* Diagnostic: IDCMP_MOUSEBUTTONS only arrives for clicks

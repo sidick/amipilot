@@ -63,13 +63,62 @@ BOOL AmipMoveMouseTo(struct Screen *screen, WORD x, WORD y);
 BOOL AmipClickAt(struct Screen *screen, WORD x, WORD y, AmipMouseButton button);
 
 /* Resolves gadget's current on-screen center from window's position plus
- * the gadget's own LeftEdge/TopEdge/Width/Height, then calls
- * AmipClickAt() with AMIP_BUTTON_LEFT. Correct for classic/GadTools
- * gadgets and BOOPSI CUSTOMGADGET alike -- the latter via
+ * the gadget's own LeftEdge/TopEdge/Width/Height -- correct for classic/
+ * GadTools gadgets and BOOPSI CUSTOMGADGET alike, the latter via
  * GetAttr(GA_Left/GA_Top/GA_Width/GA_Height), with GFLG_RELWIDTH/
  * RELHEIGHT/RELRIGHT/RELBOTTOM resolved against the window's own size
- * (see this function's definition in action.c). */
+ * (see this function's definition in action.c). Pure geometry query --
+ * doesn't bring the window/screen forward or touch input.device; callers
+ * that act on the result (AmipClickGadget, AmipDragGadgetBy/
+ * AmipDragGadgetToGadget below) do that themselves. FALSE (xOut/yOut
+ * untouched) if window or gadget is NULL. */
+BOOL AmipGadgetCenter(struct Window *window, struct Gadget *gadget, WORD *xOut, WORD *yOut);
+
+/* Resolves gadget's current on-screen center (AmipGadgetCenter()) and
+ * clicks it (AmipClickAt() with AMIP_BUTTON_LEFT), after bringing the
+ * target screen/window forward. */
 BOOL AmipClickGadget(struct Window *window, struct Gadget *gadget);
+
+/* --- drag: press, move, release ------------------------------------ */
+
+/* The raw two-point drag primitive: moves to (x1, y1), presses the left
+ * button, moves to (x2, y2), releases -- two real input.device button
+ * events plus two absolute IEPointerPixel jumps, the same events a
+ * human's press-drag-release would produce, just not synthesized as a
+ * continuous stream of intermediate motion events (a single jump
+ * between the two endpoints, not many small ones). This is a known,
+ * accepted limitation for v1: Intuition's own built-in gadget/prop
+ * dragging (GadTools SLIDER_KIND/PROP_KIND scrollers, window drag bars)
+ * tracks the pointer via ordinary mouse-move events regardless of how
+ * many arrive, so a single jump between press and release is sufficient
+ * for those -- but an application with its OWN pointer-motion-sensitive
+ * drag handling (tracking per-frame deltas rather than just where the
+ * button was released) could in principle behave differently under a
+ * single jump than under continuous motion. Narrows to "the endpoints
+ * are always genuine input.device events reaching the real event path,"
+ * not "indistinguishable from a human dragging the mouse across every
+ * intervening pixel." If the button-down succeeds but the move to
+ * (x2, y2) fails, the button is still released (best-effort, avoids
+ * leaving Intuition thinking a button is stuck down) before returning
+ * FALSE. */
+BOOL AmipDragAt(struct Screen *screen, WORD x1, WORD y1, WORD x2, WORD y2);
+
+/* Drags gadget from its current center by a pixel offset (dx, dy) --
+ * the natural shape for adjusting a slider/scroller (GadTools
+ * SLIDER_KIND/PROP_KIND), which is a delta operation, not a locator-to-
+ * locator one. Brings the window/screen forward first, same as
+ * AmipClickGadget. */
+BOOL AmipDragGadgetBy(struct Window *window, struct Gadget *gadget, WORD dx, WORD dy);
+
+/* Drags srcGadget's current center onto destGadget's current center,
+ * both resolved live at action time -- zero coordinates in the caller's
+ * script, for drag-and-drop/reorder cases (e.g. dragging one listview
+ * item onto another) where the destination is itself a gadget, not an
+ * offset. Both gadgets are assumed to belong to `window` (dest resolved
+ * against the same window as src -- see arexx_cmd.h's DRAG doc
+ * comment). Brings the window/screen forward first, same as
+ * AmipClickGadget. */
+BOOL AmipDragGadgetToGadget(struct Window *window, struct Gadget *srcGadget, struct Gadget *destGadget);
 
 /* Types text as genuine IECLASS_RAWKEY press/release events into
  * whatever currently has keyboard focus (click/activate the target

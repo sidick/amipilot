@@ -446,24 +446,13 @@ static void ResolveGadgetGeometry(struct Window *window, UWORD flags,
     }
 }
 
-BOOL AmipClickGadget(struct Window *window, struct Gadget *gadget)
+BOOL AmipGadgetCenter(struct Window *window, struct Gadget *gadget, WORD *xOut, WORD *yOut)
 {
     WORD gadLeft, gadTop, gadWidth, gadHeight;
-    WORD centerX, centerY;
 
-    if (window == NULL || gadget == NULL) {
+    if (window == NULL || gadget == NULL || xOut == NULL || yOut == NULL) {
         return FALSE;
     }
-
-    /* A click has to actually reach the target screen/window to mean
-     * anything -- input events only interact with whatever is frontmost.
-     * docs/implementation-plan.md's architecture diagram already scopes
-     * focus to the action engine, not the caller: bring both forward
-     * unconditionally rather than leaving it to whoever calls
-     * AmipClickGadget to remember. */
-    ScreenToFront(window->WScreen);
-    WindowToFront(window);
-    ActivateWindow(window);
 
     /* BOOPSI CUSTOMGADGET position isn't necessarily mirrored into the
      * classic LeftEdge/TopEdge/Width/Height fields -- intuition-model's
@@ -504,10 +493,95 @@ BOOL AmipClickGadget(struct Window *window, struct Gadget *gadget)
      *
      * IEPointerPixel coordinates are screen-relative; window LeftEdge/
      * TopEdge are also screen-relative, so no screen offset needed. */
-    centerX = window->LeftEdge + gadLeft + gadWidth / 2;
-    centerY = window->TopEdge + gadTop + gadHeight / 2;
+    *xOut = window->LeftEdge + gadLeft + gadWidth / 2;
+    *yOut = window->TopEdge + gadTop + gadHeight / 2;
+    return TRUE;
+}
 
+/* A click/drag has to actually reach the target screen/window to mean
+ * anything -- input events only interact with whatever is frontmost.
+ * docs/implementation-plan.md's architecture diagram already scopes
+ * focus to the action engine, not the caller: bring both forward
+ * unconditionally rather than leaving it to whoever calls this to
+ * remember. Shared by AmipClickGadget and the drag entry points below. */
+static void BringWindowForward(struct Window *window)
+{
+    ScreenToFront(window->WScreen);
+    WindowToFront(window);
+    ActivateWindow(window);
+}
+
+BOOL AmipClickGadget(struct Window *window, struct Gadget *gadget)
+{
+    WORD centerX, centerY;
+
+    if (window == NULL || gadget == NULL) {
+        return FALSE;
+    }
+
+    BringWindowForward(window);
+
+    if (!AmipGadgetCenter(window, gadget, &centerX, &centerY)) {
+        return FALSE;
+    }
     return AmipClickAt(window->WScreen, centerX, centerY, AMIP_BUTTON_LEFT);
+}
+
+BOOL AmipDragAt(struct Screen *screen, WORD x1, WORD y1, WORD x2, WORD y2)
+{
+    if (!AmipMoveMouseTo(screen, x1, y1)) {
+        return FALSE;
+    }
+    if (!SendRawMouseButton(IEQUALIFIER_LEFTBUTTON, IECODE_LBUTTON)) {
+        return FALSE;
+    }
+    /* A real drag has non-zero press duration before motion starts. */
+    Delay(3);
+
+    if (!AmipMoveMouseTo(screen, x2, y2)) {
+        /* Best-effort release even on failure -- don't leave Intuition
+         * thinking the button is still held down. */
+        SendRawMouseButton(0, (UWORD)(IECODE_LBUTTON | IECODE_UP_PREFIX));
+        return FALSE;
+    }
+    Delay(3);
+    return SendRawMouseButton(0, (UWORD)(IECODE_LBUTTON | IECODE_UP_PREFIX));
+}
+
+BOOL AmipDragGadgetBy(struct Window *window, struct Gadget *gadget, WORD dx, WORD dy)
+{
+    WORD centerX, centerY;
+
+    if (window == NULL || gadget == NULL) {
+        return FALSE;
+    }
+
+    BringWindowForward(window);
+
+    if (!AmipGadgetCenter(window, gadget, &centerX, &centerY)) {
+        return FALSE;
+    }
+    return AmipDragAt(window->WScreen, centerX, centerY,
+                       (WORD)(centerX + dx), (WORD)(centerY + dy));
+}
+
+BOOL AmipDragGadgetToGadget(struct Window *window, struct Gadget *srcGadget, struct Gadget *destGadget)
+{
+    WORD srcX, srcY, destX, destY;
+
+    if (window == NULL || srcGadget == NULL || destGadget == NULL) {
+        return FALSE;
+    }
+
+    BringWindowForward(window);
+
+    if (!AmipGadgetCenter(window, srcGadget, &srcX, &srcY)) {
+        return FALSE;
+    }
+    if (!AmipGadgetCenter(window, destGadget, &destX, &destY)) {
+        return FALSE;
+    }
+    return AmipDragAt(window->WScreen, srcX, srcY, destX, destY);
 }
 
 /* See action_engine.h's "locators" section for the design rationale --

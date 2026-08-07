@@ -176,6 +176,47 @@ class RoleLocators(unittest.TestCase):
         )
 
 
+class Drag(unittest.TestCase):
+    def test_drag_offset(self):
+        c = client_with(b"RC 0 0\n")
+        c.drag("GadTools", 5, 20, 0)
+        self.assertEqual(c._wire._t.sent[0], b"DRAG GadTools 5 20 0\n")
+
+    def test_drag_offset_negative(self):
+        c = client_with(b"RC 0 0\n")
+        c.drag("GadTools", 5, -10, -5)
+        self.assertEqual(c._wire._t.sent[0], b"DRAG GadTools 5 -10 -5\n")
+
+    def test_drag_offset_honours_screen(self):
+        c = client_with(b"RC 0 0\n")
+        c.drag("GadTools", 5, 20, 0, screen="Workbench")
+        self.assertEqual(
+            c._wire._t.sent[0], b"DRAG SCREEN=Workbench GadTools 5 20 0\n"
+        )
+
+    def test_drag_by_name(self):
+        c = client_with(b"RC 0 0\n")
+        c.drag_by_name("volume_slider", 20, 0)
+        self.assertEqual(c._wire._t.sent[0], b"DRAG @volume_slider 20 0\n")
+
+    def test_drag_to(self):
+        c = client_with(b"RC 0 0\n")
+        c.drag_to("GadTools", 1, 2)
+        self.assertEqual(c._wire._t.sent[0], b"DRAG GadTools 1 TO 2\n")
+
+    def test_drag_to_honours_screen(self):
+        c = client_with(b"RC 0 0\n")
+        c.drag_to("GadTools", 1, 2, screen="Workbench")
+        self.assertEqual(
+            c._wire._t.sent[0], b"DRAG SCREEN=Workbench GadTools 1 TO 2\n"
+        )
+
+    def test_drag_to_by_name(self):
+        c = client_with(b"RC 0 0\n")
+        c.drag_to_by_name("source_item", "dest_item")
+        self.assertEqual(c._wire._t.sent[0], b"DRAG @source_item TO @dest_item\n")
+
+
 class RcMapping(unittest.TestCase):
     def test_ok_returns_normally(self):
         c = client_with(b"RC 0 0\n")
