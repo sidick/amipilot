@@ -69,10 +69,10 @@ A quick manual session over the Copperline bridge:
 ```
 $ nc 127.0.0.1 1234
 VERSION
-RC 0 134
+RC 0 156
 AMIPILOT 0.3 PROTOCOL 1
 STABLE VERSION
-EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH FSLIST FSSTAT FSMKDIR FSDELETE FSGET QUIT
+EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH FSLIST FSSTAT FSMKDIR FSDELETE FSGET MENU MENUPICK SCREENS QUIT
 GETTEXT GadTools 2
 RC 0 10
 aminet.net
@@ -223,3 +223,106 @@ not a general file transfer mechanism.
 binary request body, and the wire's request grammar today is strictly
 single LF-terminated text lines — a real protocol addition, deferred
 as its own follow-up rather than bolted on here.
+
+## Menus
+
+From 0.4, a connected session can read a window's menu strip and
+select an item by its keyboard shortcut:
+
+```python
+from amipilot import ActionFailed, Amipilot
+
+with Amipilot.connect("127.0.0.1", 1234) as client:
+    strip = client.menu("GadTools")
+    project = strip.menus[0]
+    print(project.title, [i.text for i in project.items])
+
+    about = strip.find("About")             # look up by label instead
+    client.menu_pick("GadTools", about.menu_num, about.item_num)
+
+    try:
+        client.menu_pick("GadTools", 0, 2)   # a disabled item, say
+    except ActionFailed:
+        pass                                  # RC 20, expected
+```
+
+`menu()` returns a `MenuStrip`: one `Menu` per pulldown title, each
+with a list of `MenuItem`s and — one level deep, matching classic
+Intuition's own limit — their submenu items. Each `MenuItem` carries
+`text`, `checkit`/`checked` (for a checkmark toggle item),
+`enabled`, `shortcut` (the single keyboard character, or `None`), and
+`menu_num`/`item_num`/`sub_num` — the same 0-based chain positions
+Intuition itself reports via `IDCMP_MENUPICK`'s `MENUNUM()`/
+`ITEMNUM()`/`SUBNUM()` macros. `MenuStrip.find("some label")` looks up
+an item by its text instead of hand-counting positions.
+
+**`menu_pick()` selects by keyboard shortcut only, for now.** It
+activates the window, then strikes the item's shortcut character with
+the right-Amiga qualifier held — the same input.device path a human
+pressing Right-Amiga+key produces. Intuition resolves that
+combination against the window's own live menu strip; AmiPilot
+doesn't (and can't) synthesize the pick event directly, so `RC 0` is
+real evidence the pick reached the app through the genuine
+menu-shortcut path. Raises `ActionFailed` (`RC 20`) if the item is
+disabled, or if it has no keyboard shortcut at all — pointer-based
+navigation (open the menu, move across items, release over the
+target) for shortcut-less items is planned but not built yet; see
+`server/README.md`.
+
+## Screens
+
+From 0.4, a connected session can see every open screen and target a
+specific one when a window-title pattern is ambiguous:
+
+```python
+from amipilot import Amipilot
+
+with Amipilot.connect("127.0.0.1", 1234) as client:
+    for screen in client.screens():
+        print(screen.title, screen.width, screen.height, screen.frontmost)
+
+    # Two windows both matching "GadTools" on different screens --
+    # narrow the search to a specific one:
+    window = client.tree("GadTools", screen="Second Screen")
+
+    # Waiting for an asynchronously launched program's own screen to
+    # appear, instead of a fixed sleep:
+    client.launch("SRC:build/fixtures/SecondScreenApp")
+    screen = client.wait_for_screen("Second Screen", timeout=20.0)
+    window = client.wait_for_window("GadTools", screen=screen.title)
+```
+
+`screens()` returns every screen's `title` (its `DefaultTitle` — the
+app's own stable name for the screen, set once at open time — **not**
+the live title-bar text, which tracks whichever window is currently
+active on that screen via that window's own `WA_ScreenTitle` and so
+isn't a safe identity to match against), position, size, and whether
+it's frontmost.
+
+`tree()`, `click()`, `type()`, `get_text()`, `menu()`, and
+`menu_pick()` all accept an optional `screen=` keyword that narrows
+the window search to screens whose title contains it — this is purely
+for *disambiguating* two same-titled windows on different screens;
+window-finding already searched every screen before this existed, it
+just couldn't tell two matches apart. `TREE`/`MENU`'s own payload
+gains a `screen="..."` field on the window line for the same reason
+(`Window.screen`/`MenuStrip.screen` on the host side), so you can
+confirm which screen a match actually landed on.
+
+**Acting on a window brings its screen forward automatically.**
+`click()`, `type()`, and `menu_pick()` already call `ScreenToFront()`
+on the target window's own screen before injecting anything — this
+predates `SCREEN=`/`SCREENS`, and there's no separate "bring this
+screen to front" verb because none is needed. Read-only calls
+(`tree()`, `get_text()`, `menu()`) deliberately leave screen order
+alone.
+
+`wait_for_window()`/`wait_for_screen()` poll `tree()`/`screens()`
+until the target appears or `timeout` elapses (`TimeoutError` on
+expiry) — the same host-side poll loop `launch()`'s own docs already
+recommend by hand ("assert on the expected effect instead, e.g.
+polling `TREE`"), promoted into reusable methods. There's
+deliberately no server-side blocking wait verb: `AmiPilotServer`
+services one command at a time, so a verb that blocks server-side for
+a timeout would stall the whole server — including `QUIT` — for that
+whole duration.

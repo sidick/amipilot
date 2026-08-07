@@ -135,7 +135,7 @@ class Verbs(unittest.TestCase):
 
     def test_tree_parses_payload(self):
         payload = (
-            'window "GadTools" [0,0 10x10]\n'
+            'window "GadTools" screen="Workbench Screen" [0,0 10x10]\n'
             '  gadget id=1 role=BUTTON class="" label="Connect" [0,0 1x1]\n'
         )
         c = client_with(b"RC 0 %d\n%s" % (len(payload), payload.encode()))
@@ -196,6 +196,154 @@ class Verbs(unittest.TestCase):
         c = client_with(b"RC 10 %d\n%s" % (len(payload), payload))
         with self.assertRaises(CommandError):
             c.fs_list("SYS:")
+
+    def test_menu_parses_payload(self):
+        payload = (
+            'window "GadTools" screen="Workbench Screen" [0,0 10x10]\n'
+            'menu num=0 title="Project" enabled=1\n'
+            '  item num=0/0 text="About" shortcut=A checkit=0 checked=0 enabled=1\n'
+        )
+        c = client_with(b"RC 0 %d\n%s" % (len(payload), payload.encode()))
+        strip = c.menu("GadTools")
+        self.assertEqual(c._wire._t.sent[0], b"MENU GadTools\n")
+        self.assertEqual(strip.menus[0].items[0].text, "About")
+
+    def test_menu_pick_without_subnum(self):
+        c = client_with(b"RC 0 0\n")
+        c.menu_pick("GadTools", 0, 0)
+        self.assertEqual(c._wire._t.sent[0], b"MENUPICK GadTools 0 0\n")
+
+    def test_menu_pick_with_subnum(self):
+        c = client_with(b"RC 0 0\n")
+        c.menu_pick("GadTools", 0, 4, 0)
+        self.assertEqual(c._wire._t.sent[0], b"MENUPICK GadTools 0 4 0\n")
+
+    def test_menu_pick_disabled_raises_action_failed(self):
+        payload = b"menu item is disabled"
+        c = client_with(b"RC 20 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(ActionFailed):
+            c.menu_pick("GadTools", 0, 2)
+
+    def test_menu_pick_no_shortcut_raises_action_failed(self):
+        payload = b"item has no keyboard shortcut"
+        c = client_with(b"RC 20 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(ActionFailed):
+            c.menu_pick("GadTools", 0, 1)
+
+    def test_menu_pick_missing_item_raises_not_found(self):
+        c = client_with(b"RC 5 11\nnot matched")
+        with self.assertRaises(NotFound):
+            c.menu_pick("GadTools", 9, 9)
+
+    def test_tree_with_screen_prepends_screen_prefix(self):
+        payload = 'window "GadTools" screen="Second Screen" [0,0 10x10]\n'
+        c = client_with(b"RC 0 %d\n%s" % (len(payload), payload.encode()))
+        window = c.tree("GadTools", screen="Second Screen")
+        self.assertEqual(c._wire._t.sent[0], b'TREE SCREEN="Second Screen" GadTools\n')
+        self.assertEqual(window.screen, "Second Screen")
+
+    def test_click_without_screen_omits_prefix(self):
+        c = client_with(b"RC 0 0\n")
+        c.click("GadTools", 1)
+        self.assertEqual(c._wire._t.sent[0], b"CLICK GadTools 1\n")
+
+    def test_menu_pick_with_screen_prepends_prefix(self):
+        c = client_with(b"RC 0 0\n")
+        c.menu_pick("GadTools", 0, 0, screen="Second")
+        self.assertEqual(c._wire._t.sent[0], b"MENUPICK SCREEN=Second GadTools 0 0\n")
+
+    def test_screens_parses_payload(self):
+        payload = (
+            'screen title="Second Screen" [0,0 320x256] frontmost=1\n'
+            'screen title="Workbench Screen" [0,0 640x256] frontmost=0\n'
+        )
+        c = client_with(b"RC 0 %d\n%s" % (len(payload), payload.encode()))
+        screens = c.screens()
+        self.assertEqual(c._wire._t.sent[0], b"SCREENS\n")
+        self.assertEqual(len(screens), 2)
+        self.assertTrue(screens[0].frontmost)
+
+
+class FakeClock:
+    """A controllable fake clock for wait_for_window()/wait_for_screen()'s
+    poll loops -- patches time.monotonic/time.sleep so each simulated
+    sleep deterministically advances the same clock time.monotonic()
+    reads, instead of racing a real wall clock against however many
+    canned replies FakeTransport has queued (mock.patch.object(time,
+    "sleep", lambda _s: None), the pattern ConnectWithRetry's tests use
+    below, would spin through every queued reply near-instantly with
+    no way to control iteration count)."""
+
+    def __init__(self):
+        self.now = 0.0
+
+    def monotonic(self):
+        return self.now
+
+    def sleep(self, seconds):
+        self.now += seconds
+
+
+class WaitFor(unittest.TestCase):
+    def test_wait_for_window_succeeds_after_polling(self):
+        payload = 'window "GadTools" screen="" [0,0 10x10]\n'
+        c = client_with(
+            b"RC 5 11\nnot matched", b"RC 5 11\nnot matched",
+            b"RC 0 %d\n%s" % (len(payload), payload.encode()),
+        )
+        clock = FakeClock()
+        with mock.patch.object(time, "monotonic", clock.monotonic), \
+             mock.patch.object(time, "sleep", clock.sleep):
+            window = c.wait_for_window("GadTools", timeout=20.0, poll_interval=0.5)
+        self.assertEqual(window.title, "GadTools")
+        self.assertEqual(len(c._wire._t.sent), 3)
+
+    def test_wait_for_window_passes_screen_through(self):
+        payload = 'window "GadTools" screen="Second" [0,0 10x10]\n'
+        c = client_with(b"RC 0 %d\n%s" % (len(payload), payload.encode()))
+        clock = FakeClock()
+        with mock.patch.object(time, "monotonic", clock.monotonic), \
+             mock.patch.object(time, "sleep", clock.sleep):
+            c.wait_for_window("GadTools", screen="Second", timeout=20.0)
+        self.assertEqual(c._wire._t.sent[0], b'TREE SCREEN=Second GadTools\n')
+
+    def test_wait_for_window_raises_timeout(self):
+        c = client_with(
+            b"RC 5 11\nnot matched", b"RC 5 11\nnot matched", b"RC 5 11\nnot matched",
+        )
+        clock = FakeClock()
+        with mock.patch.object(time, "monotonic", clock.monotonic), \
+             mock.patch.object(time, "sleep", clock.sleep):
+            with self.assertRaisesRegex(TimeoutError, "no window matching"):
+                c.wait_for_window("GadTools", timeout=1.0, poll_interval=0.5)
+
+    def test_wait_for_screen_succeeds_after_polling(self):
+        miss = 'screen title="Workbench Screen" [0,0 640x256] frontmost=1\n'
+        hit = (
+            'screen title="Second Screen" [0,0 320x256] frontmost=1\n'
+            'screen title="Workbench Screen" [0,0 640x256] frontmost=0\n'
+        )
+        c = client_with(
+            b"RC 0 %d\n%s" % (len(miss), miss.encode()),
+            b"RC 0 %d\n%s" % (len(hit), hit.encode()),
+        )
+        clock = FakeClock()
+        with mock.patch.object(time, "monotonic", clock.monotonic), \
+             mock.patch.object(time, "sleep", clock.sleep):
+            screen = c.wait_for_screen("Second", timeout=20.0, poll_interval=0.5)
+        self.assertEqual(screen.title, "Second Screen")
+
+    def test_wait_for_screen_raises_timeout(self):
+        miss = 'screen title="Workbench Screen" [0,0 640x256] frontmost=1\n'
+        c = client_with(
+            b"RC 0 %d\n%s" % (len(miss), miss.encode()),
+            b"RC 0 %d\n%s" % (len(miss), miss.encode()),
+        )
+        clock = FakeClock()
+        with mock.patch.object(time, "monotonic", clock.monotonic), \
+             mock.patch.object(time, "sleep", clock.sleep):
+            with self.assertRaisesRegex(TimeoutError, "no screen matching"):
+                c.wait_for_screen("Second", timeout=1.0, poll_interval=0.5)
 
 
 class FakeSocket:

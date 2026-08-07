@@ -157,12 +157,74 @@ static void BuildTreeResult(const AmipWindowModel *model, char *buf, size_t cap)
     const AmipGadgetModel *gadget;
 
     buf[0] = '\0';
-    snprintf(buf, cap, "window \"%s\" [%d,%d %dx%d]\n",
+    snprintf(buf, cap, "window \"%s\" screen=\"%s\" [%d,%d %dx%d]\n",
              model->title != NULL ? (const char *)model->title : "(untitled)",
+             model->screenTitle != NULL ? (const char *)model->screenTitle : "",
              model->left, model->top, model->width, model->height);
 
     for (gadget = model->gadgets; gadget != NULL; gadget = gadget->next) {
         AppendGadgetLine(buf, cap, gadget);
+    }
+}
+
+/* Appends one menu item's line, same shape AmiInspect's PrintMenuItemLine
+ * prints it -- "item" for a top-level entry (num=<menu>/<item>),
+ * "subitem" for one of its submenu children (num=<menu>/<item>/<sub>). */
+static void AppendMenuItemLine(char *buf, size_t cap, const AmipMenuItemModel *item,
+                                const char *tag, int indent)
+{
+    size_t used = strlen(buf);
+    if (used >= cap - 1) {
+        return;
+    }
+    snprintf(buf + used, cap - used, "%*s%s num=%ld/%ld", indent, "", tag,
+             (long)item->menuNum, (long)item->itemNum);
+    if (item->subNum >= 0) {
+        used = strlen(buf);
+        snprintf(buf + used, cap - used, "/%ld", (long)item->subNum);
+    }
+    used = strlen(buf);
+    snprintf(buf + used, cap - used, " text=\"%s\"",
+             item->text != NULL ? (const char *)item->text : "");
+    if (item->hasShortcut) {
+        used = strlen(buf);
+        snprintf(buf + used, cap - used, " shortcut=%c", (char)item->shortcut);
+    }
+    used = strlen(buf);
+    snprintf(buf + used, cap - used, " checkit=%d checked=%d enabled=%d\n",
+             item->checkit, item->checked, item->enabled);
+}
+
+static void BuildMenuResult(const AmipWindowModel *window, const AmipMenuModel *menus,
+                             char *buf, size_t cap)
+{
+    const AmipMenuModel *menu;
+
+    buf[0] = '\0';
+    snprintf(buf, cap, "window \"%s\" screen=\"%s\" [%d,%d %dx%d]\n",
+             window->title != NULL ? (const char *)window->title : "(untitled)",
+             window->screenTitle != NULL ? (const char *)window->screenTitle : "",
+             window->left, window->top, window->width, window->height);
+
+    for (menu = menus; menu != NULL; menu = menu->next) {
+        const AmipMenuItemModel *item;
+        size_t used = strlen(buf);
+
+        if (used >= cap - 1) {
+            break;
+        }
+        snprintf(buf + used, cap - used, "menu num=%ld title=\"%s\" enabled=%d\n",
+                 (long)menu->menuNum, menu->title != NULL ? (const char *)menu->title : "",
+                 menu->enabled);
+
+        for (item = menu->items; item != NULL; item = item->next) {
+            const AmipMenuItemModel *sub;
+
+            AppendMenuItemLine(buf, cap, item, "item", 2);
+            for (sub = item->subItems; sub != NULL; sub = sub->next) {
+                AppendMenuItemLine(buf, cap, sub, "subitem", 4);
+            }
+        }
     }
 }
 
@@ -277,12 +339,13 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                      "AMIPILOT " XSTR(VERSION) "." XSTR(REVISION) " PROTOCOL 1\n"
                      "STABLE VERSION\n"
                      "EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH "
-                     "FSLIST FSSTAT FSMKDIR FSDELETE FSGET QUIT\n");
+                     "FSLIST FSSTAT FSMKDIR FSDELETE FSGET MENU MENUPICK "
+                     "SCREENS QUIT\n");
             result = g_resultBuf;
             break;
 
         case AMIP_AREXX_CMD_TREE: {
-            struct Window *w = AmipFindWindow((CONST_STRPTR)cmd->windowPattern);
+            struct Window *w = AmipFindWindow((CONST_STRPTR)cmd->screenPattern, (CONST_STRPTR)cmd->windowPattern);
             AmipWindowModel *model;
 
             if (w == NULL) {
@@ -301,7 +364,7 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
         }
 
         case AMIP_AREXX_CMD_CLICK: {
-            struct Window *w = AmipFindWindow((CONST_STRPTR)cmd->windowPattern);
+            struct Window *w = AmipFindWindow((CONST_STRPTR)cmd->screenPattern, (CONST_STRPTR)cmd->windowPattern);
             struct Gadget *g;
 
             if (w == NULL) {
@@ -320,7 +383,7 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
         }
 
         case AMIP_AREXX_CMD_TYPE: {
-            struct Window *w = AmipFindWindow((CONST_STRPTR)cmd->windowPattern);
+            struct Window *w = AmipFindWindow((CONST_STRPTR)cmd->screenPattern, (CONST_STRPTR)cmd->windowPattern);
             struct Gadget *g;
 
             if (w == NULL) {
@@ -339,7 +402,7 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
         }
 
         case AMIP_AREXX_CMD_GETTEXT: {
-            struct Window *w = AmipFindWindow((CONST_STRPTR)cmd->windowPattern);
+            struct Window *w = AmipFindWindow((CONST_STRPTR)cmd->screenPattern, (CONST_STRPTR)cmd->windowPattern);
 
             if (w == NULL) {
                 rc = AMIP_AREXX_RC_WARN;
@@ -432,6 +495,101 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
         case AMIP_AREXX_CMD_FSGET:
             rc = AmipFsGet(cmd->path, &result, resultLenOut);
             break;
+
+        case AMIP_AREXX_CMD_MENU: {
+            struct Window *w = AmipFindWindow((CONST_STRPTR)cmd->screenPattern, (CONST_STRPTR)cmd->windowPattern);
+            AmipWindowModel *model;
+            AmipMenuModel *menus;
+
+            if (w == NULL) {
+                rc = AMIP_AREXX_RC_WARN;
+                break;
+            }
+            model = AmipWalkWindow(w);
+            if (model == NULL) {
+                rc = AMIP_AREXX_RC_FAIL;
+                break;
+            }
+            menus = AmipWalkMenuStrip(w);
+            BuildMenuResult(model, menus, g_treeBuf, sizeof(g_treeBuf));
+            AmipFreeMenuModel(menus);
+            AmipFreeWindowModel(model);
+            result = g_treeBuf;
+            break;
+        }
+
+        case AMIP_AREXX_CMD_MENUPICK: {
+            struct Window *w = AmipFindWindow((CONST_STRPTR)cmd->screenPattern, (CONST_STRPTR)cmd->windowPattern);
+            struct MenuItem *item;
+            AmipMenuPickResult pickRc;
+
+            if (w == NULL) {
+                rc = AMIP_AREXX_RC_WARN;
+                break;
+            }
+            item = AmipFindMenuItem(w, cmd->menuNum, cmd->itemNum, cmd->subNum);
+            if (item == NULL || !AmipIsWindowOpen(w)) {
+                rc = AMIP_AREXX_RC_WARN;
+                break;
+            }
+            pickRc = AmipMenuPickByShortcut(w, item);
+            switch (pickRc) {
+                case AMIP_MENUPICK_OK:
+                    break;
+                case AMIP_MENUPICK_DISABLED:
+                    rc = AMIP_AREXX_RC_FAIL;
+                    strncpy(g_resultBuf, "menu item is disabled", sizeof(g_resultBuf) - 1);
+                    result = g_resultBuf;
+                    break;
+                case AMIP_MENUPICK_NO_SHORTCUT:
+                    rc = AMIP_AREXX_RC_FAIL;
+                    strncpy(g_resultBuf,
+                            "item has no keyboard shortcut -- pointer-based menu "
+                            "selection isn't built yet (see server/README.md)",
+                            sizeof(g_resultBuf) - 1);
+                    result = g_resultBuf;
+                    break;
+                case AMIP_MENUPICK_INJECT_FAILED:
+                default:
+                    rc = AMIP_AREXX_RC_FAIL;
+                    strncpy(g_resultBuf, "menu pick failed to inject input",
+                            sizeof(g_resultBuf) - 1);
+                    result = g_resultBuf;
+                    break;
+            }
+            break;
+        }
+
+        case AMIP_AREXX_CMD_SCREENS: {
+            struct Screen *screen;
+            size_t used;
+
+            g_treeBuf[0] = '\0';
+            /* A brief LockIBase hold for the whole walk, same as
+             * AmipIsWindowOpen's own raw structure walk -- this is a
+             * short, allocation-free loop (just formatting into an
+             * already-owned buffer), not a copy-out-then-release model
+             * like intuition-model's own walkers use for the (longer)
+             * gadget-tree walk. */
+            LockIBase(0);
+            for (screen = IntuitionBase->FirstScreen; screen != NULL; screen = screen->NextScreen) {
+                used = strlen(g_treeBuf);
+                if (used >= sizeof(g_treeBuf) - 1) {
+                    break;
+                }
+                /* DefaultTitle, not the live Title field -- see
+                 * action_engine.h's AmipFindWindow doc comment for why
+                 * Title isn't a stable screen identity. */
+                snprintf(g_treeBuf + used, sizeof(g_treeBuf) - used,
+                         "screen title=\"%s\" [%d,%d %dx%d] frontmost=%d\n",
+                         screen->DefaultTitle != NULL ? (const char *)screen->DefaultTitle : "",
+                         screen->LeftEdge, screen->TopEdge, screen->Width, screen->Height,
+                         screen == IntuitionBase->FirstScreen ? 1 : 0);
+            }
+            UnlockIBase(0);
+            result = g_treeBuf;
+            break;
+        }
 
         case AMIP_AREXX_CMD_QUIT:
             *runningOut = FALSE;

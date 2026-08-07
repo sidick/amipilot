@@ -319,6 +319,9 @@ static AmipWindowModel *WalkOneWindow(struct Window *window)
     }
 
     model->title = CopyString(window->Title);
+    model->screenTitle = (window->WScreen != NULL)
+                              ? CopyString(window->WScreen->DefaultTitle)
+                              : NULL;
     model->left = window->LeftEdge;
     model->top = window->TopEdge;
     model->width = window->Width;
@@ -401,8 +404,192 @@ void AmipFreeWindowModel(AmipWindowModel *model)
         if (model->title != NULL) {
             FreeVec(model->title);
         }
+        if (model->screenTitle != NULL) {
+            FreeVec(model->screenTitle);
+        }
         FreeVec(model);
         model = nextWindow;
+    }
+}
+
+/* Fills one already-allocated node from `item`. Doesn't touch
+ * next/subNum -- the two callers below (top-level vs. submenu) set
+ * those according to which chain they're walking. */
+static void FillMenuItemNode(AmipMenuItemModel *node, struct MenuItem *item,
+                              LONG menuNum, LONG itemNum)
+{
+    /* ItemFill points to an Image, an IntuiText, or NULL depending on
+     * the ITEMTEXT flag (intuition.h's own comment on the field) --
+     * only read IText when ITEMTEXT says it's really an IntuiText. A
+     * graphical (IM_ITEM/IM_SUB) item leaves text NULL, same
+     * "captured what it structurally is, not what it can't be" stance
+     * as walk.c's ClassifyByClassID for an unrecognised BOOPSI class. */
+    if ((item->Flags & ITEMTEXT) && item->ItemFill != NULL) {
+        struct IntuiText *itext = (struct IntuiText *)item->ItemFill;
+        node->text = CopyString(itext->IText);
+    } else {
+        node->text = NULL;
+    }
+
+    node->enabled = (item->Flags & ITEMENABLED) ? TRUE : FALSE;
+    node->checkit = (item->Flags & CHECKIT) ? TRUE : FALSE;
+    node->checked = (item->Flags & CHECKED) ? TRUE : FALSE;
+
+    /* Command is "only if appliprog sets the COMMSEQ flag" (intuition.h)
+     * -- a zero Command byte with COMMSEQ set isn't a real shortcut
+     * either, so require both. */
+    if ((item->Flags & COMMSEQ) && item->Command != 0) {
+        node->hasShortcut = TRUE;
+        node->shortcut = (UBYTE)item->Command;
+    } else {
+        node->hasShortcut = FALSE;
+        node->shortcut = 0;
+    }
+
+    node->menuNum = menuNum;
+    node->itemNum = itemNum;
+}
+
+/* Walks a submenu's NextItem chain (item->SubItem, one level deep --
+ * classic Intuition menus don't nest a submenu's own SubItem field
+ * into a second pull-right level, so this never recurses). subNum is
+ * this chain's own 0-based index, matching what Intuition's
+ * IDCMP_MENUPICK SUBNUM() macro would report for the same entry. */
+static AmipMenuItemModel *WalkSubItemChain(struct MenuItem *item, LONG menuNum, LONG itemNum)
+{
+    AmipMenuItemModel *head = NULL;
+    AmipMenuItemModel *tail = NULL;
+    LONG subNum;
+
+    for (subNum = 0; item != NULL; item = item->NextItem, subNum++) {
+        AmipMenuItemModel *node = AllocVec(sizeof(AmipMenuItemModel), MEMF_PUBLIC | MEMF_CLEAR);
+        if (node == NULL) {
+            break;
+        }
+        FillMenuItemNode(node, item, menuNum, itemNum);
+        node->subNum = subNum;
+        node->subItems = NULL;
+
+        if (tail == NULL) {
+            head = tail = node;
+        } else {
+            tail->next = node;
+            tail = node;
+        }
+    }
+
+    return head;
+}
+
+/* Walks a menu's top-level FirstItem chain, building one node per
+ * item and -- for any item with a SubItem pointer -- its one level of
+ * pull-right children via WalkSubItemChain(). */
+static AmipMenuItemModel *WalkTopItemChain(struct MenuItem *item, LONG menuNum)
+{
+    AmipMenuItemModel *head = NULL;
+    AmipMenuItemModel *tail = NULL;
+    LONG itemNum;
+
+    for (itemNum = 0; item != NULL; item = item->NextItem, itemNum++) {
+        AmipMenuItemModel *node = AllocVec(sizeof(AmipMenuItemModel), MEMF_PUBLIC | MEMF_CLEAR);
+        if (node == NULL) {
+            break;
+        }
+        FillMenuItemNode(node, item, menuNum, itemNum);
+        node->subNum = -1;
+        node->subItems = (item->SubItem != NULL)
+                              ? WalkSubItemChain(item->SubItem, menuNum, itemNum)
+                              : NULL;
+
+        if (tail == NULL) {
+            head = tail = node;
+        } else {
+            tail->next = node;
+            tail = node;
+        }
+    }
+
+    return head;
+}
+
+static AmipMenuModel *WalkMenuList(struct Menu *menu)
+{
+    AmipMenuModel *head = NULL;
+    AmipMenuModel *tail = NULL;
+    LONG menuNum;
+
+    for (menuNum = 0; menu != NULL; menu = menu->NextMenu, menuNum++) {
+        AmipMenuModel *node = AllocVec(sizeof(AmipMenuModel), MEMF_PUBLIC | MEMF_CLEAR);
+        if (node == NULL) {
+            break;
+        }
+
+        node->title = CopyString(menu->MenuName);
+        node->enabled = (menu->Flags & MENUENABLED) ? TRUE : FALSE;
+        node->menuNum = menuNum;
+        node->items = WalkTopItemChain(menu->FirstItem, menuNum);
+
+        if (tail == NULL) {
+            head = tail = node;
+        } else {
+            tail->next = node;
+            tail = node;
+        }
+    }
+
+    return head;
+}
+
+AmipMenuModel *AmipWalkMenuStrip(struct Window *window)
+{
+    struct Menu *strip;
+
+    if (window == NULL) {
+        return NULL;
+    }
+
+    LockIBase(0);
+    strip = window->MenuStrip;
+    UnlockIBase(0);
+
+    if (strip == NULL) {
+        return NULL;
+    }
+
+    return WalkMenuList(strip);
+}
+
+void AmipFreeMenuModel(AmipMenuModel *model)
+{
+    while (model != NULL) {
+        AmipMenuModel *nextMenu = model->next;
+        AmipMenuItemModel *item = model->items;
+
+        while (item != NULL) {
+            AmipMenuItemModel *nextItem = item->next;
+            AmipMenuItemModel *sub = item->subItems;
+
+            while (sub != NULL) {
+                AmipMenuItemModel *nextSub = sub->next;
+                if (sub->text != NULL) {
+                    FreeVec(sub->text);
+                }
+                FreeVec(sub);
+                sub = nextSub;
+            }
+
+            if (item->text != NULL) {
+                FreeVec(item->text);
+            }
+            FreeVec(item);
+            item = nextItem;
+        }
+
+        if (model->title != NULL) {
+            FreeVec(model->title);
+        }
+        FreeVec(model);
+        model = nextMenu;
     }
 }
 

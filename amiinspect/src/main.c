@@ -79,8 +79,9 @@ static void PrintModel(const AmipWindowModel *model)
 {
     const AmipGadgetModel *gadget;
 
-    printf("window \"%s\" [%d,%d %dx%d]\n",
+    printf("window \"%s\" screen=\"%s\" [%d,%d %dx%d]\n",
            model->title != NULL ? (const char *)model->title : "(untitled)",
+           model->screenTitle != NULL ? (const char *)model->screenTitle : "",
            model->left, model->top, model->width, model->height);
 
     for (gadget = model->gadgets; gadget != NULL; gadget = gadget->next) {
@@ -94,6 +95,42 @@ static void PrintModel(const AmipWindowModel *model)
         }
         printf(" [%d,%d %dx%d]\n",
                gadget->left, gadget->top, gadget->width, gadget->height);
+    }
+}
+
+static void PrintMenuItemLine(const AmipMenuItemModel *item, const char *tag, int indent)
+{
+    printf("%*s%s num=%ld/%ld", indent, "", tag, (long)item->menuNum, (long)item->itemNum);
+    if (item->subNum >= 0) {
+        printf("/%ld", (long)item->subNum);
+    }
+    printf(" text=\"%s\"", item->text != NULL ? (const char *)item->text : "");
+    if (item->hasShortcut) {
+        printf(" shortcut=%c", (char)item->shortcut);
+    }
+    printf(" checkit=%d checked=%d enabled=%d\n",
+           item->checkit, item->checked, item->enabled);
+}
+
+static void PrintMenus(const AmipMenuModel *menus)
+{
+    const AmipMenuModel *menu;
+
+    for (menu = menus; menu != NULL; menu = menu->next) {
+        const AmipMenuItemModel *item;
+
+        printf("menu num=%ld title=\"%s\" enabled=%d\n",
+               (long)menu->menuNum, menu->title != NULL ? (const char *)menu->title : "",
+               menu->enabled);
+
+        for (item = menu->items; item != NULL; item = item->next) {
+            const AmipMenuItemModel *sub;
+
+            PrintMenuItemLine(item, "item", 2);
+            for (sub = item->subItems; sub != NULL; sub = sub->next) {
+                PrintMenuItemLine(sub, "subitem", 4);
+            }
+        }
     }
 }
 
@@ -138,8 +175,14 @@ int main(void)
             fprintf(stderr, "AmiInspect: out of memory walking window\n");
             rc = RETURN_FAIL;
         } else {
+            AmipMenuModel *menus = AmipWalkMenuStrip(target);
+
             PrintModel(model);
             AmipFreeWindowModel(model);
+            if (menus != NULL) {
+                PrintMenus(menus);
+                AmipFreeMenuModel(menus);
+            }
         }
     }
 

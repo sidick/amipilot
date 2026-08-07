@@ -580,6 +580,184 @@ EOF
 	fi
 }
 
+# --- MENU/MENUPICK check (phase 0.4) ---------------------------------
+# fixtures/gadtools-app carries a menu strip (see its own header
+# comment): Project > About(shortcut A)/Toggle(checkit)/Disabled/
+# separator/More>Sub Item(shortcut S). tests/copperline/menu-test.py
+# walks it via MENU, asserts the fields the walker read off Intuition's
+# live struct Menu/MenuItem chain, MENUPICKs About and Sub Item by
+# their keyboard shortcuts and confirms each pick genuinely reached
+# the app (GTApp's own IDCMP_MENUPICK handler writes a marker into its
+# Host string gadget, read back via GETTEXT), and confirms the
+# permanently-disabled item is rejected without sending a keystroke.
+run_menu_check() {
+	echo "run.sh: MENU/MENUPICK"
+
+	rm -f "$BUILD/menu-result.txt" "$BUILD/marker-menu-ready.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+Run >NIL: SRC:build/fixtures/GTApp
+Wait 5
+Run >NIL: SRC:build/AmiPilotServer SERIAL
+Wait 5
+Echo "READY" >SRC:build/marker-menu-ready.txt
+EOF
+
+	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
+	rm -f "$info"
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
+		--fast 8M --noaudio --serial tcp --control :0 --control-info "$info" \
+		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
+	COPPERLINE_PID=$!
+
+	tries=0
+	while [ ! -f "$info" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 100 ]; then
+			echo "run.sh: FAIL (menu): copperline never wrote $info"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			return
+		fi
+		sleep 0.1
+	done
+
+	"$COPPERLINE_CTL" --info "$info" run_until '{"seconds": 600}' > /dev/null 2>&1 &
+
+	tries=0
+	while [ ! -f "$BUILD/marker-menu-ready.txt" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 120 ]; then
+			echo "run.sh: FAIL (menu): guest never became ready -- crash or hang"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			rm -f "$info"
+			return
+		fi
+		sleep 0.5
+	done
+
+	python3 "$REPO_ROOT/tests/copperline/menu-test.py" 127.0.0.1:1234 \
+		> "$BUILD/menu-result.txt" 2>&1 || true
+
+	kill "$COPPERLINE_PID" 2>/dev/null || true
+	COPPERLINE_PID=""
+	rm -f "$info"
+
+	ok=1
+	for pattern in \
+		'MENU-STRUCTURE PASS' \
+		'MENU-FIELDS PASS' \
+		'MENUPICK-ABOUT PASS' \
+		'MENUPICK-SUBITEM PASS' \
+		'MENUPICK-DISABLED PASS'; do
+		if ! grep -qF "$pattern" "$BUILD/menu-result.txt" 2>/dev/null; then
+			echo "run.sh: FAIL (menu): expected line not found: $pattern"
+			ok=0
+		fi
+	done
+
+	if [ "$ok" -eq 1 ]; then
+		echo "run.sh: PASS (MENU/MENUPICK)"
+	else
+		echo "run.sh:   --- actual output ---"
+		sed 's/^/run.sh:   /' "$BUILD/menu-result.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+	fi
+}
+
+# --- multi-screen check (phase 0.4, SCREENS + SCREEN=) --------------------
+# Stages fixtures/gadtools-app (opens on the default Workbench screen)
+# THEN fixtures/second-screen-app (opens its own custom screen, which
+# becomes frontmost as a result) -- the actual scenario this feature
+# exists for: a window needing its background screen brought forward
+# before it can be driven. tests/copperline/screens-test.py asserts
+# SCREENS/SCREEN= (via wait_for_screen(), exercising that polling
+# helper live), disambiguates two loosely-matching windows by screen,
+# and -- the core proof -- confirms CLICK/TYPE against GTApp's window
+# on the now-background Workbench screen still works, i.e. the
+# existing ScreenToFront()/WindowToFront()/ActivateWindow() calls in
+# AmipClickGadget() genuinely bring a background screen forward.
+run_screens_check() {
+	echo "run.sh: multi-screen (SCREENS/SCREEN=)"
+
+	rm -f "$BUILD/screens-result.txt" "$BUILD/marker-screens-ready.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+Run >NIL: SRC:build/fixtures/GTApp
+Wait 5
+Run >NIL: SRC:build/fixtures/SecondScreenApp
+Wait 5
+Run >NIL: SRC:build/AmiPilotServer SERIAL
+Wait 5
+Echo "READY" >SRC:build/marker-screens-ready.txt
+EOF
+
+	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
+	rm -f "$info"
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
+		--fast 8M --noaudio --serial tcp --control :0 --control-info "$info" \
+		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
+	COPPERLINE_PID=$!
+
+	tries=0
+	while [ ! -f "$info" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 100 ]; then
+			echo "run.sh: FAIL (screens): copperline never wrote $info"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			return
+		fi
+		sleep 0.1
+	done
+
+	"$COPPERLINE_CTL" --info "$info" run_until '{"seconds": 600}' > /dev/null 2>&1 &
+
+	tries=0
+	while [ ! -f "$BUILD/marker-screens-ready.txt" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 120 ]; then
+			echo "run.sh: FAIL (screens): guest never became ready -- crash or hang"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			rm -f "$info"
+			return
+		fi
+		sleep 0.5
+	done
+
+	python3 "$REPO_ROOT/tests/copperline/screens-test.py" 127.0.0.1:1234 \
+		> "$BUILD/screens-result.txt" 2>&1 || true
+
+	kill "$COPPERLINE_PID" 2>/dev/null || true
+	COPPERLINE_PID=""
+	rm -f "$info"
+
+	ok=1
+	for pattern in \
+		'SCREENS PASS' \
+		'LOOSE-MATCH PASS' \
+		'SCREEN-DISAMBIGUATE PASS' \
+		'BACKGROUND-TYPE PASS' \
+		'BACKGROUND-CLICK PASS'; do
+		if ! grep -qF "$pattern" "$BUILD/screens-result.txt" 2>/dev/null; then
+			echo "run.sh: FAIL (screens): expected line not found: $pattern"
+			ok=0
+		fi
+	done
+
+	if [ "$ok" -eq 1 ]; then
+		echo "run.sh: PASS (multi-screen)"
+	else
+		echo "run.sh:   --- actual output ---"
+		sed 's/^/run.sh:   /' "$BUILD/screens-result.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+	fi
+}
+
 # --- file API check (phase 0.4, allowlist-scoped FSLIST/FSSTAT/FSMKDIR/
 # FSDELETE/FSGET) ------------------------------------------------------
 # smoke.script stages a granted root (RAM:amipilot-fs-test, created and
@@ -716,6 +894,8 @@ run_manifest_check
 run_wire_check
 run_launch_check
 run_fs_check
+run_menu_check
+run_screens_check
 run_pytest_release_gate_check
 
 if [ "$FAILED" -eq 0 ]; then
@@ -731,6 +911,8 @@ if [ "$FAILED" -eq 0 ]; then
 		"$BUILD"/wire-result.txt "$BUILD"/marker-wire-ready.txt \
 		"$BUILD"/launch-result.txt "$BUILD"/marker-launch-ready.txt \
 		"$BUILD"/fs-result.txt "$BUILD"/marker-fs-ready.txt \
+		"$BUILD"/menu-result.txt "$BUILD"/marker-menu-ready.txt \
+		"$BUILD"/screens-result.txt "$BUILD"/marker-screens-ready.txt \
 		"$BUILD"/pytest-result.txt
 	echo "run.sh: all fixtures PASS"
 	exit 0
