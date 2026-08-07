@@ -106,6 +106,55 @@ trust me", because that would be a lie waiting to be shipped.
   it; renaming a gadget's on-screen label is not a change at all. This
   asymmetry is the entire point.
 
+## Quirk profiles: the same format for apps you don't control
+
+Nothing about the `MANIFEST <path>` wire verb (`server/WIRE.md`,
+`userdocs/ARexx-Reference.md`) requires the file it loads to have been
+authored, or even known about, by the application itself — it just
+parses whatever version-1 manifest sits at that path. That means this
+exact format also serves a second, equally real use case the app-
+author story above doesn't cover: driving a third-party application
+you have no source access to, where you've worked out the window
+titles and `GA_ID`s yourself (by hand, or via `amipilot dump --format
+python`, which already emits manifest-ready `# name = <id>` name
+suggestions — see `host/README.md`). AmiPilot calls a manifest written
+this way, by a user or the community rather than the app's own
+developer, a **quirk profile** — same `MANIFEST`/`APP`/`WINDOW`/
+`GADGET` records, same loader, same versioning rules above. There is
+deliberately no second file format or parser for this: one grammar,
+authored by whoever happens to know the target's structure, is less
+machinery than two.
+
+What a quirk profile adds beyond the plain mapping is a documented
+convention for **known-oddity notes**: a `;`/`#` comment line placed
+directly above (or after) the `WINDOW`/`GADGET` record it concerns,
+recording something a script author would otherwise have to
+rediscover the hard way. These are ordinary comment lines — already
+ignored by every consumer per the "File format" section above — so
+this adds no new syntax, only a convention for where to put them:
+
+```
+; quirk: gadtools.library's BUTTON_KIND never populates GadgetText
+; under any PLACETEXT_* value -- LABEL= can't find this button.
+; Located by GA_ID here for exactly that reason.
+GADGET ok_button main 7
+
+; quirk: this field only settles ~2s after the async request opens --
+; a script clicking it immediately should WAITFOR its TEXT= first
+; rather than assume it's populated on the window's first appearance.
+GADGET status_field req_window 3
+```
+
+A quirk profile is not a substitute for a manifest an app ships
+itself — if the app later adopts the contract, prefer that copy, since
+it changes in the same commit as the `GA_ID`s it describes and a
+third-party file can silently drift out of date. The "Resolution
+semantics" section's limit above applies here too, and matters more:
+a quirk profile can *record* a `GA_ID` for a gadget invisible to
+structural walking, but recording it doesn't make it reachable — the
+same "no way to express 'unreachable but trust me'" honesty applies
+regardless of who wrote the file.
+
 ## Versioning policy
 
 - Format version bumps only for changes that would make a version-1
