@@ -52,6 +52,21 @@ typedef struct AmipGadgetModel {
 typedef struct AmipWindowModel {
     struct AmipWindowModel *next;
     STRPTR  title;          /* copied out, caller-owned; NULL if untitled */
+    STRPTR  screenTitle;    /* window->WScreen->DefaultTitle, copied out;
+                             * NULL if the screen has none. Deliberately
+                             * DefaultTitle, not the live Title field --
+                             * Title tracks whichever window is currently
+                             * ACTIVE on that screen (intuition.doc's
+                             * SetWindowTitles: "the screen title appears
+                             * ... whenever this window is the active
+                             * one"), so it drifts as activation changes
+                             * and isn't a stable screen identity.
+                             * DefaultTitle is the app's own name for the
+                             * screen, set once at open time (classic
+                             * NewScreen.DefaultTitle or the V36+ SA_Title
+                             * tag -- same field either way, confirmed via
+                             * the autodoc's own "[For V36: superseded by
+                             * SA_Title]" note on DefaultTitle). */
     WORD    left, top, width, height;
     AmipGadgetModel *gadgets; /* linked list, walk order */
 } AmipWindowModel;

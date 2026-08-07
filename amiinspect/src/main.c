@@ -79,8 +79,9 @@ static void PrintModel(const AmipWindowModel *model)
 {
     const AmipGadgetModel *gadget;
 
-    printf("window \"%s\" [%d,%d %dx%d]\n",
+    printf("window \"%s\" screen=\"%s\" [%d,%d %dx%d]\n",
            model->title != NULL ? (const char *)model->title : "(untitled)",
+           model->screenTitle != NULL ? (const char *)model->screenTitle : "",
            model->left, model->top, model->width, model->height);
 
     for (gadget = model->gadgets; gadget != NULL; gadget = gadget->next) {

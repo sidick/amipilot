@@ -1,9 +1,9 @@
 """The AmiPilot object API: a Pythonic client over `WireClient`
 (server/WIRE.md framing) matching the verb set `AmiPilotServer`
 currently implements (TREE/CLICK/TYPE/GETTEXT/MANIFEST/LAUNCH/
-FSLIST/FSSTAT/FSMKDIR/FSDELETE/FSGET/MENU/MENUPICK/VERSION/QUIT --
-see server/README.md; windows/list, find, drag, wait-for, and fs-put
-are still 0.4+ scope, not invented here ahead of the server actually
+FSLIST/FSSTAT/FSMKDIR/FSDELETE/FSGET/MENU/MENUPICK/SCREENS/VERSION/
+QUIT -- see server/README.md; windows/list, find, drag, and fs-put are
+still 0.4+ scope, not invented here ahead of the server actually
 offering them).
 
 Quoting matches the ARexx port's own command grammar (arexx_cmd.c):
@@ -20,6 +20,7 @@ import time
 from .fs import FsEntry, parse_fs_entries, parse_fs_entry
 from .menu import MenuStrip, parse_menu_strip
 from .model import Window, parse_tree
+from .screen import Screen, parse_screens
 from .wire import RC_ERROR, RC_FAIL, RC_OK, RC_WARN, Reply, ServerInfo, WireClient
 
 
@@ -54,6 +55,14 @@ def _quote(s: str) -> str:
             raise ValueError(f"cannot quote a pattern containing '\"': {s!r}")
         return f'"{s}"'
     return s
+
+
+def _screen_prefix(screen: str | None) -> str:
+    """Renders the optional "SCREEN=<substring> " token every window-
+    targeting verb accepts right after its own keyword (server/
+    include/arexx_cmd.h) -- empty string when `screen` is None, so
+    callers can just prepend the result unconditionally."""
+    return f"SCREEN={_quote(screen)} " if screen is not None else ""
 
 
 class Amipilot:
@@ -163,41 +172,55 @@ class Amipilot:
 
     # -- verbs ------------------------------------------------------
 
-    def tree(self, window_pattern: str) -> Window:
+    def tree(self, window_pattern: str, *, screen: str | None = None) -> Window:
         """TREE <window-pattern> -- the matched window's full gadget
-        model. Raises NotFound if no window matches."""
-        reply = self._run(f"TREE {_quote(window_pattern)}")
+        model. Raises NotFound if no window matches.
+
+        `screen`, if given, narrows the search to screens whose own
+        name (DefaultTitle) contains it -- for disambiguating two
+        same-titled windows on different screens; see `screens()`.
+        Omitted searches every screen, same as before this parameter
+        existed."""
+        reply = self._run(f"TREE {_screen_prefix(screen)}{_quote(window_pattern)}")
         return parse_tree(reply.text)
 
-    def click(self, window_pattern: str, gadget_id: int) -> None:
+    def click(self, window_pattern: str, gadget_id: int, *, screen: str | None = None) -> None:
         """CLICK <window-pattern> <gadget-id> -- a genuine input.device
         click. Raises NotFound (no such window/gadget) or ActionFailed
-        (event injection didn't deliver)."""
-        self._run(f"CLICK {_quote(window_pattern)} {gadget_id}")
+        (event injection didn't deliver). `screen` narrows the window
+        search the same way `tree()`'s does; the target screen is
+        brought to front as part of the click regardless."""
+        self._run(f"CLICK {_screen_prefix(screen)}{_quote(window_pattern)} {gadget_id}")
 
     def click_by_name(self, name: str) -> None:
         """CLICK @<name> -- the manifest-locator form; requires a
         manifest loaded first via `manifest()`."""
         self._run(f"CLICK @{name}")
 
-    def type(self, window_pattern: str, gadget_id: int, text: str) -> None:
+    def type(
+        self, window_pattern: str, gadget_id: int, text: str, *, screen: str | None = None
+    ) -> None:
         """TYPE <window-pattern> <gadget-id> <text> -- clicks the
         gadget to focus it, then types via real IECLASS_RAWKEY events.
         `text` is sent verbatim after the gadget ID (server/README.md's
-        rest-of-line rule); it must not contain a newline."""
+        rest-of-line rule); it must not contain a newline. `screen`
+        narrows the window search the same way `tree()`'s does."""
         if "\n" in text or "\r" in text:
             raise ValueError("TYPE text must not contain a line terminator")
-        self._run(f"TYPE {_quote(window_pattern)} {gadget_id} {text}")
+        self._run(f"TYPE {_screen_prefix(screen)}{_quote(window_pattern)} {gadget_id} {text}")
 
     def type_by_name(self, name: str, text: str) -> None:
         if "\n" in text or "\r" in text:
             raise ValueError("TYPE text must not contain a line terminator")
         self._run(f"TYPE @{name} {text}")
 
-    def get_text(self, window_pattern: str, gadget_id: int) -> str:
+    def get_text(self, window_pattern: str, gadget_id: int, *, screen: str | None = None) -> str:
         """GETTEXT <window-pattern> <gadget-id> -- a string/integer
-        gadget's live value, else its label."""
-        return self._run(f"GETTEXT {_quote(window_pattern)} {gadget_id}").text
+        gadget's live value, else its label. `screen` narrows the
+        window search the same way `tree()`'s does."""
+        return self._run(
+            f"GETTEXT {_screen_prefix(screen)}{_quote(window_pattern)} {gadget_id}"
+        ).text
 
     def get_text_by_name(self, name: str) -> str:
         return self._run(f"GETTEXT @{name}").text
@@ -277,19 +300,26 @@ class Amipilot:
         "File system access" section)."""
         return self._run(f"FSGET {_quote(path)}").payload
 
-    def menu(self, window_pattern: str) -> MenuStrip:
+    def menu(self, window_pattern: str, *, screen: str | None = None) -> MenuStrip:
         """MENU <window-pattern> -- the matched window's full menu
         strip: every pulldown menu, its items, and (one level deep)
         their submenu items, with the checkit/checked/enabled state
         and keyboard shortcut (if any) the walker read live off
         Intuition's own struct Menu/MenuItem chain. Raises NotFound if
         no window matches; a window with no menu strip at all returns
-        a MenuStrip with an empty `menus` list, not an error."""
-        reply = self._run(f"MENU {_quote(window_pattern)}")
+        a MenuStrip with an empty `menus` list, not an error. `screen`
+        narrows the window search the same way `tree()`'s does."""
+        reply = self._run(f"MENU {_screen_prefix(screen)}{_quote(window_pattern)}")
         return parse_menu_strip(reply.text)
 
     def menu_pick(
-        self, window_pattern: str, menu_num: int, item_num: int, sub_num: int | None = None
+        self,
+        window_pattern: str,
+        menu_num: int,
+        item_num: int,
+        sub_num: int | None = None,
+        *,
+        screen: str | None = None,
     ) -> None:
         """MENUPICK <window-pattern> <menu-num> <item-num> [<sub-num>]
         -- selects a menu item via its keyboard shortcut (Right-Amiga
@@ -298,7 +328,9 @@ class Amipilot:
         `sub_num` are the same 0-based chain positions `menu()`'s
         MenuItem.menu_num/item_num/sub_num report -- use `menu(...).
         find("Some Label")` to look one up by text instead of
-        hand-counting positions.
+        hand-counting positions. `screen` narrows the window search
+        the same way `tree()`'s does; the target screen is brought to
+        front as part of the pick regardless.
 
         Raises NotFound if the window or the addressed item doesn't
         exist, ActionFailed if the item is disabled, has no keyboard
@@ -309,10 +341,71 @@ class Amipilot:
         against the window's live menu strip on its own, so this
         doesn't (and can't) confirm the app's own IDCMP_MENUPICK
         handler ran -- assert on the expected effect instead."""
-        cmd = f"MENUPICK {_quote(window_pattern)} {menu_num} {item_num}"
+        cmd = f"MENUPICK {_screen_prefix(screen)}{_quote(window_pattern)} {menu_num} {item_num}"
         if sub_num is not None:
             cmd += f" {sub_num}"
         self._run(cmd)
+
+    def screens(self) -> list[Screen]:
+        """SCREENS -- every open screen (title, position, size, and
+        whether it's frontmost). `title` is each screen's own name
+        (DefaultTitle), not the dynamic title-bar text a window's own
+        WA_ScreenTitle can override -- a stable identity to match
+        against, same as the `screen` parameter above and `SCREEN=`
+        itself use (server/include/action_engine.h has the full
+        rationale)."""
+        return parse_screens(self._run("SCREENS").text)
+
+    def wait_for_window(
+        self,
+        window_pattern: str,
+        *,
+        screen: str | None = None,
+        timeout: float = 20.0,
+        poll_interval: float = 0.5,
+    ) -> Window:
+        """Polls `tree()` until it stops raising NotFound or `timeout`
+        elapses -- promotes the poll loop LAUNCH's own docstring
+        recommends ("assert on the expected effect instead, e.g.
+        polling TREE for the launched app's window") into a reusable
+        method rather than every caller hand-rolling it, the way
+        tests/copperline/launch-test.py originally did. Raises
+        TimeoutError (not NotFound) once the deadline passes, chained
+        from the last NotFound via `__cause__`."""
+        deadline = time.monotonic() + timeout
+        last_error: NotFound | None = None
+        while time.monotonic() < deadline:
+            try:
+                return self.tree(window_pattern, screen=screen)
+            except NotFound as e:
+                last_error = e
+                time.sleep(poll_interval)
+        raise TimeoutError(
+            f"no window matching {window_pattern!r} "
+            f"{'on screen ' + repr(screen) + ' ' if screen else ''}"
+            f"appeared within {timeout:.0f}s"
+        ) from last_error
+
+    def wait_for_screen(
+        self, screen_pattern: str, *, timeout: float = 20.0, poll_interval: float = 0.5
+    ) -> Screen:
+        """Polls `screens()` until one whose title (DefaultTitle)
+        contains `screen_pattern` shows up, or `timeout` elapses --
+        same shape as `wait_for_window()`, for the case of waiting on
+        a whole screen to open (e.g. an asynchronously `launch()`ed
+        program that opens its own custom screen) rather than a
+        window on an already-open one. Filtering is done here, host-
+        side: SCREENS itself always returns every screen, same as
+        `screens()`. Raises TimeoutError once the deadline passes."""
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            for screen in self.screens():
+                if screen_pattern in screen.title:
+                    return screen
+            time.sleep(poll_interval)
+        raise TimeoutError(
+            f"no screen matching {screen_pattern!r} appeared within {timeout:.0f}s"
+        )
 
     def quit(self) -> None:
         """QUIT -- shuts the server down cleanly. The connection is

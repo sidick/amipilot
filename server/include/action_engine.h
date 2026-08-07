@@ -104,9 +104,16 @@ BOOL AmipTypeString(CONST_STRPTR text);
  * needed the exact same lookups, to avoid a second copy drifting.
  */
 
-/* First window (any screen) whose title contains titleSubstring. NULL if
- * none matches. */
-struct Window *AmipFindWindow(CONST_STRPTR titleSubstring);
+/* First window whose title contains titleSubstring, restricted to
+ * screens whose DefaultTitle contains screenSubstring -- NOT the live
+ * Title field, which tracks whichever window is currently active on
+ * that screen (intuition.doc's SetWindowTitles: "the screen title
+ * appears ... whenever this window is the active one") and so isn't a
+ * stable screen identity; DefaultTitle is the app's own name for the
+ * screen, set once at open time. screenSubstring NULL or "" means no
+ * screen filter -- searches every screen, front-to-back, same as
+ * before this parameter existed. NULL if no window matches. */
+struct Window *AmipFindWindow(CONST_STRPTR screenSubstring, CONST_STRPTR titleSubstring);
 
 /* First gadget in window's own list (window->FirstGadget) with a
  * matching GadgetID. NULL if none matches -- note this walks the classic

@@ -15,8 +15,8 @@ from .model import Window
 
 
 def render_text(window: Window) -> str:
-    lines = [f'window "{window.title}" [{window.left},{window.top} '
-             f"{window.width}x{window.height}]"]
+    lines = [f'window "{window.title}" screen="{window.screen}" '
+             f"[{window.left},{window.top} {window.width}x{window.height}]"]
     for g in window.gadgets:
         value = f' value="{g.value}"' if g.value is not None else ""
         lines.append(
@@ -44,6 +44,11 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="amipilot dump",
                                      description=__doc__.strip().splitlines()[0])
     parser.add_argument("window", help="window-title substring to match")
+    parser.add_argument("--screen", default=None,
+                        help="restrict the match to screens whose own name "
+                             "(DefaultTitle) contains this substring -- for "
+                             "disambiguating two same-titled windows on "
+                             "different screens")
     parser.add_argument("--host", default="127.0.0.1",
                         help="wire transport host (default 127.0.0.1)")
     parser.add_argument("--port", type=int, default=1234,
@@ -56,7 +61,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         with Amipilot.connect(args.host, args.port) as client:
-            window = client.tree(args.window)
+            window = client.tree(args.window, screen=args.screen)
     except AmipilotError as e:
         print(f"amipilot dump: {e}", file=sys.stderr)
         return 1
