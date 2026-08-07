@@ -329,6 +329,72 @@ static BOOL FindGadgetText(struct Window *window, ULONG gadgetId, char *buf, siz
     return found;
 }
 
+/* WAITFOR/CLICK's EXPECT= -- polling primitives. Default timeout when
+ * TIMEOUT= is omitted (expectTimeout == 0). */
+#define AMIP_EXPECT_DEFAULT_TIMEOUT 10  /* seconds */
+/* Delay() ticks between polls (~100ms at the usual 50Hz/60Hz tick
+ * rate) -- a fixed tick count, not refresh-rate-corrected, same
+ * precision level AmipClickAt()'s own Delay(3) press-duration already
+ * accepts (action.c) -- not a new imprecision introduced here. */
+#define AMIP_EXPECT_POLL_TICKS 5
+
+/* Blocking one verb handler in a Delay() poll loop for up to
+ * TIMEOUT seconds is safe in this server's model: HandleCommand()'s
+ * callers (the ARexx/serial/TCP dispatch loops, RealMain()'s main
+ * while loop) are strictly single-threaded and synchronous -- nothing
+ * else is serviced until this call returns and the loop comes back
+ * around to Wait()/AmipTcpWait() -- and TCP's own "one active client
+ * at a time" model (tcp.h) means there is no second connection that
+ * could be starved by this. */
+
+/* Polls AmipFindWindow(screenPattern, titlePattern) until it returns
+ * non-NULL (wantPresent TRUE) or NULL (wantPresent FALSE), or
+ * timeoutSeconds elapses. Always a fresh pattern search each poll --
+ * no prior window identity to anchor to, since this is used both by
+ * standalone WAITFOR (no action) and doesn't need one for the
+ * WINDOW= "a NEW window appears" case even when called from CLICK. */
+static BOOL WaitForWindowPattern(CONST_STRPTR screenPattern, CONST_STRPTR titlePattern,
+                                 long timeoutSeconds, BOOL wantPresent)
+{
+    ULONG ticksTotal = (ULONG)(timeoutSeconds > 0 ? timeoutSeconds : AMIP_EXPECT_DEFAULT_TIMEOUT) * 50;
+    ULONG ticksWaited = 0;
+
+    for (;;) {
+        struct Window *w = AmipFindWindow(screenPattern, titlePattern);
+        if (wantPresent ? (w != NULL) : (w == NULL)) {
+            return TRUE;
+        }
+        if (ticksWaited >= ticksTotal) {
+            return FALSE;
+        }
+        Delay(AMIP_EXPECT_POLL_TICKS);
+        ticksWaited += AMIP_EXPECT_POLL_TICKS;
+    }
+}
+
+/* Polls AmipIsWindowOpen(target) until it returns FALSE (the exact
+ * window closed) or timeoutSeconds elapses -- CLICK's own bare
+ * EXPECT=NOWINDOW, checked by pointer identity against the window
+ * CLICK itself just resolved and acted on, not a pattern re-search.
+ * This is the precise "snapshot the delta" guarantee docs/
+ * implementation-plan.md's "Async by design" section describes. */
+static BOOL WaitForWindowClosed(struct Window *target, long timeoutSeconds)
+{
+    ULONG ticksTotal = (ULONG)(timeoutSeconds > 0 ? timeoutSeconds : AMIP_EXPECT_DEFAULT_TIMEOUT) * 50;
+    ULONG ticksWaited = 0;
+
+    for (;;) {
+        if (!AmipIsWindowOpen(target)) {
+            return TRUE;
+        }
+        if (ticksWaited >= ticksTotal) {
+            return FALSE;
+        }
+        Delay(AMIP_EXPECT_POLL_TICKS);
+        ticksWaited += AMIP_EXPECT_POLL_TICKS;
+    }
+}
+
 /* Resolves CLICK/TYPE/GETTEXT's (and DRAG's, 0.4) target gadget --
  * either the classic numeric cmd->gadgetId (today's original,
  * unchanged path: a plain AmipFindGadgetById lookup) or, when
@@ -557,7 +623,7 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                      "STABLE VERSION\n"
                      "EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH "
                      "FSLIST FSSTAT FSMKDIR FSDELETE FSGET MENU MENUPICK DRAG "
-                     "SCREENS AUTH QUIT\n");
+                     "WAITFOR SCREENS AUTH QUIT\n");
             result = g_resultBuf;
             break;
 
@@ -595,6 +661,22 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
             }
             if (!AmipClickGadget(w, g)) {
                 rc = AMIP_AREXX_RC_FAIL;
+                break;
+            }
+            /* EXPECT=: the click already happened above regardless --
+             * a timeout here means the click delivered but the
+             * expected effect never showed up, reported distinctly
+             * (RC_TIMEOUT) from the click's own injection failing
+             * outright (RC_FAIL, handled above). */
+            if (cmd->expectMode == 1) {
+                if (!WaitForWindowPattern(NULL, (CONST_STRPTR)cmd->expectPattern,
+                                          cmd->expectTimeout, TRUE)) {
+                    rc = AMIP_AREXX_RC_TIMEOUT;
+                }
+            } else if (cmd->expectMode == 2) {
+                if (!WaitForWindowClosed(w, cmd->expectTimeout)) {
+                    rc = AMIP_AREXX_RC_TIMEOUT;
+                }
             }
             break;
         }
@@ -846,6 +928,28 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
             }
             UnlockIBase(0);
             result = g_treeBuf;
+            break;
+        }
+
+        case AMIP_AREXX_CMD_WAITFOR: {
+            BOOL ok;
+            CONST_STRPTR screenPattern = cmd->screenPattern[0] != '\0'
+                ? (CONST_STRPTR)cmd->screenPattern : NULL;
+
+            if (cmd->expectMode == 1) {
+                ok = WaitForWindowPattern(screenPattern, (CONST_STRPTR)cmd->expectPattern,
+                                          cmd->expectTimeout, TRUE);
+            } else {
+                /* expectMode == 2 (NOWINDOW=<pattern>) is the only
+                 * other value AmipArexxParse() ever sets for WAITFOR
+                 * -- parse_expect_condition() rejects anything else
+                 * as a parse error before this dispatch is reached. */
+                ok = WaitForWindowPattern(screenPattern, (CONST_STRPTR)cmd->expectPattern,
+                                          cmd->expectTimeout, FALSE);
+            }
+            if (!ok) {
+                rc = AMIP_AREXX_RC_TIMEOUT;
+            }
             break;
         }
 

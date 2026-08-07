@@ -11,7 +11,7 @@ from unittest import mock
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from amipilot.client import ActionFailed, Amipilot, CommandError, NotFound  # noqa: E402
+from amipilot.client import ActionFailed, Amipilot, CommandError, NotFound, Timeout  # noqa: E402
 from amipilot.wire import WireClient, WireError  # noqa: E402
 
 
@@ -215,6 +215,92 @@ class Drag(unittest.TestCase):
         c = client_with(b"RC 0 0\n")
         c.drag_to_by_name("source_item", "dest_item")
         self.assertEqual(c._wire._t.sent[0], b"DRAG @source_item TO @dest_item\n")
+
+
+class ClickExpect(unittest.TestCase):
+    def test_click_with_expect_window(self):
+        c = client_with(b"RC 0 0\n")
+        c.click("GadTools", 1, expect="window:Async Dialog")
+        self.assertEqual(
+            c._wire._t.sent[0],
+            b'CLICK GadTools 1 EXPECT=WINDOW="Async Dialog" TIMEOUT=10\n',
+        )
+
+    def test_click_with_expect_nowindow(self):
+        c = client_with(b"RC 0 0\n")
+        c.click("GadTools", 1, expect="nowindow", timeout=5)
+        self.assertEqual(
+            c._wire._t.sent[0], b"CLICK GadTools 1 EXPECT=NOWINDOW TIMEOUT=5\n"
+        )
+
+    def test_click_without_expect_unchanged(self):
+        # Regression check: omitting expect= must produce exactly
+        # today's CLICK line, no trailing tokens at all.
+        c = client_with(b"RC 0 0\n")
+        c.click("GadTools", 1)
+        self.assertEqual(c._wire._t.sent[0], b"CLICK GadTools 1\n")
+
+    def test_click_by_name_with_expect(self):
+        c = client_with(b"RC 0 0\n")
+        c.click_by_name("connect_button", expect="window:Async Dialog")
+        self.assertEqual(
+            c._wire._t.sent[0],
+            b'CLICK @connect_button EXPECT=WINDOW="Async Dialog" TIMEOUT=10\n',
+        )
+
+    def test_click_by_role_with_expect(self):
+        c = client_with(b"RC 0 0\n")
+        c.click_by_role("GadTools", role="button", expect="nowindow")
+        self.assertEqual(
+            c._wire._t.sent[0],
+            b"CLICK GadTools ROLE=button EXPECT=NOWINDOW TIMEOUT=10\n",
+        )
+
+    def test_expect_window_without_pattern_raises_locally(self):
+        c = client_with()
+        with self.assertRaises(ValueError):
+            c.click("GadTools", 1, expect="window:")
+
+    def test_expect_unrecognised_condition_raises_locally(self):
+        c = client_with()
+        with self.assertRaises(ValueError):
+            c.click("GadTools", 1, expect="bogus:whatever")
+
+    def test_timeout_rc_raises_timeout_exception(self):
+        payload = b"condition never became true"
+        c = client_with(b"RC 15 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(Timeout):
+            c.click("GadTools", 1, expect="window:Async Dialog")
+
+
+class WaitFor(unittest.TestCase):
+    def test_wait_for_window(self):
+        c = client_with(b"RC 0 0\n")
+        c.wait_for("window:Async Dialog")
+        self.assertEqual(
+            c._wire._t.sent[0], b'WAITFOR WINDOW="Async Dialog" TIMEOUT=10\n'
+        )
+
+    def test_wait_for_nowindow_with_pattern(self):
+        c = client_with(b"RC 0 0\n")
+        c.wait_for("nowindow:Async Dialog", timeout=3)
+        self.assertEqual(
+            c._wire._t.sent[0], b'WAITFOR NOWINDOW="Async Dialog" TIMEOUT=3\n'
+        )
+
+    def test_wait_for_honours_screen(self):
+        c = client_with(b"RC 0 0\n")
+        c.wait_for("window:Async Dialog", screen="Workbench")
+        self.assertEqual(
+            c._wire._t.sent[0],
+            b'WAITFOR SCREEN=Workbench WINDOW="Async Dialog" TIMEOUT=10\n',
+        )
+
+    def test_wait_for_timeout_raises(self):
+        payload = b"condition never became true"
+        c = client_with(b"RC 15 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(Timeout):
+            c.wait_for("window:Async Dialog")
 
 
 class RcMapping(unittest.TestCase):

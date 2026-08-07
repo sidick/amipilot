@@ -120,6 +120,66 @@ static int fail_if_trunc(int trunc, AmipArexxParsed *out)
     return 0;
 }
 
+/* Parses one WAITFOR/EXPECT= condition at *pp -- "WINDOW=<pattern>"
+ * or "NOWINDOW" optionally followed by "=<pattern>" -- into
+ * out->expectMode (1/2)/out->expectPattern, then consumes a trailing
+ * "TIMEOUT=<n>" if present. patternRequired distinguishes WAITFOR's
+ * own NOWINDOW= (always needs a pattern, there being no prior action
+ * to anchor an identity to) from CLICK's bare EXPECT=NOWINDOW (never
+ * takes one -- it means the window CLICK itself just resolved and
+ * acted on, checked by pointer identity server-side, not a pattern
+ * search; see arexx_cmd.h's doc comment on AmipArexxParse). Advances
+ * *pp past whatever it consumed. Returns 0 on success, -1 (out->type
+ * forced UNKNOWN, same convention as every other parse failure here)
+ * on a malformed condition. */
+static int parse_expect_condition(const char **pp, AmipArexxParsed *out, int patternRequired)
+{
+    const char *p = *pp;
+    int trunc;
+
+    if (ci_streq_prefix(p, "WINDOW=")) {
+        p += 7; /* strlen("WINDOW=") */
+        out->expectMode = 1;
+        p = read_token(p, out->expectPattern, sizeof(out->expectPattern), &trunc);
+        if (fail_if_trunc(trunc, out)) return -1;
+        if (out->expectPattern[0] == '\0') {
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+    } else if (ci_streq_prefix(p, "NOWINDOW")) {
+        p += 8; /* strlen("NOWINDOW") */
+        out->expectMode = 2;
+        if (*p == '=') {
+            p++;
+            p = read_token(p, out->expectPattern, sizeof(out->expectPattern), &trunc);
+            if (fail_if_trunc(trunc, out)) return -1;
+            if (out->expectPattern[0] == '\0') {
+                out->type = AMIP_AREXX_CMD_UNKNOWN;
+                return -1;
+            }
+        } else if (patternRequired) {
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+    } else {
+        out->type = AMIP_AREXX_CMD_UNKNOWN;
+        return -1;
+    }
+
+    p = skip_ws(p);
+    if (ci_streq_prefix(p, "TIMEOUT=")) {
+        char numbuf[16];
+        p += 8; /* strlen("TIMEOUT=") */
+        p = read_token(p, numbuf, sizeof(numbuf), &trunc);
+        if (fail_if_trunc(trunc, out)) return -1;
+        out->expectTimeout = strtol(numbuf, NULL, 10);
+        p = skip_ws(p);
+    }
+
+    *pp = p;
+    return 0;
+}
+
 int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
 {
     char kw[16];
@@ -155,6 +215,7 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
     else if (ci_streq(kw, "DRAG"))     out->type = AMIP_AREXX_CMD_DRAG;
     else if (ci_streq(kw, "SCREENS"))  out->type = AMIP_AREXX_CMD_SCREENS;
     else if (ci_streq(kw, "AUTH"))     out->type = AMIP_AREXX_CMD_AUTH;
+    else if (ci_streq(kw, "WAITFOR"))  out->type = AMIP_AREXX_CMD_WAITFOR;
     else if (ci_streq(kw, "QUIT"))     out->type = AMIP_AREXX_CMD_QUIT;
     else { out->type = AMIP_AREXX_CMD_UNKNOWN; return -1; }
 
@@ -263,6 +324,21 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
         return 0;
     }
 
+    if (out->type == AMIP_AREXX_CMD_WAITFOR) {
+        int trunc;
+        p = skip_ws(p);
+        parse_optional_screen_prefix(&p, out->screenPattern, sizeof(out->screenPattern), &trunc);
+        if (fail_if_trunc(trunc, out)) return -1;
+        if (*p == '\0') {
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+        if (parse_expect_condition(&p, out, /* patternRequired */ 1) != 0) {
+            return -1;
+        }
+        return 0;
+    }
+
     /* Every other command starts with either a window-pattern argument
      * or a "@<logical-name>" manifest locator (see arexx_cmd.h), with
      * an optional leading "SCREEN=<substring>" ahead of the classic
@@ -364,6 +440,22 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
             }
             strncpy(out->text, p, sizeof(out->text) - 1);
             out->text[sizeof(out->text) - 1] = '\0';
+        }
+    }
+
+    /* CLICK-only optional trailing "EXPECT=...": TYPE/DRAG/MENUPICK
+     * don't accept it in this pass (see arexx_cmd.h's doc comment on
+     * AmipArexxParse) -- use a separate WAITFOR call after them
+     * instead. Absent EXPECT=, CLICK is entirely unchanged from
+     * before this field existed (expectMode stays 0, the memset()
+     * default). */
+    if (out->type == AMIP_AREXX_CMD_CLICK) {
+        p = skip_ws(p);
+        if (ci_streq_prefix(p, "EXPECT=")) {
+            p += 7; /* strlen("EXPECT=") */
+            if (parse_expect_condition(&p, out, /* patternRequired */ 0) != 0) {
+                return -1;
+            }
         }
     }
 

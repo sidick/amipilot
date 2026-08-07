@@ -38,7 +38,7 @@ for disambiguating two same-titled windows on different screens; see
 | Command | Arguments | What it does |
 |---------|-----------|---------------|
 | `TREE` | `<window-pattern>` | Returns the matched window's full gadget tree as a multi-line string, in the same format `AmiInspect` prints (`RESULT` gains embedded newlines — most REXX interpreters handle that fine in a variable). |
-| `CLICK` | `<window-pattern> (<gadget-id> \| ROLE=<r> [LABEL=<l>] [INDEX=<n>])` | Clicks the target gadget — a genuine `input.device` click, not a shortcut. Either a numeric `GA_ID`, or a [tier-2 locator](#tier-2-semantic-locators) below. |
+| `CLICK` | `<window-pattern> (<gadget-id> \| ROLE=<r> [LABEL=<l>] [INDEX=<n>]) [EXPECT=WINDOW=<pattern> \| EXPECT=NOWINDOW] [TIMEOUT=<n>]` | Clicks the target gadget — a genuine `input.device` click, not a shortcut. Either a numeric `GA_ID`, or a [tier-2 locator](#tier-2-semantic-locators) below. Optional `EXPECT=` composes the click atomically with a server-side wait — see [Wait/expectation primitives](#waitexpectation-primitives). |
 | `TYPE` | `<window-pattern> (<gadget-id> \| ROLE=<r> [LABEL=<l>] [INDEX=<n>]) <text...>` | Clicks the gadget (to focus it), then types `text` into it via real `IECLASS_RAWKEY` events, human-paced. Everything after the locator is taken verbatim as the text — no quoting needed unless the text itself starts with `"`. |
 | `GETTEXT` | `<window-pattern> (<gadget-id> \| ROLE=<r> [LABEL=<l>] [INDEX=<n>])` | Returns that gadget's current text: a string/integer gadget's live value if it has one, otherwise its label. |
 | `MANIFEST` | `<file-path>` | Loads an application's manifest (see below). Replaces any previously loaded one. `RESULT` reports what loaded (`loaded GTApp: 1 windows, 3 gadgets`); a rejected manifest returns `RC=10` with the reason (including line number) in `RESULT`. |
@@ -53,6 +53,7 @@ for disambiguating two same-titled windows on different screens; see
 | `MENU` | `<window-pattern>` | Returns the matched window's full menu strip — every pulldown menu, its items, and (one level deep) their submenu items, with checkit/checked/enabled state and any keyboard shortcut, in the same text shape `AmiInspect` prints. |
 | `MENUPICK` | `<window-pattern> <menu-num> <item-num> [<sub-num>]` | Selects a menu item via its keyboard shortcut (Right-Amiga + the shortcut character) — the numbers are the same 0-based chain positions `MENU`'s own output reports. `RC=20` if the item is disabled or has no keyboard shortcut (pointer-based selection for shortcut-less items isn't built yet). See [Wire Protocol](Wire-Protocol.md#menus) for the full contract. |
 | `DRAG` | `<window-pattern> <locator> <dx> <dy>` or `<window-pattern> <locator> TO (<dest-gadget-id> \| @<dest-name>)` | A genuine press/move/release drag. The offset form (`<dx> <dy>`) moves the gadget's current center by a pixel delta — the natural shape for a slider/scroller. The `TO` form drags onto a second gadget's center instead, both resolved live, for drag-and-drop/reorder — the destination must be in the same window as the source. `<locator>` is the same numeric `GA_ID`, `ROLE=`/`LABEL=`/`INDEX=`, or `@name` form CLICK/TYPE/GETTEXT accept. |
+| `WAITFOR` | `[SCREEN=<s>] WINDOW=<pattern> [TIMEOUT=<n>]` or `[SCREEN=<s>] NOWINDOW=<pattern> [TIMEOUT=<n>]` | Polls (server-side, one round trip) until a window matching `<pattern>` appears, or until none does. `TIMEOUT` defaults to 10 seconds. `RC=15` if the condition never becomes true in time — a new RC distinct from "nothing matched" (`RC=5`) or "the action itself failed" (`RC=20`). See [Wait/expectation primitives](#waitexpectation-primitives). |
 | `AUTH` | `<password>` | Authenticates a TCP connection (no effect on ARexx or serial.device, which have their own implicit trust boundaries). Until it succeeds, the TCP transport refuses every command except `VERSION`/`AUTH`/`QUIT` with `RC=10`. See [Securing TCP](Wire-Protocol.md#securing-tcp). |
 | `QUIT` | (none) | Shuts the commodity down cleanly. |
 
@@ -110,6 +111,47 @@ This is honest and useful, but fragile against relabelling in a way
 one. No match (nothing with that role/label, or `INDEX=` past the
 last match) is `RC=5`, the same class an unmatched `GA_ID` already
 uses.
+
+## Wait/expectation primitives
+
+A naive "click, then immediately check" ordering can race — the app
+hasn't necessarily processed the click's event yet by the time your
+next command runs. `WAITFOR` and `CLICK`'s own `EXPECT=` close that
+race by polling **server-side**, in the same request, instead of the
+script polling over and over from the host:
+
+```rexx
+'WAITFOR WINDOW=Preferences TIMEOUT=15'
+'CLICK GadTools 1 EXPECT=WINDOW=Async TIMEOUT=15'
+'CLICK GadTools 1 EXPECT=NOWINDOW'
+```
+
+`WAITFOR [SCREEN=<substring>] WINDOW=<pattern> [TIMEOUT=<n>]` waits
+for a window matching `<pattern>` to appear; `NOWINDOW=<pattern>`
+waits for none to match. `TIMEOUT` (seconds) defaults to 10.
+
+`CLICK` additionally accepts a trailing `EXPECT=WINDOW=<pattern>` or
+bare `EXPECT=NOWINDOW` (no argument) — the click still always happens
+either way. The two `NOWINDOW` forms mean subtly different things,
+deliberately: `CLICK ... EXPECT=NOWINDOW` means "the window *this
+click itself* just acted on has closed" — precise, because the server
+already knows exactly which window that was. `WAITFOR NOWINDOW=<x>`
+has no click to anchor to, so it means "no window currently matches
+`<x>`" — a fresh search each time, which in principle a different,
+similarly-titled window could satisfy without the original ever
+having closed. Use `CLICK ... EXPECT=NOWINDOW` when you want "the
+thing I just clicked away is gone," and `WAITFOR NOWINDOW=<pattern>`
+when there's no click to anchor to at all.
+
+A condition that never becomes true in time is `RC=15` — a distinct
+RC from "nothing matched at all" (`RC=5`) or "the action's own
+input.device injection failed" (`RC=20`), since none of those mean the
+same thing to a test author deciding how to react.
+
+**Scope today:** only window-appearing/disappearing conditions
+(`WINDOW=`/`NOWINDOW=`) are understood, and only `CLICK` composes with
+`EXPECT=` — `TYPE`/`DRAG`/`MENUPICK` use a separate `WAITFOR` call
+instead. Waiting on a gadget's text/state isn't built yet.
 
 ## Example
 

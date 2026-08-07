@@ -17,9 +17,12 @@
 typedef enum {
     AMIP_AREXX_CMD_UNKNOWN = 0,
     AMIP_AREXX_CMD_TREE,     /* TREE <window-pattern> */
-    AMIP_AREXX_CMD_CLICK,    /* CLICK <window-pattern> <gadget-id> |
-                              * CLICK <window-pattern> ROLE=<r> [LABEL=<l>] [INDEX=<n>] |
-                              * CLICK @<name> */
+    AMIP_AREXX_CMD_CLICK,    /* CLICK <window-pattern> <gadget-id> [EXPECT=...] [TIMEOUT=<n>] |
+                              * CLICK <window-pattern> ROLE=<r> [LABEL=<l>] [INDEX=<n>] [EXPECT=...] [TIMEOUT=<n>] |
+                              * CLICK @<name> [EXPECT=...] [TIMEOUT=<n>]
+                              * -- EXPECT= is "WINDOW=<pattern>" or bare
+                              * "NOWINDOW"; see AmipArexxParse's doc
+                              * comment. */
     AMIP_AREXX_CMD_TYPE,     /* TYPE <window-pattern> <gadget-id> <text...> |
                               * TYPE <window-pattern> ROLE=<r> [LABEL=<l>] [INDEX=<n>] <text...> |
                               * TYPE @<name> <text...> */
@@ -43,6 +46,8 @@ typedef enum {
                               * DRAG @<name> TO (<dest-gadget-id> | @<dest-name>) */
     AMIP_AREXX_CMD_SCREENS,  /* SCREENS */
     AMIP_AREXX_CMD_AUTH,     /* AUTH <password> */
+    AMIP_AREXX_CMD_WAITFOR,  /* WAITFOR [SCREEN=<s>] WINDOW=<pattern> [TIMEOUT=<n>] |
+                              * WAITFOR [SCREEN=<s>] NOWINDOW=<pattern> [TIMEOUT=<n>] */
     AMIP_AREXX_CMD_QUIT      /* QUIT */
 } AmipArexxCmdType;
 
@@ -50,13 +55,20 @@ typedef enum {
  * for this project's sibling apps -- see its userdocs/ARexx-Port.md):
  * 0 success, 5 warning (window/gadget not found -- the command was
  * well-formed but had nothing to act on), 10 error (bad syntax/unknown
- * command), 20 failure (the action itself didn't deliver -- input.device
- * event injection failed). */
+ * command), 15 timeout (WAITFOR/CLICK's EXPECT= -- the condition never
+ * became true within TIMEOUT; distinct from WARN because the command
+ * DID find its target and, for CLICK, the action itself DID happen --
+ * "the click delivered but the expected effect never showed up" is a
+ * genuinely different failure a test author may want to handle
+ * differently from "nothing matched the locator at all"), 20 failure
+ * (the action itself didn't deliver -- input.device event injection
+ * failed). */
 enum {
-    AMIP_AREXX_RC_OK    =  0,
-    AMIP_AREXX_RC_WARN  =  5,
-    AMIP_AREXX_RC_ERROR = 10,
-    AMIP_AREXX_RC_FAIL  = 20
+    AMIP_AREXX_RC_OK      =  0,
+    AMIP_AREXX_RC_WARN    =  5,
+    AMIP_AREXX_RC_ERROR   = 10,
+    AMIP_AREXX_RC_TIMEOUT = 15,
+    AMIP_AREXX_RC_FAIL    = 20
 };
 
 #define AMIP_AREXX_MAX_WINDOW 128
@@ -144,6 +156,55 @@ typedef struct {
                                                     * "TO @<dest-name>"; empty =
                                                     * dragToGadgetId was given
                                                     * directly instead. */
+    int expectMode;                             /* WAITFOR, and CLICK's optional
+                                                  * trailing EXPECT=: 0 = none
+                                                  * (CLICK behaves exactly as
+                                                  * before this field existed);
+                                                  * 1 = WINDOW=<pattern> --  wait
+                                                  * for a window matching
+                                                  * expectPattern to appear
+                                                  * (always a fresh
+                                                  * AmipFindWindow() search,
+                                                  * there being no prior
+                                                  * identity to compare
+                                                  * against); 2 = NOWINDOW --
+                                                  * wait for a window to close.
+                                                  * On WAITFOR this is
+                                                  * NOWINDOW=<pattern>
+                                                  * (expectPattern set, a fresh
+                                                  * AmipFindWindow() search
+                                                  * returning NULL -- an
+                                                  * honest, slightly weaker
+                                                  * guarantee than CLICK's own
+                                                  * form, since a DIFFERENT
+                                                  * window could coincidentally
+                                                  * match the same pattern
+                                                  * later); on CLICK this is
+                                                  * bare NOWINDOW (no argument,
+                                                  * expectPattern unused) --
+                                                  * checked by POINTER IDENTITY
+                                                  * via the exact struct
+                                                  * Window* CLICK itself just
+                                                  * resolved and acted on
+                                                  * (AmipIsWindowOpen(),
+                                                  * action.c), not a pattern
+                                                  * re-search -- the precise
+                                                  * "snapshot the delta"
+                                                  * guarantee docs/
+                                                  * implementation-plan.md's
+                                                  * "Async by design" section
+                                                  * describes. */
+    char expectPattern[AMIP_AREXX_MAX_WINDOW];  /* WAITFOR's WINDOW=/NOWINDOW=
+                                                  * pattern, and CLICK's
+                                                  * EXPECT=WINDOW= pattern;
+                                                  * unused (empty) for CLICK's
+                                                  * bare EXPECT=NOWINDOW. */
+    long expectTimeout;                         /* WAITFOR/CLICK's EXPECT=:
+                                                  * seconds to poll before
+                                                  * giving up (AMIP_AREXX_RC_
+                                                  * TIMEOUT); 0 = use the
+                                                  * server's own default (10s,
+                                                  * amipilotserver/main.c). */
     int argTooLong;                             /* set when some argument didn't
                                                   * fit its field (see the
                                                   * AMIP_AREXX_MAX_* caps above)
@@ -265,6 +326,39 @@ typedef struct {
  * with a stray trailing token.
  *
  * SCREENS takes no arguments, like VERSION/QUIT.
+ *
+ * WAITFOR takes an optional leading "SCREEN=<substring>" (same idiom
+ * as TREE/CLICK/etc.'s own), then exactly one of "WINDOW=<pattern>"
+ * (waits for a window matching <pattern> to appear) or
+ * "NOWINDOW=<pattern>" (waits for no window to match <pattern> --
+ * note this is always a pattern re-search, since a standalone WAITFOR
+ * has no prior action to anchor an exact window identity to), then an
+ * optional trailing "TIMEOUT=<n>" (seconds; default 10 if omitted).
+ * Maps to AMIP_AREXX_RC_OK if the condition becomes true in time,
+ * AMIP_AREXX_RC_TIMEOUT otherwise.
+ *
+ * CLICK's classic and "@name" forms both additionally accept an
+ * optional trailing "EXPECT=WINDOW=<pattern>" or bare
+ * "EXPECT=NOWINDOW" (no argument), plus an optional trailing
+ * "TIMEOUT=<n>" -- same condition vocabulary as WAITFOR, but
+ * EXPECT=NOWINDOW means something more precise than WAITFOR's own
+ * NOWINDOW=<pattern>: it's checked by POINTER IDENTITY against the
+ * exact window CLICK itself just resolved and clicked
+ * (AmipIsWindowOpen(), server/src/action.c), not a fresh pattern
+ * search -- "the window I just acted on is now closed," not "nothing
+ * matches this pattern right now" (a different, weaker claim a
+ * same-titled replacement window could satisfy without the original
+ * ever having closed). This is the atomic "snapshot right after
+ * acting, watch for the exact delta" primitive docs/
+ * implementation-plan.md's "Async by design" section describes --
+ * the click itself still happens regardless of EXPECT=; a timeout
+ * waiting for the expected effect (AMIP_AREXX_RC_TIMEOUT) is reported
+ * distinctly from the click's own injection failing outright
+ * (AMIP_AREXX_RC_FAIL, unchanged). EXPECT=WINDOW=<pattern> does not
+ * get its own nested SCREEN= filter -- searches every screen for the
+ * expected window, a deliberate v1 scope decision. TYPE/DRAG/MENUPICK
+ * don't accept EXPECT= in this pass -- use a separate WAITFOR call
+ * after them instead.
  *
  * AUTH takes a single <password> argument, parsed exactly like
  * MANIFEST's (into the same `path` field). Parseable and answerable
