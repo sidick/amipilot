@@ -2,7 +2,7 @@ Short:        Object-level GUI automation for classic AmigaOS
 Author:       simond@irrelevant.org (Simon Dick)
 Uploader:     simond@irrelevant.org (Simon Dick)
 Type:         util/misc
-Version:      0.3
+Version:      0.4
 Architecture: m68k-amigaos
 Distribution: GitHub only (not yet on Aminet)
 
@@ -16,11 +16,14 @@ assert on the result. This archive has two pieces:
     and states - the platform's first UIA-Inspect / browser element-
     picker equivalent. No host machine, server, or session required.
   - AmiPilotServer: a commodity that hosts the same walker plus a real
-    action engine (click, type, read state) behind a public ARexx port
+    action engine (click, type, drag, read state, launch a subject
+    under test, move files, walk menus) behind a public ARexx port
     and, from 0.3, the same command set over a host-facing wire
-    protocol (serial.device) - so a script running on the SAME Amiga,
-    or a Python client on a host machine, can drive another program's
-    GUI. See "Documentation" below for the full command/wire reference.
+    protocol - serial.device, or (from 0.4) TCP - so a script running
+    on the SAME Amiga, or a Python client on a host machine (over the
+    wire, or now a real serial port directly), can drive another
+    program's GUI. See "Documentation" below for the full command/wire
+    reference.
 
 Features
 --------
@@ -34,19 +37,27 @@ Features
   - BOOPSI/ReAction gadgets: reads the real, live class name
     (button.gadget, checkbox.gadget, layout.gadget, and more) via a
     documented NDK mechanism, and maps known classes to a role.
-  - Genuine input.device event synthesis for clicks and typed text
-    (IECLASS_NEWPOINTERPOS/RAWKEY), not coordinate-level or posted-
-    message shortcuts - driven from an ARexx port (AmiPilotServer) or,
-    from 0.3, the same commands over serial.device from a host Python
-    client.
+  - Genuine input.device event synthesis for clicks, typed text, and
+    (from 0.4) drags (IECLASS_NEWPOINTERPOS/RAWKEY/RAWMOUSE), not
+    coordinate-level or posted-message shortcuts - driven from an
+    ARexx port (AmiPilotServer) or the same commands over serial.device
+    or TCP from a host Python client.
+  - From 0.4: locate a gadget by role and label text, or by position
+    among several matches (ROLE=/LABEL=/INDEX=), not just by numeric ID
+    or a manifest name; drag a gadget by a pixel offset (for a
+    slider/scroller) or onto a second gadget (drag-and-drop/reorder);
+    launch the test subject itself over the wire (LAUNCH); read and
+    manage files inside an allowlisted directory (the file API); walk
+    and select a window's live menu strip (MENU/MENUPICK).
   - Verified against real, unmodified stock AmigaOS software and
     purpose-built conformance fixtures, not just software built for
     this project.
   - Honest, documented limits rather than silent gaps: a few specific,
-    well-understood cases (PLACETEXT_IN button labels, a window.class
-    window's layout.gadget-nested children) are genuinely unreadable at
-    this tier, and AmiInspect says so rather than guessing - see the
-    included guide's "Locator Tiers and Limits" page.
+    well-understood cases (PLACETEXT_IN and PLACETEXT_RIGHT button
+    labels, a window.class window's layout.gadget-nested children) are
+    genuinely unreadable at this tier, and AmiInspect says so rather
+    than guessing - see the included guide's "Locator Tiers and
+    Limits" page.
 
 Requirements
 ------------
@@ -71,6 +82,9 @@ Quick start
                                named AMIPILOT.1 (or the next free slot)
   Run AmiPilotServer SERIAL    also carry the same commands over
                                serial.device, for a host Python client
+  Run AmiPilotServer TCP       also carry the same commands over TCP
+   TCPPORT=6800                (bsdsocket.library), for real hardware
+                               or an emulator with no serial bridge
 
 AI disclosure
 -------------

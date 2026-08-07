@@ -7,7 +7,7 @@ first, then serial.device, then TCP).
 Lands in phase 0.2 onward -- see
 [`docs/implementation-plan.md`](../docs/implementation-plan.md).
 
-## Current state (phase 0.4, in progress)
+## Current state (phase 0.4, shipped in v0.4)
 
 - **The wire (phase 0.3, shipped in v0.3):** the same verb grammar over
   serial.device, framed per [`WIRE.md`](WIRE.md) (this directory) --
@@ -29,7 +29,7 @@ Lands in phase 0.2 onward -- see
   and the pytest plugin's `--amipilot-serial-device`/
   `--amipilot-serial-baud` (optional `pyserial` dependency) --
   see [Wire Protocol](../userdocs/Wire-Protocol.md#connecting-from-a-real-serial-port-host-side).
-- **TCP (phase 0.4, in progress):** the same wire over
+- **TCP (phase 0.4, shipped in v0.4):** the same wire over
   bsdsocket.library, listen-mode -- `src/tcp.c`, enabled with
   `AmiPilotServer TCP TCPPORT=n` (`SERIAL` and `TCP` are independent;
   either or both may be given at once). Readiness is driven by
@@ -71,7 +71,7 @@ Lands in phase 0.2 onward -- see
   outbound connectivity -- is proposed future work, see
   [amipilot#12](https://github.com/sidick/amipilot/issues/12).
 
-- **Securing TCP (phase 0.4, in progress):** `AmipTcpOpen()` binds
+- **Securing TCP (phase 0.4, shipped in v0.4):** `AmipTcpOpen()` binds
   `INADDR_ANY` and accepts any source by default -- fine for a trusted
   LAN, real exposure on anything else given this server can run
   arbitrary shell commands (`LAUNCH`), read/write files inside a
@@ -175,7 +175,7 @@ Lands in phase 0.2 onward -- see
   -- confirmed by the client-side reset/no-reply happening correctly
   while the log stayed empty until `AmiPilotServer` was killed.
 
-- **Program launch (phase 0.4, in progress):** `LAUNCH [STACK=n]
+- **Program launch (phase 0.4, shipped in v0.4):** `LAUNCH [STACK=n]
   <command-line...>` starts an AmigaDOS process from a connected
   session -- so a test can connect first, confirm nothing is running
   yet, and start its own subject over the wire instead of pre-staging
@@ -206,7 +206,7 @@ Lands in phase 0.2 onward -- see
   process is genuinely functional with the non-default stack, not just
   that it didn't immediately crash.
 
-- **File API (phase 0.4, in progress):** `FSLIST`/`FSSTAT`/`FSMKDIR`/
+- **File API (phase 0.4, shipped in v0.4):** `FSLIST`/`FSSTAT`/`FSMKDIR`/
   `FSDELETE`/`FSGET`, each taking a single `<path>` argument (quoted
   the same way a window pattern is if it contains a space) --
   `src/fs.c`. Disabled entirely until the server is started with at
@@ -247,7 +247,7 @@ Lands in phase 0.2 onward -- see
   for-byte, creates and deletes a subdirectory, and confirms `FSLIST
   SYS:` -- outside the granted root -- is rejected rather than served.
 
-- **Menus (phase 0.4, in progress):** `MENU <window-pattern>` walks a
+- **Menus (phase 0.4, shipped in v0.4):** `MENU <window-pattern>` walks a
   window's live `struct Menu`/`struct MenuItem` chain
   (`intuition-model`'s `AmipWalkMenuStrip()`, `intuition-model/src/
   walk.c`) and returns every pulldown menu, its items, and (one level
@@ -294,7 +294,7 @@ Lands in phase 0.2 onward -- see
   fixture's permanently-disabled item is rejected without ever sending
   a keystroke.
 
-- **Tier-2 semantic locators (phase 0.4, in progress):** `CLICK`/`TYPE`/
+- **Tier-2 semantic locators (phase 0.4, shipped in v0.4):** `CLICK`/`TYPE`/
   `GETTEXT`'s classic form accepts a `ROLE=<role>`/`LABEL=<substring>`/
   `INDEX=<n>` locator in place of the bare numeric `<gadget-id>` --
   `docs/implementation-plan.md`'s "Locator tiers" section, tier 2
@@ -322,7 +322,7 @@ Lands in phase 0.2 onward -- see
   pair to disambiguate, not just a single unambiguous instance
   `ROLE=`/`LABEL=` alone could already find.
 
-- **Drag (phase 0.4, in progress):** `DRAG <window-pattern> <locator>
+- **Drag (phase 0.4, shipped in v0.4):** `DRAG <window-pattern> <locator>
   <dx> <dy>` -- a genuine press/move/release drag of the target
   gadget's current center by a pixel offset, the natural shape for
   adjusting a slider/scroller (GadTools `SLIDER_KIND`/`PROP_KIND`,
@@ -367,7 +367,7 @@ Lands in phase 0.2 onward -- see
   a `DRAG` genuinely reached GadTools' real slider-tracking code, not
   just that input.device events were injected.
 
-- **Screens (phase 0.4, in progress):** `SCREENS` (no arguments) lists
+- **Screens (phase 0.4, shipped in v0.4):** `SCREENS` (no arguments) lists
   every open screen -- title, position, size, and whether it's
   frontmost. Every window-targeting verb (`TREE`/`CLICK`/`TYPE`/
   `GETTEXT`/`MENU`/`MENUPICK`'s classic form, not `@name`) additionally
