@@ -747,10 +747,64 @@ class Amipilot:
         to an action you just took; `wait_for_window()`/
         `wait_for_screen()` remain the right tool for polling for a
         window/screen with no accompanying action (they also cover
-        screens, which WAITFOR's condition vocabulary doesn't)."""
+        screens, which WAITFOR's condition vocabulary doesn't). For
+        waiting on a GADGET's text/state rather than a window, use
+        `wait_for_text()`/`wait_for_text_by_role()`/
+        `wait_for_text_by_name()` instead -- that condition needs a
+        gadget locator this method's simple `condition` string doesn't
+        carry."""
         self._run(
             f"WAITFOR {_screen_prefix(screen)}{_render_condition(condition)} "
             f"TIMEOUT={int(timeout)}"
+        )
+
+    def wait_for_text(
+        self,
+        window_pattern: str,
+        gadget_id: int,
+        text: str,
+        *,
+        screen: str | None = None,
+        timeout: float = 10.0,
+    ) -> None:
+        """WAITFOR <window-pattern> <gadget-id> TEXT=<value> [TIMEOUT=<n>]
+        -- polls server-side until the gadget's text (`get_text()`'s
+        own value-or-label convention) EXACTLY equals `text`, or
+        `timeout` elapses. Raises NotFound if the window/gadget
+        doesn't exist, `Timeout` (RC 15) if the text never matches in
+        time. WAITFOR-only -- `click()`'s own `expect=` doesn't have a
+        text form, since the gadget whose text changes after a click
+        is often a different gadget than the one clicked (see
+        `click()`'s own docstring)."""
+        self._run(
+            f"WAITFOR {_screen_prefix(screen)}{_quote(window_pattern)} {gadget_id} "
+            f"TEXT={_quote(text)} TIMEOUT={int(timeout)}"
+        )
+
+    def wait_for_text_by_name(self, name: str, text: str, *, timeout: float = 10.0) -> None:
+        """WAITFOR @<name> TEXT=<value> [TIMEOUT=<n>] -- the manifest-
+        locator form of `wait_for_text()`; requires a manifest loaded
+        first via `manifest()`."""
+        self._run(f"WAITFOR @{name} TEXT={_quote(text)} TIMEOUT={int(timeout)}")
+
+    def wait_for_text_by_role(
+        self,
+        window_pattern: str,
+        text: str,
+        *,
+        role: str | None = None,
+        label: str | None = None,
+        index: int = 0,
+        screen: str | None = None,
+        timeout: float = 10.0,
+    ) -> None:
+        """WAITFOR <window-pattern> ROLE=<r> [LABEL=<l>] [INDEX=<n>]
+        TEXT=<value> [TIMEOUT=<n>] -- the tier-2 locator form of
+        `wait_for_text()`; see `click_by_role()` for the locator
+        semantics."""
+        self._run(
+            f"WAITFOR {_screen_prefix(screen)}{_quote(window_pattern)} "
+            f"{_role_locator(role, label, index)} TEXT={_quote(text)} TIMEOUT={int(timeout)}"
         )
 
     def quit(self) -> None:

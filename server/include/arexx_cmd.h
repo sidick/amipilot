@@ -47,7 +47,9 @@ typedef enum {
     AMIP_AREXX_CMD_SCREENS,  /* SCREENS */
     AMIP_AREXX_CMD_AUTH,     /* AUTH <password> */
     AMIP_AREXX_CMD_WAITFOR,  /* WAITFOR [SCREEN=<s>] WINDOW=<pattern> [TIMEOUT=<n>] |
-                              * WAITFOR [SCREEN=<s>] NOWINDOW=<pattern> [TIMEOUT=<n>] */
+                              * WAITFOR [SCREEN=<s>] NOWINDOW=<pattern> [TIMEOUT=<n>] |
+                              * WAITFOR [SCREEN=<s>] <window-pattern> (<gadget-id> | ROLE=<r> [LABEL=<l>] [INDEX=<n>]) TEXT=<value> [TIMEOUT=<n>] |
+                              * WAITFOR @<name> TEXT=<value> [TIMEOUT=<n>] */
     AMIP_AREXX_CMD_QUIT      /* QUIT */
 } AmipArexxCmdType;
 
@@ -193,12 +195,37 @@ typedef struct {
                                                   * guarantee docs/
                                                   * implementation-plan.md's
                                                   * "Async by design" section
-                                                  * describes. */
+                                                  * describes; 3 = TEXT=<value>
+                                                  * -- WAITFOR only (not
+                                                  * CLICK's EXPECT=): wait for
+                                                  * a gadget's text (the same
+                                                  * value-or-label convention
+                                                  * GETTEXT itself uses) to
+                                                  * EXACTLY equal expectText.
+                                                  * The gadget is located via
+                                                  * this same struct's
+                                                  * windowPattern/gadgetId/
+                                                  * gadgetLocatorMode/
+                                                  * roleName/labelSubstring/
+                                                  * locatorIndex/manifestName
+                                                  * fields -- WAITFOR's TEXT=
+                                                  * form falls through into
+                                                  * exactly the same window-
+                                                  * pattern-or-@name +
+                                                  * gadget-locator parsing
+                                                  * CLICK/TYPE/GETTEXT/DRAG
+                                                  * already share, rather than
+                                                  * duplicating it. */
     char expectPattern[AMIP_AREXX_MAX_WINDOW];  /* WAITFOR's WINDOW=/NOWINDOW=
                                                   * pattern, and CLICK's
                                                   * EXPECT=WINDOW= pattern;
                                                   * unused (empty) for CLICK's
-                                                  * bare EXPECT=NOWINDOW. */
+                                                  * bare EXPECT=NOWINDOW and
+                                                  * for WAITFOR's TEXT= form. */
+    char expectText[AMIP_AREXX_MAX_TEXT];       /* WAITFOR's TEXT=<value>
+                                                  * token (expectMode == 3
+                                                  * only); quotable the same
+                                                  * as a window pattern. */
     long expectTimeout;                         /* WAITFOR/CLICK's EXPECT=:
                                                   * seconds to poll before
                                                   * giving up (AMIP_AREXX_RC_
@@ -328,14 +355,31 @@ typedef struct {
  * SCREENS takes no arguments, like VERSION/QUIT.
  *
  * WAITFOR takes an optional leading "SCREEN=<substring>" (same idiom
- * as TREE/CLICK/etc.'s own), then exactly one of "WINDOW=<pattern>"
- * (waits for a window matching <pattern> to appear) or
- * "NOWINDOW=<pattern>" (waits for no window to match <pattern> --
- * note this is always a pattern re-search, since a standalone WAITFOR
- * has no prior action to anchor an exact window identity to), then an
- * optional trailing "TIMEOUT=<n>" (seconds; default 10 if omitted).
- * Maps to AMIP_AREXX_RC_OK if the condition becomes true in time,
- * AMIP_AREXX_RC_TIMEOUT otherwise.
+ * as TREE/CLICK/etc.'s own), then one of three condition forms:
+ *   - "WINDOW=<pattern>" -- waits for a window matching <pattern> to
+ *     appear.
+ *   - "NOWINDOW=<pattern>" -- waits for no window to match <pattern>
+ *     (always a fresh pattern re-search each poll, since a standalone
+ *     WAITFOR has no prior action to anchor an exact window identity
+ *     to -- see CLICK's own EXPECT=NOWINDOW below for the identity-
+ *     based alternative).
+ *   - <window-pattern> (or "@<name>") followed by a gadget locator
+ *     (numeric <gadget-id>, or ROLE=/LABEL=/INDEX=, exactly like
+ *     CLICK/TYPE/GETTEXT/DRAG's own -- this form falls through into
+ *     that same shared parsing code) followed by "TEXT=<value>" --
+ *     waits for the gadget's text (GETTEXT's own value-or-label
+ *     convention) to EXACTLY equal <value>. WAITFOR-only, not
+ *     available as one of CLICK's own EXPECT= conditions: the gadget
+ *     whose text changes as a result of a click is often a DIFFERENT
+ *     gadget than the one clicked, which would need a second,
+ *     independent locator embedded inside EXPECT= -- real added
+ *     complexity, deferred rather than silently built partway.
+ * Then an optional trailing "TIMEOUT=<n>" (seconds; default 10 if
+ * omitted) on any form. Maps to AMIP_AREXX_RC_OK if the condition
+ * becomes true in time, AMIP_AREXX_RC_TIMEOUT otherwise -- or
+ * AMIP_AREXX_RC_WARN, same as CLICK/TYPE/GETTEXT, if the TEXT= form's
+ * window/gadget locator itself doesn't resolve to anything (a
+ * different failure than "found it but the text never matched").
  *
  * CLICK's classic and "@name" forms both additionally accept an
  * optional trailing "EXPECT=WINDOW=<pattern>" or bare

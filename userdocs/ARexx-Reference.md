@@ -53,7 +53,7 @@ for disambiguating two same-titled windows on different screens; see
 | `MENU` | `<window-pattern>` | Returns the matched window's full menu strip — every pulldown menu, its items, and (one level deep) their submenu items, with checkit/checked/enabled state and any keyboard shortcut, in the same text shape `AmiInspect` prints. |
 | `MENUPICK` | `<window-pattern> <menu-num> <item-num> [<sub-num>]` | Selects a menu item via its keyboard shortcut (Right-Amiga + the shortcut character) — the numbers are the same 0-based chain positions `MENU`'s own output reports. `RC=20` if the item is disabled or has no keyboard shortcut (pointer-based selection for shortcut-less items isn't built yet). See [Wire Protocol](Wire-Protocol.md#menus) for the full contract. |
 | `DRAG` | `<window-pattern> <locator> <dx> <dy>` or `<window-pattern> <locator> TO (<dest-gadget-id> \| @<dest-name>)` | A genuine press/move/release drag. The offset form (`<dx> <dy>`) moves the gadget's current center by a pixel delta — the natural shape for a slider/scroller. The `TO` form drags onto a second gadget's center instead, both resolved live, for drag-and-drop/reorder — the destination must be in the same window as the source. `<locator>` is the same numeric `GA_ID`, `ROLE=`/`LABEL=`/`INDEX=`, or `@name` form CLICK/TYPE/GETTEXT accept. |
-| `WAITFOR` | `[SCREEN=<s>] WINDOW=<pattern> [TIMEOUT=<n>]` or `[SCREEN=<s>] NOWINDOW=<pattern> [TIMEOUT=<n>]` | Polls (server-side, one round trip) until a window matching `<pattern>` appears, or until none does. `TIMEOUT` defaults to 10 seconds. `RC=15` if the condition never becomes true in time — a new RC distinct from "nothing matched" (`RC=5`) or "the action itself failed" (`RC=20`). See [Wait/expectation primitives](#waitexpectation-primitives). |
+| `WAITFOR` | `[SCREEN=<s>] WINDOW=<pattern> [TIMEOUT=<n>]` or `[SCREEN=<s>] NOWINDOW=<pattern> [TIMEOUT=<n>]` or `[SCREEN=<s>] <window-pattern> (<gadget-id> \| ROLE=<r> [LABEL=<l>] [INDEX=<n>]) TEXT=<value> [TIMEOUT=<n>]` or `@<name> TEXT=<value> [TIMEOUT=<n>]` | Polls (server-side, one round trip) until a window matching `<pattern>` appears, until none does, or until a gadget's text exactly equals `<value>`. `TIMEOUT` defaults to 10 seconds. `RC=15` if the condition never becomes true in time — a new RC distinct from "nothing matched" (`RC=5`) or "the action itself failed" (`RC=20`). See [Wait/expectation primitives](#waitexpectation-primitives). |
 | `AUTH` | `<password>` | Authenticates a TCP connection (no effect on ARexx or serial.device, which have their own implicit trust boundaries). Until it succeeds, the TCP transport refuses every command except `VERSION`/`AUTH`/`QUIT` with `RC=10`. See [Securing TCP](Wire-Protocol.md#securing-tcp). |
 | `QUIT` | (none) | Shuts the commodity down cleanly. |
 
@@ -148,10 +148,29 @@ RC from "nothing matched at all" (`RC=5`) or "the action's own
 input.device injection failed" (`RC=20`), since none of those mean the
 same thing to a test author deciding how to react.
 
-**Scope today:** only window-appearing/disappearing conditions
-(`WINDOW=`/`NOWINDOW=`) are understood, and only `CLICK` composes with
-`EXPECT=` — `TYPE`/`DRAG`/`MENUPICK` use a separate `WAITFOR` call
-instead. Waiting on a gadget's text/state isn't built yet.
+`WAITFOR` also has a third condition, for waiting on a gadget's
+*text* rather than a window:
+
+```rexx
+'CLICK GadTools 4'
+'WAITFOR GadTools 2 TEXT="cancel clicked" TIMEOUT=15'
+'WAITFOR @host_field TEXT="hello wire" TIMEOUT=15'
+```
+
+`WAITFOR [SCREEN=<s>] <window-pattern> (<gadget-id> | ROLE=<r>
+[LABEL=<l>] [INDEX=<n>]) TEXT=<value> [TIMEOUT=<n>]` (or `WAITFOR
+@<name> TEXT=<value>`) polls the same gadget-text `GETTEXT` would read
+until it exactly equals `<value>` — not a substring match, since a
+partial match could be satisfied by an intermediate state on the way
+to the final one (e.g. "loading..." matching before "loaded" does).
+This condition is `WAITFOR`-only, not available on `CLICK`'s
+`EXPECT=`, because the gadget whose text changes as a result of a
+click is often a *different* gadget than the one clicked.
+
+**Scope today:** `WINDOW=`/`NOWINDOW=`/`TEXT=` conditions are
+understood, and only `CLICK` composes with `EXPECT=` (`WINDOW=`/
+`NOWINDOW=` only, not `TEXT=`) — `TYPE`/`DRAG`/`MENUPICK` callers, and
+anyone wanting a `TEXT=` wait, use a separate `WAITFOR` call instead.
 
 ## Example
 

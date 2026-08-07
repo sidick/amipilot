@@ -273,7 +273,19 @@ class ClickExpect(unittest.TestCase):
             c.click("GadTools", 1, expect="window:Async Dialog")
 
 
-class WaitFor(unittest.TestCase):
+class WaitForVerb(unittest.TestCase):
+    """Tests for the WAITFOR wire verb (wait_for()/wait_for_text*()) --
+    named distinctly from the pre-existing WaitFor class below (which
+    predates phase 0.5 and tests the host-side wait_for_window()/
+    wait_for_screen() polling helpers instead). A prior version of this
+    class was ALSO named WaitFor, which silently shadowed the other
+    one in this module's namespace -- unittest/pytest class discovery
+    reads the module's own attribute dict, so only the LAST `class
+    WaitFor` binding a module defines is ever collected; the other's
+    tests never ran at all despite the suite reporting green. Caught
+    via `pytest --collect-only`, not by a failing test (there wasn't
+    one -- that's what made it dangerous)."""
+
     def test_wait_for_window(self):
         c = client_with(b"RC 0 0\n")
         c.wait_for("window:Async Dialog")
@@ -301,6 +313,48 @@ class WaitFor(unittest.TestCase):
         c = client_with(b"RC 15 %d\n%s" % (len(payload), payload))
         with self.assertRaises(Timeout):
             c.wait_for("window:Async Dialog")
+
+    def test_wait_for_text(self):
+        c = client_with(b"RC 0 0\n")
+        c.wait_for_text("GadTools", 2, "hello wire")
+        self.assertEqual(
+            c._wire._t.sent[0],
+            b'WAITFOR GadTools 2 TEXT="hello wire" TIMEOUT=10\n',
+        )
+
+    def test_wait_for_text_honours_screen_and_timeout(self):
+        c = client_with(b"RC 0 0\n")
+        c.wait_for_text("GadTools", 2, "hello wire", screen="Workbench", timeout=3)
+        self.assertEqual(
+            c._wire._t.sent[0],
+            b'WAITFOR SCREEN=Workbench GadTools 2 TEXT="hello wire" TIMEOUT=3\n',
+        )
+
+    def test_wait_for_text_by_name(self):
+        c = client_with(b"RC 0 0\n")
+        c.wait_for_text_by_name("host_field", "hello wire")
+        self.assertEqual(
+            c._wire._t.sent[0], b'WAITFOR @host_field TEXT="hello wire" TIMEOUT=10\n'
+        )
+
+    def test_wait_for_text_by_role(self):
+        c = client_with(b"RC 0 0\n")
+        c.wait_for_text_by_role("GadTools", "hello wire", role="string", label="Host")
+        self.assertEqual(
+            c._wire._t.sent[0],
+            b'WAITFOR GadTools ROLE=string LABEL=Host TEXT="hello wire" TIMEOUT=10\n',
+        )
+
+    def test_wait_for_text_timeout_raises(self):
+        payload = b"condition never became true"
+        c = client_with(b"RC 15 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(Timeout):
+            c.wait_for_text("GadTools", 2, "hello wire")
+
+    def test_wait_for_text_not_found_raises(self):
+        c = client_with(b"RC 5 11\nnot matched")
+        with self.assertRaises(NotFound):
+            c.wait_for_text("Gone", 2, "hello wire")
 
 
 class RcMapping(unittest.TestCase):

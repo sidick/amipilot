@@ -403,11 +403,30 @@ Lands in phase 0.2 onward -- see
   second connection to starve), which is the actual point: this closes
   the classic click-then-check race a host-side poll loop can still
   lose on a fast transition, not just a convenience wrapper around one.
-  **Scope for this pass:** only `WINDOW=`/`NOWINDOW=` conditions, and
-  only `CLICK` composes with `EXPECT=` -- `TYPE`/`DRAG`/`MENUPICK`
-  callers use a separate `WAITFOR` call instead. Gadget-text/state
-  waiting isn't built -- a real, documented follow-up, not a silent
-  gap.
+
+  `WAITFOR` also takes a third condition form for gadget state:
+  `WAITFOR [SCREEN=<s>] <window-pattern> (<gadget-id> | ROLE=<r>
+  [LABEL=<l>] [INDEX=<n>]) TEXT=<value> [TIMEOUT=<n>]` (or `WAITFOR
+  @<name> TEXT=<value>`) polls until a gadget's text (`GETTEXT`'s own
+  value-or-label convention) EXACTLY equals `<value>`. This falls
+  through into the exact same window-pattern-or-`@name` + gadget-
+  locator parsing `CLICK`/`TYPE`/`GETTEXT`/`DRAG` already share, rather
+  than a second copy of it, and reuses `GETTEXT`'s own text-reading
+  logic (`FindGadgetText()`) for the comparison -- no new reading
+  path, just a poll loop around the existing one. `TEXT=` matching is
+  exact, not substring: a partial match could be satisfied by an
+  intermediate, not-yet-final state (e.g. matching both "loading..."
+  and "loaded"), a subtler footgun for a wait condition specifically.
+
+  **Scope for this pass:** `WINDOW=`/`NOWINDOW=`/`TEXT=` conditions,
+  and only `CLICK` composes with `EXPECT=` (`WINDOW=`/`NOWINDOW=`
+  only, not `TEXT=`) -- `TYPE`/`DRAG`/`MENUPICK` callers, and anyone
+  wanting a `TEXT=` wait, use a separate `WAITFOR` call instead.
+  `CLICK`'s own `EXPECT=` doesn't get a `TEXT=` form: the gadget whose
+  text changes as a result of a click is often a DIFFERENT gadget than
+  the one clicked (e.g. a status label), which would need a second,
+  independent locator embedded inside `EXPECT=` -- real added
+  complexity, deferred rather than silently built partway.
 
   `fixtures/gadtools-app` carries a button (`Open Req`) whose
   `IDCMP_GADGETUP` handler doesn't open a second window until a full
