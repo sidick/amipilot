@@ -510,6 +510,48 @@ class Connect(unittest.TestCase):
                 Amipilot.connect("127.0.0.1", 1234, password="wrong")
 
 
+class ConnectSerial(unittest.TestCase):
+    """Amipilot.connect_serial() -- same AUTH/close-on-failure contract
+    as Connect above, just over WireClient.connect_serial() instead of
+    connect(). Patches out connect_serial() itself so these run with no
+    pyserial installed (an optional dependency)."""
+
+    def test_sends_auth_with_default_password(self):
+        version_payload = (
+            b"AMIPILOT 0.3 PROTOCOL 1\n"
+            b"STABLE VERSION\n"
+            b"EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST QUIT\n"
+        )
+        c = client_with(b"RC 0 %d\n%s" % (len(version_payload), version_payload),
+                         b"RC 0 0\n")  # VERSION, then AUTH
+        with mock.patch.object(WireClient, "connect_serial", lambda *a, **kw: c._wire):
+            Amipilot.connect_serial("/dev/fake0", 19200)
+        self.assertEqual(c._wire._t.sent[0], b"VERSION\n")
+        self.assertEqual(c._wire._t.sent[1], b"AUTH amipilot\n")
+
+    def test_malformed_handshake_closes_transport(self):
+        garbage_payload = b"not a valid VERSION payload\n"
+        c = client_with(b"RC 0 %d\n%s" % (len(garbage_payload), garbage_payload))
+        with mock.patch.object(WireClient, "connect_serial", lambda *a, **kw: c._wire):
+            with self.assertRaises(WireError):
+                Amipilot.connect_serial("/dev/fake0", 19200)
+        self.assertTrue(c._wire._t.closed)
+
+    def test_wrong_password_raises_and_closes(self):
+        version_payload = (
+            b"AMIPILOT 0.3 PROTOCOL 1\n"
+            b"STABLE VERSION\n"
+            b"EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST QUIT\n"
+        )
+        auth_payload = b"authentication failed: wrong password"
+        c = client_with(b"RC 0 %d\n%s" % (len(version_payload), version_payload),
+                         b"RC 10 %d\n%s" % (len(auth_payload), auth_payload))
+        with mock.patch.object(WireClient, "connect_serial", lambda *a, **kw: c._wire):
+            with self.assertRaises(CommandError):
+                Amipilot.connect_serial("/dev/fake0", 19200, password="wrong")
+        self.assertTrue(c._wire._t.closed)
+
+
 class FakeSocket:
     """A connected-socket stand-in for connect_with_retry's post-
     connect path: settimeout/sendall/recv/close, no real TCP. `chunks`

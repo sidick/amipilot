@@ -5,21 +5,32 @@ the emulator in CI").
 
 Auto-registered once `host/` is installed (pyproject.toml's
 `[project.entry-points.pytest11]`). Provides one fixture, `amipilot`
-(session-scoped): boots a Copperline config that already stages
-`AmiPilotServer SERIAL` (e.g. via the target's `S:User-Startup`, same
-technique `tests/copperline/run.sh` uses), waits for the wire transport
-to answer, connects, and hands the test a live `Amipilot` client.
+(session-scoped), with two mutually exclusive connection modes:
 
-Nothing here is emulator-specific beyond invoking the `copperline` /
-`copperline-ctl` binaries documented in Copperline's own headless-mode
-guide -- this plugin doesn't know or care what the guest is running,
-same as the rest of the host client.
+- **Copperline** (the default shape): boots a Copperline config that
+  already stages `AmiPilotServer SERIAL` (e.g. via the target's
+  `S:User-Startup`, same technique `tests/copperline/run.sh` uses),
+  waits for the wire transport to answer, connects, and hands the
+  test a live `Amipilot` client. Nothing here is emulator-specific
+  beyond invoking the `copperline`/`copperline-ctl` binaries
+  documented in Copperline's own headless-mode guide.
+- **Real serial** (`--amipilot-serial-device`/`amipilot_serial_device`):
+  connects directly over a real (or virtual) serial port -- no
+  Copperline process involved at all -- for real Amiga hardware over
+  a real cable, or a Copperline config that itself uses a real serial
+  device instead of `[serial] mode = "tcp"`. Whatever's on the other
+  end must already be running `AmiPilotServer SERIAL` with a matching
+  `SERDEVICE`/`SERUNIT`/`BAUD` (server/README.md) -- this mode starts
+  nothing, it only connects. Requires `pyserial` (`pip install
+  amipilot[serial]`).
 
-Configuration is machine-specific (a real Kickstart ROM, a Workbench
-install with the test's fixture staged), so a test using `amipilot`
-SKIPS cleanly -- not a false pass -- when `--amipilot-config` /
-`amipilot_config` isn't set, exactly like `make test-target` skips
-without `tests/copperline/copperline.local.toml`.
+Configuration is machine-specific (a real Kickstart ROM and staged
+Workbench install for Copperline; a real cable and a running server
+for real serial), so a test using `amipilot` SKIPS cleanly -- not a
+false pass -- when neither `--amipilot-config` nor
+`--amipilot-serial-device` (nor their ini equivalents) is set, exactly
+like `make test-target` skips without
+`tests/copperline/copperline.local.toml`.
 """
 
 from __future__ import annotations
@@ -76,6 +87,25 @@ def pytest_addoption(parser: "pytest.Parser") -> None:
         default=60.0,
         help="seconds to wait for boot + wire handshake (default 60)",
     )
+    group.addoption(
+        "--amipilot-serial-device",
+        action="store",
+        default=None,
+        help="connect directly over this serial device instead of "
+             "booting Copperline -- e.g. for real Amiga hardware, or a "
+             "Copperline config using a real serial device (see the "
+             "module docstring's 'Real serial' mode). Mutually "
+             "exclusive with --amipilot-config; whichever is set wins. "
+             "Requires pyserial (pip install amipilot[serial]).",
+    )
+    group.addoption(
+        "--amipilot-serial-baud",
+        action="store",
+        type=int,
+        default=19200,
+        help="baud rate for --amipilot-serial-device (default 19200, "
+             "matching AmiPilotServer's own BAUD default)",
+    )
 
     parser.addini("amipilot_config", "same as --amipilot-config", default=None)
     parser.addini(
@@ -84,6 +114,13 @@ def pytest_addoption(parser: "pytest.Parser") -> None:
         "--control are added automatically)",
         default=_DEFAULT_COPPERLINE_ARGS,
     )
+    parser.addini("amipilot_serial_device", "same as --amipilot-serial-device", default=None)
+    # No ini for amipilot_serial_baud, matching --amipilot-boot-timeout/
+    # --amipilot-wire-port's own precedent: _option() only ever falls
+    # through to getini() when getoption() returns None/"" (see
+    # _option() below), and --amipilot-serial-baud always has a real
+    # default (19200), so an ini entry here could never actually be
+    # reached -- dead config surface, not added.
 
 
 def _option(request: "pytest.FixtureRequest", name: str, ini_name: str | None = None):
@@ -199,10 +236,37 @@ def _connect_with_retry(host: str, port: int, deadline: float) -> Amipilot:
 
 @pytest.fixture(scope="session")
 def amipilot(request: "pytest.FixtureRequest", tmp_path_factory) -> Amipilot:
-    """A live `Amipilot` client connected to a Copperline guest booted
-    from `--amipilot-config`. Session-scoped: one emulator boot serves
-    the whole test session (matching the wire's own "one test session
-    at a time" model, server/WIRE.md). Skips cleanly if unconfigured."""
+    """A live `Amipilot` client, either connected directly over a real
+    serial port (`--amipilot-serial-device`) or to a Copperline guest
+    this fixture boots itself (`--amipilot-config`) -- see the module
+    docstring's two connection modes. Session-scoped: one connection
+    (or one emulator boot) serves the whole test session, matching the
+    wire's own "one test session at a time" model (server/WIRE.md).
+    Skips cleanly if neither mode is configured; raises immediately
+    (not a skip -- this is a config mistake, not an absent optional
+    setup) if both are, since only one connection can win and silently
+    picking one over the other could mask which config the caller
+    actually meant to use."""
+    serial_device = _option(request, "--amipilot-serial-device", "amipilot_serial_device")
+    config = _option(request, "--amipilot-config", "amipilot_config")
+    if serial_device and config:
+        raise pytest.UsageError(
+            "--amipilot-serial-device and --amipilot-config (or their ini "
+            "equivalents) are mutually exclusive -- set only one"
+        )
+
+    if serial_device:
+        baud = _option(request, "--amipilot-serial-baud")
+        timeout = _option(request, "--amipilot-boot-timeout")
+        client = Amipilot.connect_serial(serial_device, int(baud), timeout=timeout)
+        yield client
+        try:
+            client.quit()
+        except Exception:
+            pass
+        client.close()
+        return
+
     port = _option(request, "--amipilot-wire-port")
     timeout = _option(request, "--amipilot-boot-timeout")
 

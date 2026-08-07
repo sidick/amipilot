@@ -51,6 +51,41 @@ own network reachable from the host — Copperline's `[hostsocket]`
 board bridged to a real or virtual adapter, or a real Amiga with
 TCP/IP on the LAN.
 
+### Connecting from a real serial port (host side)
+
+The Copperline-bridge path above is convenience, not the only option
+— `host/amipilot` can also connect directly over a real (or virtual)
+serial port on the host machine, no TCP bridge involved at all. This
+is what you need for **real Amiga hardware** over a real cable, or a
+Copperline config that itself uses a real serial device instead of
+`[serial] mode = "tcp"`. Requires the optional `pyserial` dependency
+(`pip install amipilot[serial]`) — everything else about `amipilot`
+works with no `pyserial` installed at all.
+
+```python
+from amipilot import Amipilot
+
+client = Amipilot.connect_serial("/dev/tty.usbserial-1420", 19200)
+```
+
+`device` is OS-specific — `/dev/tty.usbserial-*` on macOS,
+`/dev/ttyUSB0`/`/dev/ttyS0` on Linux, `COM3` on Windows. `baud` must
+match whatever `AmiPilotServer SERIAL` was actually started with on
+the Amiga side — `BAUD` in the table above, default `19200` on both
+ends. This is genuinely the same wire, the same verbs, the same RC
+semantics as the TCP path; only the transport differs.
+
+Under pytest, the `amipilot` fixture (see
+[Building and Testing](Building-and-Testing.md)) takes the same
+config via `--amipilot-serial-device`/`--amipilot-serial-baud` (or the
+`amipilot_serial_device` ini setting) instead of `--amipilot-config` —
+whichever one is set is what the fixture connects with; setting both
+is a configuration mistake and fails immediately rather than silently
+picking one. Unlike the Copperline path, this mode doesn't boot or
+manage any process itself — whatever's on the other end of the cable
+must already be running `AmiPilotServer SERIAL` before the test
+session starts.
+
 ## Talking to it
 
 Send one command per line (LF-terminated; CRLF is fine). Every command

@@ -14,6 +14,11 @@ dependencies = []
 
 [project.optional-dependencies]
 test = ["pytest"]
+# Only needed for WireClient.connect_serial()/Amipilot.connect_serial()
+# (a real/virtual serial port instead of Copperline's TCP bridge) --
+# imported lazily there, not at module load, so the stdlib-only base
+# install above stays true for everyone who doesn't need it.
+serial = ["pyserial"]
 
 [project.scripts]
 amipilot = "amipilot.__main__:main"

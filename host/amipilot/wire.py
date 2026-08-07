@@ -13,7 +13,13 @@ The client is transport-agnostic: it drives any object with
 ``sendall(bytes)`` and ``recv(n) -> bytes`` (a real socket to
 Copperline's ``[serial] mode = "tcp"`` bridge, a pyserial wrapper, a
 test double). ``WireClient.connect()`` is the TCP convenience
-constructor.
+constructor; ``WireClient.connect_serial()`` is the real-serial-port
+one (real Amiga hardware, or a Copperline config using a real/virtual
+serial device instead of ``[serial] mode = "tcp"``) -- see its own
+docstring. Server-side, ``AmiPilotServer``'s own ``SERIAL``/
+``SERDEVICE``/``SERUNIT``/``BAUD`` startup arguments are the matching
+half of this (server/README.md); both sides need to agree on device/
+baud, same as any real serial link.
 """
 
 from __future__ import annotations
@@ -74,6 +80,45 @@ class ServerInfo:
     experimental: list[str] = field(default_factory=list)
 
 
+class _SerialTransport:
+    """Adapts a pyserial ``Serial`` object (``.write(bytes)``/
+    ``.read(n)``) to the ``sendall(bytes)``/``recv(n) -> bytes``
+    protocol ``WireClient`` drives -- the only transport-specific glue
+    a real serial port needs; framing/RC handling is identical to TCP.
+
+    ``recv()`` raises ``TimeoutError`` (not the empty ``b""`` pyserial
+    itself returns) when the port's own read timeout elapses with
+    nothing received. This matters: ``WireClient._recv()`` treats an
+    empty ``recv()`` as "the peer closed the connection" (the correct
+    reading for a TCP socket, where recv() truly can't return empty
+    for any other reason) and raises ``WireError`` accordingly -- but
+    for a serial port, empty almost always means "nothing arrived
+    within the timeout," a different and more actionable condition
+    (wrong device/baud, AmiPilotServer not running SERIAL, a dead
+    cable) that deserves its own clear exception rather than being
+    misreported as a graceful close that never actually happened."""
+
+    def __init__(self, ser):
+        self._ser = ser
+
+    def sendall(self, data: bytes) -> None:
+        self._ser.write(data)
+
+    def recv(self, n: int) -> bytes:
+        data = self._ser.read(n)
+        if not data:
+            raise TimeoutError(
+                f"no data received on {self._ser.port} within "
+                f"{self._ser.timeout}s -- check AmiPilotServer is running "
+                "SERIAL on the Amiga side with a matching SERDEVICE/"
+                "SERUNIT/BAUD (server/README.md)"
+            )
+        return data
+
+    def close(self) -> None:
+        self._ser.close()
+
+
 class WireClient:
     def __init__(self, transport):
         self._t = transport
@@ -84,6 +129,38 @@ class WireClient:
         """Connect to a TCP byte-stream carrying the wire -- e.g.
         Copperline's serial bridge (default 127.0.0.1:1234)."""
         return cls(socket.create_connection((host, port), timeout=timeout))
+
+    @classmethod
+    def connect_serial(cls, device: str, baud: int = 19200, *, timeout: float = 10.0) -> "WireClient":
+        """Connect over a real (or virtual) serial port -- for driving
+        real Amiga hardware over a real cable, or a Copperline config
+        using a real/virtual serial device instead of ``[serial] mode
+        = "tcp"``. `device` is OS-specific (e.g. ``/dev/tty.usbserial-*``
+        on macOS, ``/dev/ttyUSB0`` on Linux, ``COM3`` on Windows);
+        `baud` must match the Amiga side's own `BAUD` (default 19200,
+        the same default both here and `AmiPilotServer`'s own
+        `SERDEVICE`/`SERUNIT`/`BAUD` startup arguments use --
+        server/README.md). `timeout` is the per-read timeout (seconds)
+        -- a real serial link has no TCP-style "connection", so unlike
+        `connect()` this doesn't bound how long the OPEN itself takes
+        (opening a local device file is effectively instant); it bounds
+        how long each subsequent read waits before raising
+        `TimeoutError` (see `_SerialTransport`).
+
+        Requires `pyserial`, an optional dependency (`pip install
+        amipilot[serial]`) -- this project is stdlib-only otherwise
+        (pyproject.toml), so the import is deferred to here rather than
+        module level, and everything else keeps working with no
+        pyserial installed at all."""
+        try:
+            import serial
+        except ImportError as e:
+            raise RuntimeError(
+                "connect_serial() requires pyserial -- install with "
+                "'pip install amipilot[serial]' (or 'pip install pyserial')"
+            ) from e
+        ser = serial.Serial(device, baud, timeout=timeout)
+        return cls(_SerialTransport(ser))
 
     def close(self) -> None:
         close = getattr(self._t, "close", None)
