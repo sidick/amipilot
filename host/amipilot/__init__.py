@@ -9,7 +9,7 @@
 The pytest plugin (emulator-booting fixtures) lands on top of this.
 """
 
-from .client import ActionFailed, Amipilot, AmipilotError, CommandError, NotFound
+from .client import ActionFailed, Amipilot, AmipilotError, CommandError, NotFound, Timeout
 from .fs import FsEntry, FsParseError
 from .menu import Menu, MenuItem, MenuParseError, MenuStrip
 from .model import Gadget, TreeParseError, Window
@@ -34,6 +34,7 @@ __all__ = [
     "Screen",
     "ScreenParseError",
     "ServerInfo",
+    "Timeout",
     "TreeParseError",
     "WireClient",
     "WireError",

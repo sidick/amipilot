@@ -232,7 +232,7 @@ class Amipilot:
         host: str,
         port: int,
         deadline_seconds: float = 60.0,
-        connect_timeout: float = 5.0,
+        connect_timeout: float = 15.0,
         *,
         password: str = DEFAULT_TCP_PASSWORD,
     ) -> "Amipilot":
@@ -240,6 +240,27 @@ class Amipilot:
         or flaky link can show (server/WIRE.md's transport is young
         enough that callers still hit these by hand rather than
         through a purpose-built retry path -- this is that path):
+
+        `connect_timeout` does double duty, matching `WireClient.
+        connect()`'s own `timeout` parameter: it bounds each individual
+        connection attempt below, AND becomes the returned client's
+        ongoing per-command socket read timeout for its whole
+        lifetime (reset right before returning -- see the comment at
+        that reset for why). Pass something comfortably larger than
+        the longest `WAITFOR`/`CLICK(expect=...)` `TIMEOUT=` (or
+        `wait_for()`/`click(expect=...)`'s own `timeout=`) any caller
+        on this connection intends to use -- the default of 15s has
+        headroom over the wire's own 10s default for both, but a
+        caller setting `TIMEOUT=30` needs a matching `connect_timeout`
+        or a legitimate server-side wait will surface as a raw socket
+        `TimeoutError` instead of the clean RC-15 `Timeout` exception
+        -- confirmed the hard way while building the stock-app
+        conformance check (tests/copperline/stock-app-test.py): a
+        `CLICK ... EXPECT=NOWINDOW TIMEOUT=10` genuinely answered by
+        the server in ~10s still failed client-side, because this
+        method's retry loop (below) leaves the socket's timeout
+        wherever it last shrank it to (down to 0.1s near
+        `deadline_seconds`) if this reset isn't applied.
 
         1. The TCP connect itself may be transiently refused or reset
            while the far end is still starting up (a guest mid-boot,
@@ -300,6 +321,21 @@ class Amipilot:
                 # and would otherwise leak.
                 client.close()
                 raise
+            # The loop above shrinks the socket's read timeout on every
+            # iteration (down to as little as 0.1s near the deadline) so
+            # a slow-to-answer handshake attempt can't itself blow past
+            # `deadline_seconds` -- but that timeout is a SOCKET-level
+            # setting, not a per-call one, and was still in effect on
+            # this successful iteration. Left alone, a client returned
+            # here would carry that leftover (<=3s) timeout into every
+            # future command, silently breaking anything that
+            # legitimately takes longer to answer -- a WAITFOR/
+            # CLICK(expect=...) TIMEOUT= greater than a few seconds,
+            # answered correctly by the server, would still surface as
+            # a raw socket TimeoutError here instead of the clean RC-15
+            # Timeout exception. Reset it to what the caller actually
+            # asked for before handing the client back.
+            sock.settimeout(connect_timeout)
             return client
 
         sock.close()

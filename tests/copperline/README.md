@@ -76,6 +76,45 @@ single, documented reference Locale (or keep one canonical machine/CI
 environment that owns golden-file generation) rather than letting
 each contributor's own Workbench install produce a slightly different
 "golden" and fight over spurious diffs.
+
+### Stock-app conformance (phase 0.5)
+
+`run.sh` also drives a genuine OS-shipped stock application, not a
+hand-written fixture: `run_stock_app_check` starts `AmiPilotServer`
+only (no fixture pre-launched), then `tests/copperline/
+stock-app-test.py` `LAUNCH`es `SYS:Prefs/Time` over the wire and
+drives it end to end using only tier-2 `ROLE=`/`INDEX=` locators
+discovered from `AmiInspect`/`amipilot dump` output — this is the
+implementation plan's own stated success criterion for this work
+(`docs/implementation-plan.md`'s "Success criteria": "A stock Prefs
+editor is driven end-to-end... via tier-2 locators only... with the
+script written using only dump/AmiInspect output, no source or docs
+consulted"). Read the script's own header before touching it — it's
+an honest account of what was tried and what actually worked (the
+year field and "Save" button both turned out to be inert under this
+machine profile's `rtc: none` config), not a clean success story
+written after the fact. `tests/copperline/Time.manifest` is the quirk
+profile capturing those findings (see `manifest/SPEC.md`'s "Quirk
+profiles" section).
+
+Along the way this also found and fixed a real bug in `host/amipilot/
+client.py`'s `connect_with_retry()`: it left a returned client's
+socket read timeout clamped to whatever small value its own retry
+loop last shrank it to (as little as 0.1s), so any `WAITFOR`/
+`CLICK(expect=...)` call with a `TIMEOUT=` longer than that would
+raise a raw socket `TimeoutError` instead of the intended, clean RC-15
+`Timeout` exception — even when the server answered correctly. See
+that method's own docstring for the fix and how to size
+`connect_timeout` for your own long-running waits.
+
+`SYS:Prefs/WBPattern` (a different stock Prefs editor) surfaced a
+second, still-open finding the same way: `AmiInspect` genuinely hangs
+walking its window (confirmed for 90+ simulated seconds with zero
+forward progress, not just slow) — filed as issue #36, not
+root-caused yet. Stock-app conformance testing is explicitly meant to
+surface exactly this kind of gap against real, OS-shipped software,
+not just prove the happy path.
+
 ## Ad hoc smoke testing (debugging, new fixtures)
 
 For anything `run.sh` doesn't already assert on, write
