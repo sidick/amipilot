@@ -367,7 +367,7 @@ Lands in phase 0.2 onward -- see
   a `DRAG` genuinely reached GadTools' real slider-tracking code, not
   just that input.device events were injected.
 
-- **Wait/expectation primitives (phase 0.5, in progress):**
+- **Wait/expectation primitives (phase 0.5):**
   `WAITFOR [SCREEN=<s>] WINDOW=<pattern> [TIMEOUT=<n>]` polls until a
   window matching `<pattern>` appears; `WAITFOR [SCREEN=<s>]
   NOWINDOW=<pattern> [TIMEOUT=<n>]` polls until none does. `TIMEOUT`
@@ -435,6 +435,56 @@ Lands in phase 0.2 onward -- see
   misses, that `EXPECT=`/`WAITFOR` reliably don't, and that a
   deliberately-too-short `TIMEOUT=` reliably reports as `RC 15`
   (confirmed live, not just theoretically distinguishable).
+
+- **MUI-ARexx bridge tier (phase 0.5):** `MUIREXX <app-base> [TIMEOUT=<n>]
+  <command...>` sends `<command>` verbatim to the ARexx port of the MUI
+  application whose `MUIA_Application_Base` is `<app-base>` (e.g.
+  `MUIREXX MUIDEMO info title`), exactly as an ARexx script's own
+  `ADDRESS` would, and reports back what that application's own command
+  handler replied with. Genuinely different from `CLICK`/`TYPE`/
+  `GETTEXT`: no structural walk, no `input.device` synthesis -- MUI
+  internals are deliberately opaque to external walkers (`intuition-model`
+  sees a MUI window's top-level object and nothing below it, the same
+  limit `window.class`/`layout.gadget` already has), so this tier drives
+  through the port every MUI app carries automatically instead.
+
+  Port resolution tries `<app-base>` verbatim first, then `<app-base>.1`
+  -- both are real, observed naming conventions (MUI's own dev docs
+  document the `.N` slot convention explicitly, the same one this
+  server's own port uses; a shipped MUI example macro addresses its
+  target by the bare base name with no suffix at all). `server/src/
+  muirexx.c` sends a genuine `RexxMsg` (`CreateRexxMsg`/`FillRexxMsg`/
+  `PutMsg`) and polls for the reply the same `~100ms`-tick,
+  `Delay()`-based way `WAITFOR`'s own polling does -- not a signal wait,
+  so a target that never replies times out on schedule (`RC 15`)
+  instead of hanging the whole server.
+
+  **Confirmed live against a real MUI application** (AmigaOS 3.2's own
+  `MUI:Demos/MUI-Demo`) rather than assumed from docs: MUI's BUILT-IN
+  ARexx support is a small, universal, seven-command set (`quit`/`hide`/
+  `show`/`activate`/`deactivate`/`info <item>`/`help [file]`) -- there is
+  no generic "read/write this widget's value" command the way `GA_ID` or
+  tier-2 `ROLE=`/`LABEL=`/`INDEX=` are for classic gadgets. `MUI-Demo`
+  itself registers zero application-specific commands (confirmed via its
+  own `help` output). So `MUIREXX` is an honest passthrough, not a
+  CLICK/TYPE-shaped verb built on a false promise of generic MUI widget
+  access: anything beyond the universal seven is entirely up to the
+  target application having registered its own commands
+  (`MUIA_Application_Commands`), and this bridge relays whatever you send
+  it unchanged rather than inventing capability an app doesn't have.
+  `quit` -- the one command every MUI app answers -- is genuinely useful
+  on its own for the same "exit via the app's own affordances" teardown
+  discipline the rest of this project follows; confirmed live that it
+  really closes the target's window, not just that the wire round trip
+  succeeds.
+
+  The target's own reply code (an arbitrary, app-defined value -- this
+  bridge doesn't reinterpret it) is relayed as `RC 10`
+  (`AMIP_AREXX_RC_ERROR`) with the numeric code prefixed onto the result
+  text when nonzero, distinct from `RC 5` (no ARexx port found for that
+  base -- tried both naming conventions), `RC 15` (sent, but no reply
+  within `TIMEOUT`), and `RC 20` (this server's own `RexxMsg` allocation
+  failed -- out of memory, not the target application's fault).
 
 - **Screens (phase 0.4, shipped in v0.4):** `SCREENS` (no arguments) lists
   every open screen -- title, position, size, and whether it's

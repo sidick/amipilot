@@ -939,5 +939,62 @@ class AssertTreeMatches(unittest.TestCase):
                 self._client().assert_tree_matches("GadTools", path)
 
 
+class MuiRexx(unittest.TestCase):
+    """Tests for the MUIREXX wire verb (mui_command()) -- the MUI-
+    ARexx bridge tier (phase 0.5). See server/include/muirexx.h for
+    why this is a thin passthrough, not a CLICK/TYPE-shaped verb."""
+
+    def test_sends_command_verbatim(self):
+        c = client_with(b"RC 0 0\n")
+        c.mui_command("MUIDEMO", "info title")
+        self.assertEqual(
+            c._wire._t.sent[0], b"MUIREXX MUIDEMO TIMEOUT=10 info title\n"
+        )
+
+    def test_returns_result_text(self):
+        payload = b"MUI-Demo"
+        c = client_with(b"RC 0 %d\n%s" % (len(payload), payload))
+        self.assertEqual(c.mui_command("MUIDEMO", "info title"), "MUI-Demo")
+
+    def test_quotes_app_base_with_spaces(self):
+        c = client_with(b"RC 0 0\n")
+        c.mui_command("My App", "quit")
+        self.assertEqual(
+            c._wire._t.sent[0], b'MUIREXX "My App" TIMEOUT=10 quit\n'
+        )
+
+    def test_honours_custom_timeout(self):
+        c = client_with(b"RC 0 0\n")
+        c.mui_command("MUIDEMO", "quit", timeout=30)
+        self.assertEqual(
+            c._wire._t.sent[0], b"MUIREXX MUIDEMO TIMEOUT=30 quit\n"
+        )
+
+    def test_port_not_found_raises_not_found(self):
+        payload = b"no ARexx port found for that application base"
+        c = client_with(b"RC 5 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(NotFound):
+            c.mui_command("NOSUCHAPP", "info title")
+
+    def test_no_reply_raises_timeout(self):
+        payload = b"no reply within TIMEOUT"
+        c = client_with(b"RC 15 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(Timeout):
+            c.mui_command("MUIDEMO", "badcommand")
+
+    def test_app_error_raises_command_error_with_app_rc(self):
+        payload = b"20 unknown command"
+        c = client_with(b"RC 10 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(CommandError) as ctx:
+            c.mui_command("MUIDEMO", "badcommand")
+        self.assertIn("20 unknown command", str(ctx.exception))
+
+    def test_alloc_fail_raises_action_failed(self):
+        payload = b"could not allocate an ARexx message (out of memory)"
+        c = client_with(b"RC 20 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(ActionFailed):
+            c.mui_command("MUIDEMO", "quit")
+
+
 if __name__ == "__main__":
     unittest.main()

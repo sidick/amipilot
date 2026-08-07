@@ -216,6 +216,7 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
     else if (ci_streq(kw, "SCREENS"))  out->type = AMIP_AREXX_CMD_SCREENS;
     else if (ci_streq(kw, "AUTH"))     out->type = AMIP_AREXX_CMD_AUTH;
     else if (ci_streq(kw, "WAITFOR"))  out->type = AMIP_AREXX_CMD_WAITFOR;
+    else if (ci_streq(kw, "MUIREXX"))  out->type = AMIP_AREXX_CMD_MUIREXX;
     else if (ci_streq(kw, "QUIT"))     out->type = AMIP_AREXX_CMD_QUIT;
     else { out->type = AMIP_AREXX_CMD_UNKNOWN; return -1; }
 
@@ -314,6 +315,46 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
          * silently chopped) if it doesn't fit -- a truncated Shell
          * command line is a different, unintended command, not a
          * cosmetic loss. */
+        if (strlen(p) >= sizeof(out->command)) {
+            out->argTooLong = 1;
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+        strncpy(out->command, p, sizeof(out->command) - 1);
+        out->command[sizeof(out->command) - 1] = '\0';
+        return 0;
+    }
+
+    if (out->type == AMIP_AREXX_CMD_MUIREXX) {
+        int trunc;
+
+        p = skip_ws(p);
+        if (*p == '\0') {
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+        p = read_token(p, out->muiBase, sizeof(out->muiBase), &trunc);
+        if (fail_if_trunc(trunc, out)) return -1;
+
+        p = skip_ws(p);
+        if (ci_streq_prefix(p, "TIMEOUT=")) {
+            char numbuf[16];
+            p += 8; /* strlen("TIMEOUT=") */
+            p = read_token(p, numbuf, sizeof(numbuf), &trunc);
+            if (fail_if_trunc(trunc, out)) return -1;
+            out->expectTimeout = strtol(numbuf, NULL, 10);
+            p = skip_ws(p);
+        }
+
+        if (*p == '\0') {
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+        /* Verbatim rest-of-line, same as LAUNCH's/TYPE's own -- an
+         * ARexx command line is handed to the target port exactly as
+         * given, not re-tokenized by this parser. Rejected outright
+         * (not silently chopped) if it doesn't fit, same reasoning as
+         * both of those. */
         if (strlen(p) >= sizeof(out->command)) {
             out->argTooLong = 1;
             out->type = AMIP_AREXX_CMD_UNKNOWN;

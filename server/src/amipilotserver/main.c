@@ -47,6 +47,7 @@
 #include "fs.h"
 #include "intuition_model.h"
 #include "manifest.h"
+#include "muirexx.h"
 #include "serial.h"
 #include "tcp.h"
 
@@ -649,7 +650,7 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                      "STABLE VERSION\n"
                      "EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH "
                      "FSLIST FSSTAT FSMKDIR FSDELETE FSGET MENU MENUPICK DRAG "
-                     "WAITFOR SCREENS AUTH QUIT\n");
+                     "WAITFOR SCREENS AUTH MUIREXX QUIT\n");
             result = g_resultBuf;
             break;
 
@@ -1001,6 +1002,56 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                 if (!ok) {
                     rc = AMIP_AREXX_RC_TIMEOUT;
                 }
+            }
+            break;
+        }
+
+        case AMIP_AREXX_CMD_MUIREXX: {
+            long appRC = 0;
+            AmipMuiRexxResult outcome = AmipMuiRexxSend(
+                cmd->muiBase, cmd->command, cmd->expectTimeout, &appRC,
+                g_resultBuf, sizeof(g_resultBuf));
+
+            switch (outcome) {
+                case AMIP_MUIREXX_OK:
+                    result = g_resultBuf;
+                    break;
+                case AMIP_MUIREXX_APP_ERROR:
+                    /* Prefix the app's own RC onto its result text (if
+                     * any) rather than discarding it -- this bridge
+                     * relays a foreign application's own return code,
+                     * it doesn't reinterpret it, so the caller needs
+                     * to see the actual number, not just "it failed".
+                     * See muirexx.h's own doc comment. */
+                    {
+                        char withRC[AMIP_RESULT_BUF_SIZE];
+                        snprintf(withRC, sizeof(withRC), "%ld%s%s", appRC,
+                                 g_resultBuf[0] != '\0' ? " " : "", g_resultBuf);
+                        strncpy(g_resultBuf, withRC, sizeof(g_resultBuf) - 1);
+                        g_resultBuf[sizeof(g_resultBuf) - 1] = '\0';
+                    }
+                    result = g_resultBuf;
+                    rc = AMIP_AREXX_RC_ERROR;
+                    break;
+                case AMIP_MUIREXX_NOT_FOUND:
+                    strncpy(g_resultBuf, "no ARexx port found for that application base",
+                            sizeof(g_resultBuf) - 1);
+                    result = g_resultBuf;
+                    rc = AMIP_AREXX_RC_WARN;
+                    break;
+                case AMIP_MUIREXX_TIMEOUT:
+                    strncpy(g_resultBuf, "no reply within TIMEOUT",
+                            sizeof(g_resultBuf) - 1);
+                    result = g_resultBuf;
+                    rc = AMIP_AREXX_RC_TIMEOUT;
+                    break;
+                case AMIP_MUIREXX_ALLOC_FAIL:
+                default:
+                    strncpy(g_resultBuf, "could not allocate an ARexx message (out of memory)",
+                            sizeof(g_resultBuf) - 1);
+                    result = g_resultBuf;
+                    rc = AMIP_AREXX_RC_FAIL;
+                    break;
             }
             break;
         }

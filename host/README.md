@@ -9,7 +9,7 @@ Stdlib-only by design, matching the wire's own no-dependency spirit
 (`docs/implementation-plan.md`, "Protocol and client") -- nothing here
 needs installing beyond Python 3.9+.
 
-## Current state (phase 0.3, in progress)
+## Current state (phase 0.5)
 
 - **`amipilot.wire`** -- `WireClient`: transport-level framing (strict
   by-byte-count reads, `VERSION` handshake with protocol pinning). The
@@ -19,14 +19,14 @@ needs installing beyond Python 3.9+.
   `Gadget` dataclasses.
 - **`amipilot.client`** -- `Amipilot`, the object API test code
   actually imports: `tree()`, `click()`, `type()`, `get_text()`,
-  `manifest()`, `quit()`, plus `@name`-locator variants
-  (`click_by_name()` etc.). Non-OK RCs raise typed exceptions
-  (`NotFound`/`CommandError`/`ActionFailed`) rather than requiring the
-  caller to check codes by hand. Matches the verb subset
-  `AmiPilotServer` currently implements -- see `server/README.md`;
-  `windows/list`, `find`, `drag`, `menu-pick`, `wait-for`, launch, and
-  the file API are 0.4 scope, not stubbed here ahead of the server
-  offering them.
+  `manifest()`, `drag()`, `wait_for()`, `launch()`, `mui_command()`,
+  the file API (`fs_list()` etc.), `quit()`, plus `@name`- and
+  tier-2 `ROLE=`/`LABEL=`/`INDEX=`-locator variants
+  (`click_by_name()`, `click_by_role()`, etc.). Non-OK RCs raise typed
+  exceptions (`NotFound`/`CommandError`/`ActionFailed`/`Timeout`)
+  rather than requiring the caller to check codes by hand. Matches the
+  verb set `AmiPilotServer` currently implements -- see
+  `server/README.md`.
 - **`amipilot dump`** (`amipilot.dump`, wired up as the `amipilot`
   console script via `pyproject.toml`) -- the host half of "the
   inspector" (`docs/implementation-plan.md`): connects, prints a
@@ -46,13 +46,31 @@ needs installing beyond Python 3.9+.
   `tests/copperline/README.md`'s "Golden-tree fixtures and Locale"
   section before treating a golden file as portable across machines
   with different Locale preferences.
+- **The MUI-ARexx bridge tier** (phase 0.5 -- `Amipilot.mui_command()`):
+  `MUIREXX <app-base> [TIMEOUT=<n>] <command...>`'s host wrapper --
+  sends `command` verbatim to a MUI application's own ARexx port and
+  returns its result text. A genuinely different mechanism from
+  `click()`/`type()`/`get_text()` (no structural walk), and an honest
+  one: MUI's own built-in ARexx support is a small, universal command
+  set (`quit`/`hide`/`show`/`activate`/`deactivate`/`info`/`help`), not
+  a generic widget-value accessor -- confirmed live against AmigaOS
+  3.2's own MUI-Demo, which registers no application-specific commands
+  at all. See `server/README.md`'s own section for the full design
+  rationale and `userdocs/ARexx-Reference.md#driving-mui-applications`
+  for the user-facing story.
 - Verified end to end against a real guest under Copperline
   (`tests/copperline/run.sh`'s wire check, and `amipilot dump` run by
   hand against the same session): connect, handshake, `TREE`/`TYPE`/
   `GETTEXT`/`CLICK` all round-trip correctly, RC-5 (not found) surfaces
   as a clean CLI error. The golden-tree check (`run_golden_check`) is
   verified the same way, against real checked-in golden files for
-  both fixtures.
+  both fixtures. `mui_command()` is verified live too
+  (`run_mui_check`, skips cleanly when MUI isn't installed on the
+  configured Workbench volume -- it's a third-party archive, not part
+  of any standard install) against real MUI-Demo: `info title`, a
+  not-found app base, an unrecognised command, and `quit` genuinely
+  closing the target's window, not just the wire round trip
+  succeeding.
 
 - **`amipilot.pytest_plugin`** -- the pytest plugin (auto-registered via
   the `pytest11` entry point once `host/` is installed): the

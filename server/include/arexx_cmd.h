@@ -50,6 +50,9 @@ typedef enum {
                               * WAITFOR [SCREEN=<s>] NOWINDOW=<pattern> [TIMEOUT=<n>] |
                               * WAITFOR [SCREEN=<s>] <window-pattern> (<gadget-id> | ROLE=<r> [LABEL=<l>] [INDEX=<n>]) TEXT=<value> [TIMEOUT=<n>] |
                               * WAITFOR @<name> TEXT=<value> [TIMEOUT=<n>] */
+    AMIP_AREXX_CMD_MUIREXX,  /* MUIREXX <app-base> [TIMEOUT=<n>] <command...> --
+                              * the MUI-ARexx bridge tier (phase 0.5); see
+                              * server/include/muirexx.h */
     AMIP_AREXX_CMD_QUIT      /* QUIT */
 } AmipArexxCmdType;
 
@@ -231,7 +234,26 @@ typedef struct {
                                                   * giving up (AMIP_AREXX_RC_
                                                   * TIMEOUT); 0 = use the
                                                   * server's own default (10s,
-                                                  * amipilotserver/main.c). */
+                                                  * amipilotserver/main.c).
+                                                  * Also reused for MUIREXX's
+                                                  * own TIMEOUT= -- same
+                                                  * "single-token bucket"
+                                                  * reuse convention path/
+                                                  * command above already
+                                                  * use, not worth a
+                                                  * dedicated field for one
+                                                  * more "seconds to poll"
+                                                  * value. */
+    char muiBase[AMIP_AREXX_MAX_NAME];          /* MUIREXX's <app-base> token
+                                                  * -- the target MUI app's
+                                                  * ARexx port base name
+                                                  * (MUIA_Application_Base),
+                                                  * e.g. "MUIDEMO". Reuses
+                                                  * AMIP_AREXX_MAX_NAME since
+                                                  * MUI's own naming rule
+                                                  * caps a basename at 30
+                                                  * characters -- see
+                                                  * muirexx.h. */
     int argTooLong;                             /* set when some argument didn't
                                                   * fit its field (see the
                                                   * AMIP_AREXX_MAX_* caps above)
@@ -412,6 +434,22 @@ typedef struct {
  * whether it succeeded; on ARexx/serial.device it's accepted and
  * compared but has no side effect, since neither of those transports
  * ever enforces the auth flag HandleCommand() tracks.
+ *
+ * MUIREXX takes <app-base> (a single token, the target MUI
+ * application's ARexx port base name -- MUI's own naming rule caps it
+ * at 30 characters and forbids spaces/":/()#?*..."), an optional
+ * leading "TIMEOUT=<n>" (seconds; default 10, same idiom LAUNCH's own
+ * "STACK=<n>" and WAITFOR's trailing "TIMEOUT=" use, but leading here
+ * -- see AmipMuiRexxSend's own doc comment for why the command text
+ * has to be the rest of the line, unparsed, same as LAUNCH's/TYPE's
+ * own verbatim-rest-of-line handling), then the ARexx command line
+ * itself, verbatim, handed to the target application's own port
+ * exactly as an ARexx script's own ADDRESS would. This bridge does
+ * not interpret or validate the command text -- see muirexx.h for the
+ * full rationale (MUI's own built-in ARexx support is a small,
+ * universal command set plus whatever the target app chose to add;
+ * nothing generic enough to build a CLICK/TYPE-shaped verb on top of
+ * exists).
  *
  * Returns 0 on success, -1 on an unknown command or a missing required
  * argument (map to AMIP_AREXX_RC_ERROR) -- out->type is
