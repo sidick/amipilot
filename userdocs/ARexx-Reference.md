@@ -38,9 +38,9 @@ for disambiguating two same-titled windows on different screens; see
 | Command | Arguments | What it does |
 |---------|-----------|---------------|
 | `TREE` | `<window-pattern>` | Returns the matched window's full gadget tree as a multi-line string, in the same format `AmiInspect` prints (`RESULT` gains embedded newlines — most REXX interpreters handle that fine in a variable). |
-| `CLICK` | `<window-pattern> <gadget-id>` | Clicks the gadget with that `GA_ID` — a genuine `input.device` click, not a shortcut. |
-| `TYPE` | `<window-pattern> <gadget-id> <text...>` | Clicks the gadget (to focus it), then types `text` into it via real `IECLASS_RAWKEY` events, human-paced. Everything after the gadget ID is taken verbatim as the text — no quoting needed unless the text itself starts with `"`. |
-| `GETTEXT` | `<window-pattern> <gadget-id>` | Returns that gadget's current text: a string/integer gadget's live value if it has one, otherwise its label. |
+| `CLICK` | `<window-pattern> (<gadget-id> \| ROLE=<r> [LABEL=<l>] [INDEX=<n>])` | Clicks the target gadget — a genuine `input.device` click, not a shortcut. Either a numeric `GA_ID`, or a [tier-2 locator](#tier-2-semantic-locators) below. |
+| `TYPE` | `<window-pattern> (<gadget-id> \| ROLE=<r> [LABEL=<l>] [INDEX=<n>]) <text...>` | Clicks the gadget (to focus it), then types `text` into it via real `IECLASS_RAWKEY` events, human-paced. Everything after the locator is taken verbatim as the text — no quoting needed unless the text itself starts with `"`. |
+| `GETTEXT` | `<window-pattern> (<gadget-id> \| ROLE=<r> [LABEL=<l>] [INDEX=<n>])` | Returns that gadget's current text: a string/integer gadget's live value if it has one, otherwise its label. |
 | `MANIFEST` | `<file-path>` | Loads an application's manifest (see below). Replaces any previously loaded one. `RESULT` reports what loaded (`loaded GTApp: 1 windows, 3 gadgets`); a rejected manifest returns `RC=10` with the reason (including line number) in `RESULT`. |
 | `VERSION` | (none) | Returns the server version, wire-protocol number, and the stable/experimental verb lists (multi-line, same payload the [wire handshake](Wire-Protocol.md) uses) — for feature-testing from a script. |
 | `LAUNCH` | `[STACK=<n>] <command-line...>` | Starts `command-line` as an AmigaDOS process (asynchronous — the commodity keeps servicing the port while it runs). `STACK` sets the new process's stack in bytes (default 4000, AmigaDOS's own `CreateNewProc()` default — most Intuition/ReAction GUI apps need more). `RC=0` means the process itself could be created, **not** that the command was found or ran successfully; assert on the expected effect (a window appearing) instead. See [Wire Protocol](Wire-Protocol.md#launch) for the full contract and its honest limits. |
@@ -81,6 +81,34 @@ touch anything, and then only the manifest.
 
 Using `@name` with no manifest loaded, or with a name the manifest
 doesn't define, is `RC=10` with the reason in `RESULT`.
+
+## Tier-2 semantic locators
+
+For an application with no manifest, `CLICK`/`TYPE`/`GETTEXT` also
+accept a locator by **role and label text** in place of the bare
+`GA_ID` — one or more of `ROLE=<name>`, `LABEL=<substring>`, and
+`INDEX=<n>`, at least one of `ROLE=`/`LABEL=` required:
+
+```rexx
+'CLICK GadTools ROLE=button LABEL=Connect'
+'GETTEXT GadTools ROLE=string LABEL=Host'
+```
+
+`ROLE=` matches the same role name `TREE`'s own output prints for a
+gadget (`button`, `string`, `checkbox`, `slider`, ... — case doesn't
+matter). `LABEL=` is a **case-sensitive** substring match against the
+gadget's label, quoted the same way a window pattern is if it
+contains a space (`LABEL="Connect Now"`) — same convention window/
+screen patterns already use, not a separate rule to learn. `INDEX=`
+(0-based, default the first match) picks between several gadgets that
+share a role and/or label, e.g. `ROLE=button INDEX=1` for the second
+button in a window.
+
+This is honest and useful, but fragile against relabelling in a way
+`@name` isn't — prefer a manifest when the target application ships
+one. No match (nothing with that role/label, or `INDEX=` past the
+last match) is `RC=5`, the same class an unmatched `GA_ID` already
+uses.
 
 ## Example
 

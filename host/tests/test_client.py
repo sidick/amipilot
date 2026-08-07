@@ -110,6 +110,72 @@ class Quoting(unittest.TestCase):
         self.assertEqual(c._wire._t.sent[2], b'FSGET "Work:My Dir/file"\n')
 
 
+class RoleLocators(unittest.TestCase):
+    def test_click_by_role_and_label(self):
+        c = client_with(b"RC 0 0\n")
+        c.click_by_role("GadTools", role="button", label="Cancel")
+        self.assertEqual(c._wire._t.sent[0], b'CLICK GadTools ROLE=button LABEL=Cancel\n')
+
+    def test_click_by_role_only(self):
+        c = client_with(b"RC 0 0\n")
+        c.click_by_role("GadTools", role="button")
+        self.assertEqual(c._wire._t.sent[0], b"CLICK GadTools ROLE=button\n")
+
+    def test_click_by_label_only(self):
+        c = client_with(b"RC 0 0\n")
+        c.click_by_role("GadTools", label="Cancel")
+        self.assertEqual(c._wire._t.sent[0], b"CLICK GadTools LABEL=Cancel\n")
+
+    def test_click_by_role_with_index(self):
+        c = client_with(b"RC 0 0\n")
+        c.click_by_role("GadTools", role="button", index=1)
+        self.assertEqual(c._wire._t.sent[0], b"CLICK GadTools ROLE=button INDEX=1\n")
+
+    def test_click_by_role_index_zero_omitted(self):
+        # index=0 is the server's own default (the first match) --
+        # omit the token rather than sending a redundant INDEX=0.
+        c = client_with(b"RC 0 0\n")
+        c.click_by_role("GadTools", role="button", index=0)
+        self.assertEqual(c._wire._t.sent[0], b"CLICK GadTools ROLE=button\n")
+
+    def test_click_by_role_spaced_label_quoted(self):
+        c = client_with(b"RC 0 0\n")
+        c.click_by_role("GadTools", label="Cancel Now")
+        self.assertEqual(c._wire._t.sent[0], b'CLICK GadTools LABEL="Cancel Now"\n')
+
+    def test_click_by_role_requires_role_or_label(self):
+        c = client_with()
+        with self.assertRaises(ValueError):
+            c.click_by_role("GadTools")
+
+    def test_click_by_role_honours_screen(self):
+        c = client_with(b"RC 0 0\n")
+        c.click_by_role("GadTools", role="button", screen="Workbench")
+        self.assertEqual(
+            c._wire._t.sent[0], b"CLICK SCREEN=Workbench GadTools ROLE=button\n"
+        )
+
+    def test_type_by_role(self):
+        c = client_with(b"RC 0 0\n")
+        c.type_by_role("GadTools", "hello", role="string", label="Host")
+        self.assertEqual(
+            c._wire._t.sent[0], b"TYPE GadTools ROLE=string LABEL=Host hello\n"
+        )
+
+    def test_type_by_role_rejects_newline(self):
+        c = client_with()
+        with self.assertRaises(ValueError):
+            c.type_by_role("GadTools", "a\nb", role="string")
+
+    def test_get_text_by_role(self):
+        c = client_with(b"RC 0 5\nhello")
+        result = c.get_text_by_role("GadTools", role="string", label="Host")
+        self.assertEqual(result, "hello")
+        self.assertEqual(
+            c._wire._t.sent[0], b"GETTEXT GadTools ROLE=string LABEL=Host\n"
+        )
+
+
 class RcMapping(unittest.TestCase):
     def test_ok_returns_normally(self):
         c = client_with(b"RC 0 0\n")

@@ -267,12 +267,26 @@ static AmipGadgetModel *WalkGadgetList(struct Gadget *gadget, struct Window *win
         } else {
             node->role = ClassifyGadget(gadget, window);
             node->className = NULL;
-            /* GadTools only populates gadget->GadgetText for
-             * PLACETEXT_LEFT/RIGHT/ABOVE/BELOW; a PLACETEXT_IN button
-             * (confirmed against fixtures/gadtools-app) bakes its label
-             * into the rendered imagery instead, so this reads empty for
-             * that layout -- a real gap in what this tier can see, not a
-             * copy bug. */
+            /* GadTools populates gadget->GadgetText for external-label
+             * placements (PLACETEXT_LEFT/RIGHT/ABOVE/BELOW) on kinds
+             * like CHECKBOX_KIND/STRING_KIND (confirmed against
+             * fixtures/gadtools-app's Enabled checkbox and Host string
+             * gadget). **BUTTON_KIND is a documented exception**: a
+             * PLACETEXT_IN button bakes its label into the rendered
+             * imagery as expected, but a BUTTON_KIND with
+             * PLACETEXT_RIGHT does too -- confirmed via AmiInspect
+             * (ground truth, no server/wire involved) against a second
+             * button added to fixtures/gadtools-app specifically to
+             * test this (2026-08-07): gadget->GadgetText stayed NULL
+             * regardless of the PLACETEXT_* flag chosen. So a button's
+             * label is invisible to this tier under EVERY placement,
+             * not just PLACETEXT_IN as originally assumed here -- a
+             * real gap in what this tier can see (use a numeric
+             * GA_ID-or-ROLE+INDEX locator for buttons, not LABEL=),
+             * not a copy bug. PLACETEXT_LEFT/ABOVE/BELOW specifically
+             * on BUTTON_KIND remain unconfirmed -- CHECKBOX_KIND/
+             * STRING_KIND already prove this code path itself is
+             * correct, so this wasn't chased further. */
             node->label = (gadget->GadgetText != NULL && gadget->GadgetText->IText != NULL)
                               ? CopyString(gadget->GadgetText->IText)
                               : NULL;
@@ -666,4 +680,50 @@ const char *AmipRoleName(AmipRole role)
         case AMIP_ROLE_CUSTOM:        return "custom";
         default:                      return "unknown";
     }
+}
+
+/* ASCII case-insensitive full-string compare -- same small helper
+ * arexx_cmd.c's own ci_streq keeps as a separate copy per-file rather
+ * than sharing one (this library has no dependency on the server, see
+ * this file's own header comment). */
+static int RoleNameEq(const char *a, const char *b)
+{
+    for (; *a && *b; a++, b++) {
+        int ca = *a, cb = *b;
+        if (ca >= 'A' && ca <= 'Z') ca += 32;
+        if (cb >= 'A' && cb <= 'Z') cb += 32;
+        if (ca != cb) return 0;
+    }
+    return *a == '\0' && *b == '\0';
+}
+
+AmipRole AmipRoleFromName(const char *name)
+{
+    static const struct { const char *name; AmipRole role; } table[] = {
+        { "button",       AMIP_ROLE_BUTTON },
+        { "string",       AMIP_ROLE_STRING },
+        { "integer",      AMIP_ROLE_INTEGER },
+        { "checkbox",     AMIP_ROLE_CHECKBOX },
+        { "radio_button", AMIP_ROLE_RADIO_BUTTON },
+        { "cycle",        AMIP_ROLE_CYCLE },
+        { "slider",       AMIP_ROLE_SLIDER },
+        { "scroller",     AMIP_ROLE_SCROLLER },
+        { "listview",     AMIP_ROLE_LISTVIEW },
+        { "listbrowser",  AMIP_ROLE_LISTBROWSER },
+        { "text",         AMIP_ROLE_TEXT },
+        { "menu",         AMIP_ROLE_MENU },
+        { "menu_item",    AMIP_ROLE_MENU_ITEM },
+        { "custom",       AMIP_ROLE_CUSTOM },
+    };
+    size_t i;
+
+    if (name == NULL) {
+        return AMIP_ROLE_UNKNOWN;
+    }
+    for (i = 0; i < sizeof(table) / sizeof(table[0]); i++) {
+        if (RoleNameEq(name, table[i].name)) {
+            return table[i].role;
+        }
+    }
+    return AMIP_ROLE_UNKNOWN;
 }

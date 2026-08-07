@@ -99,6 +99,24 @@ class Window:
     def find(self, gadget_id: int) -> Gadget | None:
         return next((g for g in self.gadgets if g.gadget_id == gadget_id), None)
 
+    def find_by_role(
+        self, role: str | None = None, label: str | None = None, index: int = 0
+    ) -> Gadget | None:
+        """Pure-Python equivalent of the wire's tier-2 ROLE=/LABEL=/
+        INDEX= locator (server/include/arexx_cmd.h), for callers who
+        already have a `tree()`/`TREE` model in hand and don't want a
+        second round trip just to resolve one gadget's ID. `label` is
+        matched case-sensitively as a substring (`in`), same
+        convention the server's own strstr-based matching uses -- not
+        case-insensitive. Returns None if fewer than `index + 1`
+        gadgets match, same as `find()`'s own "no match" convention."""
+        matches = [
+            g
+            for g in self.gadgets
+            if (role is None or g.role == role) and (label is None or label in g.label)
+        ]
+        return matches[index] if 0 <= index < len(matches) else None
+
 
 class TreeParseError(Exception):
     pass
