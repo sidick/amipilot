@@ -55,6 +55,7 @@ for disambiguating two same-titled windows on different screens; see
 | `DRAG` | `<window-pattern> <locator> <dx> <dy>` or `<window-pattern> <locator> TO (<dest-gadget-id> \| @<dest-name>)` | A genuine press/move/release drag. The offset form (`<dx> <dy>`) moves the gadget's current center by a pixel delta — the natural shape for a slider/scroller. The `TO` form drags onto a second gadget's center instead, both resolved live, for drag-and-drop/reorder — the destination must be in the same window as the source. `<locator>` is the same numeric `GA_ID`, `ROLE=`/`LABEL=`/`INDEX=`, or `@name` form CLICK/TYPE/GETTEXT accept. |
 | `WAITFOR` | `[SCREEN=<s>] WINDOW=<pattern> [TIMEOUT=<n>]` or `[SCREEN=<s>] NOWINDOW=<pattern> [TIMEOUT=<n>]` or `[SCREEN=<s>] <window-pattern> (<gadget-id> \| ROLE=<r> [LABEL=<l>] [INDEX=<n>]) TEXT=<value> [TIMEOUT=<n>]` or `@<name> TEXT=<value> [TIMEOUT=<n>]` | Polls (server-side, one round trip) until a window matching `<pattern>` appears, until none does, or until a gadget's text exactly equals `<value>`. `TIMEOUT` defaults to 10 seconds. `RC=15` if the condition never becomes true in time — a new RC distinct from "nothing matched" (`RC=5`) or "the action itself failed" (`RC=20`). See [Wait/expectation primitives](#waitexpectation-primitives). |
 | `AUTH` | `<password>` | Authenticates a TCP connection (no effect on ARexx or serial.device, which have their own implicit trust boundaries). Until it succeeds, the TCP transport refuses every command except `VERSION`/`AUTH`/`QUIT` with `RC=10`. See [Securing TCP](Wire-Protocol.md#securing-tcp). |
+| `MUIREXX` | `<app-base> [TIMEOUT=<n>] <command...>` | Sends `<command>` verbatim to a MUI application's own ARexx port. The MUI-ARexx bridge tier — see [Driving MUI applications](#driving-mui-applications). |
 | `QUIT` | (none) | Shuts the commodity down cleanly. |
 
 The same command set is also reachable from a host machine over
@@ -171,6 +172,53 @@ click is often a *different* gadget than the one clicked.
 understood, and only `CLICK` composes with `EXPECT=` (`WINDOW=`/
 `NOWINDOW=` only, not `TEXT=`) — `TYPE`/`DRAG`/`MENUPICK` callers, and
 anyone wanting a `TEXT=` wait, use a separate `WAITFOR` call instead.
+
+## Driving MUI applications
+
+MUI (Magic User Interface) is a third-party AmigaOS GUI toolkit whose
+internals are opaque to `TREE`/`CLICK`/`TYPE`/`GETTEXT` — the same limit
+a `window.class` window's `layout.gadget` children already have (see
+[Locator Tiers and Limits](Locator-Tiers-and-Limits.md)), just for a
+different reason. Every MUI application carries an automatic ARexx port
+of its own, though, so `MUIREXX <app-base> [TIMEOUT=<n>] <command...>`
+drives it through *that* instead — a different mechanism entirely, sent
+straight to the target application, not resolved by AmiPilotServer
+against any window/gadget model:
+
+```rexx
+'MUIREXX MUIDEMO info title'
+SAY 'Target is: 'RESULT
+'MUIREXX MUIDEMO quit'
+```
+
+`<app-base>` is the target application's `MUIA_Application_Base` (its
+own chosen ARexx port name, e.g. `"MUIDEMO"` for MUI's own demo app) —
+`MUIREXX` tries it verbatim first, then `<app-base>.1`, since both are
+real conventions in use. `RC=5` if neither is found.
+
+**Be honest about what this reaches.** MUI's own built-in ARexx support
+is a small, universal set — `quit`, `hide`, `show`, `activate`,
+`deactivate`, `info <item>` (fixed metadata: title/author/version/base/
+screen/copyright/description), and `help [file]` (lists every command
+the target understands, confirmed live as the way to find out what's
+really there rather than guessing) — confirmed against AmigaOS 3.2's
+own `MUI:Demos/MUI-Demo`. There is **no generic "read or set this
+widget's value" command** the way a numeric `GA_ID` or a tier-2
+`ROLE=`/`LABEL=`/`INDEX=` locator reaches a classic gadget — MUI-Demo
+itself registers zero commands beyond that universal set. Anything
+richer is entirely up to the target application having added its own
+commands; `MUIREXX` passes whatever you send through unchanged rather
+than inventing capability a given app doesn't have. `quit` is the one
+command every MUI app answers, and is genuinely useful on its own —
+composing a script's teardown the same "exit via the app's own
+affordances" way this project's other verbs already do.
+
+The target's own reply code (an arbitrary, app-defined value this
+bridge relays rather than reinterprets) surfaces as `RC=10` with the
+code prefixed onto `RESULT` when nonzero; `RC=15` if the target never
+replied within `TIMEOUT` (default 10 seconds); `RC=20` only if
+`AmiPilotServer` itself couldn't allocate the ARexx message (its own
+resource problem, not the target's).
 
 ## Example
 

@@ -737,6 +737,103 @@ EOF
 	fi
 }
 
+# --- MUI-ARexx bridge check (phase 0.5) ------------------------------------
+# MUI itself is a third-party archive, NOT part of any standard Workbench
+# install (unlike SYS:Prefs/Time above) -- present here only because this
+# developer installed it by hand. Skips cleanly (not a false pass, same
+# discipline copperline.local.toml's own absence already gets from the
+# Makefile) when Workbench:MUI/Demos/MUI-Demo isn't found on the configured
+# Workbench volume, rather than failing for anyone else's checkout.
+run_mui_check() {
+	echo "run.sh: MUI-ARexx bridge"
+
+	wb_path=$(awk '
+		/^path = / { p = $0; sub(/^path = "/, "", p); sub(/"$/, "", p) }
+		/volume = "Workbench"/ { print p; exit }
+	' "$CONFIG")
+
+	if [ -z "$wb_path" ] || [ ! -f "$wb_path/MUI/Demos/MUI-Demo" ]; then
+		echo "run.sh: SKIP (mui): MUI not installed on the configured Workbench volume"
+		return
+	fi
+
+	rm -f "$BUILD/mui-result.txt" "$BUILD/marker-mui-ready.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+Assign MUI: Workbench:MUI
+Assign add LIBS: MUI:Libs
+Run >NIL: MUI:Demos/MUI-Demo
+Wait 10
+Run >NIL: SRC:build/AmiPilotServer SERIAL
+Wait 5
+Echo "READY" >SRC:build/marker-mui-ready.txt
+EOF
+
+	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
+	rm -f "$info"
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
+		--fast 8M --noaudio --serial tcp --control :0 --control-info "$info" \
+		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
+	COPPERLINE_PID=$!
+
+	tries=0
+	while [ ! -f "$info" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 100 ]; then
+			echo "run.sh: FAIL (mui): copperline never wrote $info"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			return
+		fi
+		sleep 0.1
+	done
+
+	"$COPPERLINE_CTL" --info "$info" run_until '{"seconds": 600}' > /dev/null 2>&1 &
+
+	tries=0
+	while [ ! -f "$BUILD/marker-mui-ready.txt" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 150 ]; then
+			echo "run.sh: FAIL (mui): guest never became ready -- crash or hang"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			rm -f "$info"
+			return
+		fi
+		sleep 0.5
+	done
+
+	python3 "$REPO_ROOT/tests/copperline/mui-test.py" 127.0.0.1:1234 \
+		> "$BUILD/mui-result.txt" 2>&1 || true
+
+	kill "$COPPERLINE_PID" 2>/dev/null || true
+	COPPERLINE_PID=""
+	rm -f "$info"
+
+	ok=1
+	for pattern in \
+		'INFO-TITLE RESULT=MUI-Demo' \
+		'NOTFOUND-CHECK PASS' \
+		'APPERROR-CHECK PASS' \
+		'BEFORE-QUIT PASS' \
+		'QUIT-SENT OK' \
+		'AFTER-QUIT PASS'; do
+		if ! grep -qF "$pattern" "$BUILD/mui-result.txt" 2>/dev/null; then
+			echo "run.sh: FAIL (mui): expected line not found: $pattern"
+			ok=0
+		fi
+	done
+
+	if [ "$ok" -eq 1 ]; then
+		echo "run.sh: PASS (MUI-ARexx bridge)"
+	else
+		echo "run.sh:   --- actual output ---"
+		sed 's/^/run.sh:   /' "$BUILD/mui-result.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+	fi
+}
+
 # --- MENU/MENUPICK check (phase 0.4) ---------------------------------
 # fixtures/gadtools-app carries a menu strip (see its own header
 # comment): Project > About(shortcut A)/Toggle(checkit)/Disabled/
@@ -1138,6 +1235,7 @@ run_manifest_check
 run_wire_check
 run_launch_check
 run_stock_app_check
+run_mui_check
 run_fs_check
 run_menu_check
 run_screens_check
@@ -1158,6 +1256,7 @@ if [ "$FAILED" -eq 0 ]; then
 		"$BUILD"/wire-result.txt "$BUILD"/marker-wire-ready.txt \
 		"$BUILD"/launch-result.txt "$BUILD"/marker-launch-ready.txt \
 		"$BUILD"/stock-result.txt "$BUILD"/marker-stock-ready.txt \
+		"$BUILD"/mui-result.txt "$BUILD"/marker-mui-ready.txt \
 		"$BUILD"/fs-result.txt "$BUILD"/marker-fs-ready.txt \
 		"$BUILD"/menu-result.txt "$BUILD"/marker-menu-ready.txt \
 		"$BUILD"/screens-result.txt "$BUILD"/marker-screens-ready.txt \

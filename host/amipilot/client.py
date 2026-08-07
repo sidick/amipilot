@@ -866,6 +866,49 @@ class Amipilot:
             f"{_role_locator(role, label, index)} TEXT={_quote(text)} TIMEOUT={int(timeout)}"
         )
 
+    def mui_command(
+        self, app_base: str, command: str, *, timeout: float = 10.0
+    ) -> str:
+        """MUIREXX <app-base> [TIMEOUT=<n>] <command...> -- the MUI-
+        ARexx bridge tier (docs/implementation-plan.md's "Locator
+        tiers": every MUI application carries an automatic ARexx
+        port). Sends `command` verbatim to the target application's
+        own ARexx port (found by `app_base`, its
+        `MUIA_Application_Base`, e.g. `"MUIDEMO"`) exactly as an ARexx
+        script's own `ADDRESS` would, and returns whatever string
+        result it replied with (empty string if none).
+
+        This is a genuinely different mechanism from `click()`/
+        `type()`/`get_text()` -- no structural walk, no input.device
+        synthesis -- and a fundamentally different contract: MUI's own
+        BUILT-IN ARexx support is a small, universal command set
+        (`quit`/`hide`/`show`/`activate`/`deactivate`/`info <item>`/
+        `help [file]` -- confirmed live against AmigaOS 3.2's own
+        MUI-Demo), not a generic "read/write this widget's value"
+        mechanism the way GA_ID or tier-2 ROLE=/LABEL=/INDEX= are for
+        classic gadgets. Anything richer than the universal set is
+        entirely up to the target application having registered its
+        own commands (`MUIA_Application_Commands`) -- this method
+        passes whatever you give it through unchanged; it can't
+        invent commands an app doesn't have. `quit` is the one command
+        every MUI app answers, useful for the same "exit via the
+        app's own affordances" teardown discipline CLAUDE.md's other
+        verbs already follow.
+
+        Raises `NotFound` if no ARexx port exists for `app_base`
+        (tries the bare base name, then `"<app_base>.1"` -- both are
+        real, observed conventions), `Timeout` if sent but no reply
+        arrived within `timeout` seconds, `CommandError` if the
+        target replied but its OWN command handler reported a nonzero
+        result code (an application-level failure this bridge relays
+        rather than reinterprets -- `.message` on the exception starts
+        with that numeric code), and `ActionFailed` if the server
+        itself couldn't even allocate the ARexx message (out of
+        memory, not this application's fault)."""
+        return self._run(
+            f"MUIREXX {_quote(app_base)} TIMEOUT={int(timeout)} {command}"
+        ).text
+
     def quit(self) -> None:
         """QUIT -- shuts the server down cleanly. The connection is
         still open afterward (the server replies before exiting); call

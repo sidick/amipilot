@@ -14,7 +14,7 @@ read that before making architectural decisions; this file only covers
 what's needed to build and navigate the code day to day.
 
 **Current state:** v0.4 released (phase 0.4, reach, complete). Phase
-0.5 has started on main, not yet tagged: `WAITFOR` (including its
+0.5's scope is feature-complete on main, not yet tagged: `WAITFOR` (including its
 `TEXT=` condition) and `CLICK`'s `EXPECT=` (wait/expectation
 primitives, docs/implementation-plan.md's "Async by design" section)
 -- see `server/README.md`'s own section. Quirk profiles are real too:
@@ -47,12 +47,32 @@ honest finding, recorded as a quirk profile at
 real bug this work found and fixed along the way: the method left a
 returned client's socket read timeout clamped to a leftover value
 from its own retry loop (as little as 0.1s), silently breaking any
-`WAITFOR`/`CLICK(expect=...)` whose `TIMEOUT=` exceeded it. Also see
-issue #36: `AmiInspect` genuinely hangs walking a different stock
-app's window (`SYS:Prefs/WBPattern`), found the same way -- a real,
-unfixed bug, not yet root-caused. Remaining 0.5 scope: the MUI-ARexx
-bridge tier (deferred -- needs a MUI development environment not
-currently available).
+`WAITFOR`/`CLICK(expect=...)` whose `TIMEOUT=` exceeded it. A second
+real bug from the same stock-app-conformance work, found and fixed
+(issue #36, closed): `AmiInspect` genuinely hung (a true deadlock, not
+a spin loop -- confirmed via GDB attached live to Copperline's `--gdb`
+remote server, `TaskWait`/`tc_SigWait` archaeology, and an
+instrumented walker build that pinned the exact gadget) walking a
+different stock app's window (`SYS:Prefs/WBPattern`, one of its
+custom-drawn Preview/Sketch boxes) -- its `GadgetType` bits claimed
+`GTYP_CUSTOMGADGET` without a real BOOPSI `_Object` header behind
+them, and `WalkGadgetList()` used to trust `OCLASS()`'s result
+unconditionally. Fixed with a `TypeOfMem()` sanity check (see
+`intuition-model/src/walk.c`'s own comment there) before dispatching
+anything through it; `tests/copperline/run.sh`'s `run_wbpattern_check`
+regression-tests this against the real app. The MUI-ARexx bridge tier
+is real too, completing phase 0.5's scope: `MUIREXX <app-base>
+[TIMEOUT=<n>] <command...>` (`server/src/muirexx.c`,
+`Amipilot.mui_command()`) sends an ARexx command verbatim to a MUI
+application's own port -- confirmed live against AmigaOS 3.2's own
+MUI-Demo that MUI's built-in ARexx support is a small, universal
+seven-command set (`quit`/`hide`/`show`/`activate`/`deactivate`/
+`info`/`help`), not a generic widget-value accessor, so this bridge
+is an honest passthrough rather than a CLICK/TYPE-shaped verb built on
+a false promise -- see `server/README.md`'s own section and
+`tests/copperline/run.sh`'s `run_mui_check` (skips cleanly when MUI
+isn't installed on the configured Workbench volume, since it's a
+third-party archive, not a standard Workbench component).
 `intuition-model/` (the walker library) and `amiinspect/` (the Shell
 command) are real, building, and verified on-target. `server/` is
 real: the action engine (`server/src/action.c`, click/type/geometry/
