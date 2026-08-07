@@ -7,6 +7,23 @@ covering both what `AmiInspect` can see and what `AmiPilotServer`'s
 `CLICK`/`TYPE`/`GETTEXT` can act on, since a gadget invisible to one is
 unreachable by the other.
 
+## Which tier reaches which toolkit, and why
+
+The [implementation plan](https://github.com/sidick/amipilot/blob/main/docs/implementation-plan.md#locator-tiers)
+defines four locator tiers: **1** (manifest logical names — or a
+community-authored [quirk profile](https://github.com/sidick/amipilot/blob/main/manifest/SPEC.md#quirk-profiles-the-same-format-for-apps-you-dont-control),
+same format), **2** (semantic — window pattern + role/`GA_ID`), **3**
+(the MUI-ARexx bridge), and **4** (raw coordinates, the fragile floor).
+This table is the honest answer to "which tier actually reaches my
+application's UI today":
+
+| UI built from | Reaches | Why |
+| --- | --- | --- |
+| Plain GadTools gadgets (button/checkbox/string/integer/slider), top-level `BOOPSI`/ReAction gadgets attached directly to a window (`button.gadget`, `string.gadget`, etc., not nested inside a layout) | **Tier 1** with a manifest/quirk profile, or **Tier 2** without one | Fully classified and structurally reachable — see "What's classified today" below. |
+| A `window.class` + `layout.gadget` window's nested button/string/checkbox children | **Tier 4 only** (raw coordinates) | The confirmed `layout.gadget` limit below — invisible to structural walking, so tiers 1–3 can't name them at all, not even via a quirk profile (there's no `GA_ID` to record). The design doc's "cooperative geometry port" (a design note, not yet scheduled) is the intended fix. |
+| MUI applications | **None today** — the design doc's Tier 3 | Every MUI app carries a live ARexx port by convention, which is what Tier 3 is meant to drive through, but that bridge isn't implemented yet in this project (deferred; needs a MUI development environment this maintainer doesn't currently have set up). `intuition-model`'s class-name walker has no MUI recognition either, so Tier 2 doesn't reach MUI gadgets. Only Tier 4 coordinates work against a MUI app today. |
+| Custom-rendered UIs (games, hand-rolled bitmap rendering) | **Tier 4 only** (raw coordinates) | Out of scope by definition — nothing structural exists for a walker to find, and there's no ARexx port to assume. |
+
 ## What's classified today
 
 **Plain GadTools gadgets** (`BOOLGADGET`/`STRGADGET`/`PROPGADGET`):
@@ -59,9 +76,11 @@ are OS4-only. Seeing those children would require reading
 `layout.gadget`'s private, undocumented internal data — the kind of
 version-fragile reverse-engineering this project deliberately doesn't do.
 If you need to drive a specific ReAction application's nested gadgets
-today, you'll need to know its `GA_ID`s by other means (its source, or a
-per-application quirk profile in a future release) rather than discovering
-them via `AmiInspect`.
+today, you'll need to know its `GA_ID`s by other means (its source) —
+and even then, a quirk profile can't help name them, since they're
+invisible to structural walking regardless of who wrote the file down
+(see the [quirk profiles section](https://github.com/sidick/amipilot/blob/main/manifest/SPEC.md#quirk-profiles-the-same-format-for-apps-you-dont-control)
+of the manifest spec).
 
 **Custom-rendered UIs are invisible.** Anything an application draws
 directly into a bitmap rather than building from real gadget structures
