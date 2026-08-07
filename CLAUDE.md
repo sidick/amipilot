@@ -213,6 +213,28 @@ just `PLACETEXT_IN` as originally thought (address a button by
 requiring a `GT_GetGadgetAttrsA` kind-probe (see `ClassifyBoolGadget`)
 to tell them apart rather than a single flag check.
 
+A third, more serious one found the same way (2026-08-07): a real,
+OS-shipped stock application's `GadgetType` bits can claim
+`GTYP_CUSTOMGADGET` (correctly matching the masked check the
+`GTYP_CUSTOMGADGET`/`GTYP_BOOLGADGET` bitmask fix above already
+requires) on a gadget that does **not** actually carry a genuine
+BOOPSI `_Object` header — confirmed against AmigaOS 3.2's own
+`SYS:Prefs/WBPattern` (its custom-drawn Preview/Sketch boxes).
+`OCLASS()` there returns an implausible pointer, and dispatching
+`GetAttr()`/`DoMethod()` through it unconditionally (as the walker
+used to) wedges the entire machine — root-caused via GDB attached
+live to Copperline's `--gdb` remote server (see the closed
+investigation on GitHub issue #36 for the full methodology, including
+two real amiga-gcc/vlink toolchain gotchas hit getting debug symbols
+working at all). Fixed in `WalkGadgetList()` with a `TypeOfMem()`
+sanity check on `OCLASS()`'s result before trusting it for anything —
+the documented, honest way to confirm a pointer refers to allocated
+system memory at all, not a guess at "plausible" address ranges.
+Degrades to `role=custom` with no class/label, the same graceful path
+an unrecognised class already took. `tests/copperline/run.sh`'s
+`run_wbpattern_check` regression-tests this directly against the real
+stock app, not just a hand-written fixture.
+
 ## Architecture
 
 **`intuition-model/`** — the reusable Intuition walker library, with no

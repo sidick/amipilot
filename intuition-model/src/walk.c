@@ -209,52 +209,91 @@ static AmipGadgetModel *WalkGadgetList(struct Gadget *gadget, struct Window *win
          * signature) against fixtures/gadtools-app. */
         if ((gadget->GadgetType & GTYP_GTYPEMASK) == GTYP_CUSTOMGADGET) {
             Class *cls = OCLASS(gadget);
-            CONST_STRPTR classID = (cls != NULL) ? cls->cl_ID : NULL;
+            /* GTYP_CUSTOMGADGET only PROMISES a real BOOPSI _Object
+             * header (NewObject()'s own layout, see the comment above
+             * ClassifyByClassID) -- Intuition doesn't enforce it, and a
+             * real, shipped stock application can set these type bits
+             * on a hand-built struct Gadget with no such header.
+             * Confirmed the hard way against AmigaOS 3.2's own
+             * SYS:Prefs/WBPattern (one of its custom-drawn Preview/
+             * Sketch boxes, discovered chasing a genuine machine-wide
+             * hang -- see docs/implementation-plan.md's "Honest
+             * limits" or the git history for the investigation):
+             * OCLASS() there returns a small, clearly-bogus pointer,
+             * and dereferencing it for cl_ID -- or routing GetAttr()/
+             * DoMethod() through it, which happens internally on
+             * every call below -- dispatches through garbage and
+             * wedges the whole machine (GetAttr(GA_ID) never
+             * returns). TypeOfMem() is the documented, honest way to
+             * confirm a pointer refers to allocated system memory at
+             * all before trusting it as a live object header -- it
+             * can't prove `cls` is a genuine Class (no public API
+             * can), but it catches exactly this failure mode (an
+             * implausible pointer like this one) without guessing at
+             * "plausible" address ranges. */
+            BOOL classLooksReal = (cls != NULL) && (TypeOfMem((APTR)cls) != 0);
+            CONST_STRPTR classID = classLooksReal ? cls->cl_ID : NULL;
             ULONG text = 0;
             ULONG id = 0;
             ULONG left = 0, top = 0, width = 0, height = 0;
-            BOOL haveLeft, haveTop, haveWidth, haveHeight;
+            BOOL haveLeft = FALSE, haveTop = FALSE, haveWidth = FALSE, haveHeight = FALSE;
 
             node->role = ClassifyByClassID(classID);
             node->className = CopyString(classID);
 
-            /* Same story as GA_Text: confirmed against fixtures/classact-
-             * app that BOOPSI gadgetclass descendants don't mirror GA_ID
-             * into the classic gadget->GadgetID field either -- every
-             * child of a layout.gadget read back as id=0 until this was
-             * read via GetAttr instead. */
-            if (GetAttr(GA_ID, gadget, &id)) {
-                node->gadgetId = (ULONG)id;
-            }
+            /* Every GetAttr()/DoMethod() below dispatches back through
+             * the same class pointer OCLASS() returned above -- skip
+             * all of them, not just the cl_ID read, when that pointer
+             * didn't pass the TypeOfMem() check. Degrades to the
+             * gadget's raw classic fields via the same per-attribute
+             * fallback already used below when GetAttr() itself
+             * answers FALSE, rather than trusting a class that isn't
+             * really there. */
+            if (classLooksReal) {
+                /* Same story as GA_Text: confirmed against fixtures/
+                 * classact-app that BOOPSI gadgetclass descendants
+                 * don't mirror GA_ID into the classic gadget->GadgetID
+                 * field either -- every child of a layout.gadget read
+                 * back as id=0 until this was read via GetAttr
+                 * instead. */
+                if (GetAttr(GA_ID, gadget, &id)) {
+                    node->gadgetId = (ULONG)id;
+                }
 
-            /* GA_Text (a plain STRPTR), not gadget->GadgetText (an
-             * IntuiText*): confirmed against fixtures/classact-app that
-             * BOOPSI gadgetclass descendants only answer their label
-             * through GetAttr, leaving GadgetText NULL. GetAttr is only
-             * safe here because we've already confirmed this gadget
-             * carries a real _Object/class header (GTYP_CUSTOMGADGET);
-             * calling it on a classic gadget below would read garbage. */
-            if (GetAttr(GA_Text, gadget, &text) && text != 0) {
-                node->label = CopyString((CONST_STRPTR)text);
+                /* GA_Text (a plain STRPTR), not gadget->GadgetText (an
+                 * IntuiText*): confirmed against fixtures/classact-app
+                 * that BOOPSI gadgetclass descendants only answer their
+                 * label through GetAttr, leaving GadgetText NULL.
+                 * GetAttr is only safe here because we've already
+                 * confirmed this gadget carries a real _Object/class
+                 * header; calling it on a classic gadget below would
+                 * read garbage. */
+                if (GetAttr(GA_Text, gadget, &text) && text != 0) {
+                    node->label = CopyString((CONST_STRPTR)text);
+                } else {
+                    node->label = NULL;
+                }
+
+                /* Same story again for geometry: confirmed against
+                 * fixtures/classact-app that a BOOPSI gadgetclass
+                 * descendant's classic LeftEdge/TopEdge/Width/Height
+                 * fields read back as nonsensical (including negative
+                 * Width/Height) -- GA_Left/GA_Top/GA_Width/GA_Height
+                 * (LONG, per gadgetclass.h) are the real values,
+                 * window-relative the same as the classic fields
+                 * (GA_Left's own doc: "relative to the left edge of
+                 * the window"), so no coordinate-convention change
+                 * downstream. Fall back to the classic fields only if
+                 * a particular attribute genuinely isn't answered --
+                 * degrade gracefully rather than leaving the whole
+                 * gadget unlocatable. */
+                haveLeft   = GetAttr(GA_Left, gadget, &left);
+                haveTop    = GetAttr(GA_Top, gadget, &top);
+                haveWidth  = GetAttr(GA_Width, gadget, &width);
+                haveHeight = GetAttr(GA_Height, gadget, &height);
             } else {
                 node->label = NULL;
             }
-
-            /* Same story again for geometry: confirmed against
-             * fixtures/classact-app that a BOOPSI gadgetclass descendant's
-             * classic LeftEdge/TopEdge/Width/Height fields read back as
-             * nonsensical (including negative Width/Height) -- GA_Left/
-             * GA_Top/GA_Width/GA_Height (LONG, per gadgetclass.h) are the
-             * real values, window-relative the same as the classic fields
-             * (GA_Left's own doc: "relative to the left edge of the
-             * window"), so no coordinate-convention change downstream.
-             * Fall back to the classic fields only if a particular
-             * attribute genuinely isn't answered -- degrade gracefully
-             * rather than leaving the whole gadget unlocatable. */
-            haveLeft   = GetAttr(GA_Left, gadget, &left);
-            haveTop    = GetAttr(GA_Top, gadget, &top);
-            haveWidth  = GetAttr(GA_Width, gadget, &width);
-            haveHeight = GetAttr(GA_Height, gadget, &height);
 
             node->left   = haveLeft   ? (WORD)left   : gadget->LeftEdge;
             node->top    = haveTop    ? (WORD)top    : gadget->TopEdge;
