@@ -173,6 +173,76 @@ Lands in phase 0.2 onward -- see
   fixture's permanently-disabled item is rejected without ever sending
   a keystroke.
 
+- **Screens (phase 0.4, in progress):** `SCREENS` (no arguments) lists
+  every open screen -- title, position, size, and whether it's
+  frontmost. Every window-targeting verb (`TREE`/`CLICK`/`TYPE`/
+  `GETTEXT`/`MENU`/`MENUPICK`'s classic form, not `@name`) additionally
+  accepts an optional leading `SCREEN=<substring>` token before the
+  window pattern -- same `KEYWORD=value` idiom `LAUNCH`'s own
+  `STACK=<n>` already established -- narrowing the window search
+  (`AmipFindWindow()`, `server/src/action.c`) to screens matching that
+  substring; omitted, the search covers every screen exactly as before
+  this existed. This is for disambiguating two same-titled windows on
+  different screens, not for making cross-screen targeting possible in
+  the first place -- `AmipFindWindow()` already searched every screen
+  before this feature existed, it just couldn't tell two matches on
+  different screens apart. `TREE`/`MENU`'s window header line also
+  gains a `screen="<title>"` field for the same reason, so a script
+  can confirm which screen a match actually landed on.
+
+  **Identity is `Screen->DefaultTitle`, deliberately not the live
+  `Title` field** -- verified against `intuition.doc`, not assumed:
+  `SetWindowTitles()`'s own doc says the screen's title-bar text
+  "appears ... whenever this window is the active one", i.e. `Title`
+  tracks whichever window is currently active on that screen (via that
+  window's own `WA_ScreenTitle`), not a fixed name for the screen
+  itself, and so isn't a safe thing to match or report as identity.
+  `DefaultTitle` is the app's own name for the screen, set once at
+  open time -- the classic `NewScreen.DefaultTitle` field and the V36+
+  `SA_Title` tag are the *same* field (the autodoc says outright "[For
+  V36: superseded by SA_Title]"), so there's no behavioral difference
+  between a screen opened the old way and a tag-opened one here.
+
+  **Honest limit, not silently glossed over:** `SCREEN=` and the new
+  `screen="..."` field only apply to the classic `<window-pattern>`
+  form -- the manifest contract and `@name` locators have no
+  screen-awareness yet, since manifests don't record which screen a
+  window belongs to. There's also no standalone "bring this screen to
+  front" verb: it's unnecessary, since `CLICK`/`TYPE`/`MENUPICK`
+  already call `ScreenToFront()`/`WindowToFront()`/`ActivateWindow()`
+  on the target window's own screen as a side effect of acting (this
+  predates the `SCREENS`/`SCREEN=` work -- see `AmipClickGadget()` and
+  `AmipMenuPickByShortcut()`), and read-only verbs (`TREE`/`GETTEXT`/
+  `MENU`) deliberately don't move anything forward.
+
+  Also new: `Amipilot.wait_for_window()`/`wait_for_screen()`
+  (`host/amipilot/client.py`) -- host-side polling helpers for "did my
+  window/screen show up yet" (an asynchronously `launch()`ed program
+  opening its own screen is the normal case, not an edge case), same
+  idea `LAUNCH`'s own docstring already recommended by hand
+  (`tests/copperline/launch-test.py`'s poll loop), now reusable rather
+  than re-written per caller. A server-side blocking wait verb was
+  considered and rejected: `AmiPilotServer`'s dispatch is
+  single-threaded and synchronous (see `main.c`'s own comment on why
+  `g_resultBuf`/`g_treeBuf` are safe as file-statics), so a verb that
+  blocks server-side for a timeout would stall the *entire* server --
+  ARexx port and wire both -- for that whole duration.
+
+  Verified end-to-end by `make test-target`'s multi-screen check
+  (`tests/copperline/screens-test.py`), against a new fixture
+  (`fixtures/second-screen-app`) that opens its own custom screen: with
+  `gadtools-app`'s window pushed to a now-background Workbench screen
+  by the second screen opening on top of it, `SCREENS` correctly
+  reports both screens and which is frontmost (reached via
+  `wait_for_screen()`, exercising that helper live rather than only
+  against a fake clock), a loose pattern matching both fixtures'
+  windows is disambiguated by `SCREEN=`, and -- the check that actually
+  retires the risk this feature exists to address -- `TYPE`/`GETTEXT`/
+  `CLICK` against the window on the background screen still succeed,
+  proving `ScreenToFront()` genuinely brings a non-frontmost screen
+  forward correctly, not just in the single-screen case every prior
+  on-target check has ever exercised.
+
 ## Phase 0.2 (shipped)
 
 - `src/action.c` + `include/action_engine.h` -- the action engine's

@@ -10,7 +10,7 @@ from amipilot.menu import MenuParseError, parse_menu_strip  # noqa: E402
 # under Copperline (2026-08-06) -- see tests/copperline/fixtures/gadtools-app's
 # menu strip and tests/copperline/menu-test.py.
 MENU_TEXT = (
-    'window "AmiPilot GadTools Fixture" [40,40 220x130]\n'
+    'window "AmiPilot GadTools Fixture" screen="Workbench Screen" [40,40 220x130]\n'
     'menu num=0 title="Project" enabled=1\n'
     '  item num=0/0 text="About" shortcut=A checkit=0 checked=0 enabled=1\n'
     '  item num=0/1 text="Toggle" shortcut=T checkit=1 checked=1 enabled=1\n'
@@ -25,6 +25,7 @@ class ParseMenuStrip(unittest.TestCase):
     def test_window_header(self):
         strip = parse_menu_strip(MENU_TEXT)
         self.assertEqual(strip.window_title, "AmiPilot GadTools Fixture")
+        self.assertEqual(strip.screen, "Workbench Screen")
 
     def test_one_menu_with_five_top_level_items(self):
         strip = parse_menu_strip(MENU_TEXT)
@@ -84,7 +85,7 @@ class ParseMenuStrip(unittest.TestCase):
         self.assertIsNone(parse_menu_strip(MENU_TEXT).find("Nonexistent"))
 
     def test_window_with_no_menus(self):
-        strip = parse_menu_strip('window "Empty" [0,0 10x10]\n')
+        strip = parse_menu_strip('window "Empty" screen="" [0,0 10x10]\n')
         self.assertEqual(strip.menus, [])
 
     def test_empty_payload_raises(self):
@@ -98,21 +99,21 @@ class ParseMenuStrip(unittest.TestCase):
     def test_item_before_any_menu_raises(self):
         with self.assertRaises(MenuParseError):
             parse_menu_strip(
-                'window "W" [0,0 1x1]\n'
+                'window "W" screen="S" [0,0 1x1]\n'
                 '  item num=0/0 text="X" checkit=0 checked=0 enabled=1\n'
             )
 
     def test_subitem_before_any_item_raises(self):
         with self.assertRaises(MenuParseError):
             parse_menu_strip(
-                'window "W" [0,0 1x1]\n'
+                'window "W" screen="S" [0,0 1x1]\n'
                 'menu num=0 title="M" enabled=1\n'
                 '    subitem num=0/0/0 text="X" checkit=0 checked=0 enabled=1\n'
             )
 
     def test_garbage_line_raises(self):
         with self.assertRaises(MenuParseError):
-            parse_menu_strip('window "W" [0,0 1x1]\nnot a menu line\n')
+            parse_menu_strip('window "W" screen="S" [0,0 1x1]\nnot a menu line\n')
 
 
 if __name__ == "__main__":

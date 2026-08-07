@@ -3,7 +3,7 @@ a window's menu strip. Format is fixed by `BuildMenuResult`/
 `AppendMenuItemLine` in server/src/amipilotserver/main.c (identical to
 AmiInspect's own `PrintMenus`, amiinspect/src/main.c):
 
-    window "<title>" [<left>,<top> <width>x<height>]
+    window "<title>" screen="<screen-title>" [<left>,<top> <width>x<height>]
     menu num=<n> title="<title>" enabled=<0|1>
       item num=<menu>/<item> text="<text>" [shortcut=<c>] checkit=<0|1> checked=<0|1> enabled=<0|1>
         subitem num=<menu>/<item>/<sub> text="<text>" [shortcut=<c>] checkit=<0|1> checked=<0|1> enabled=<0|1>
@@ -61,6 +61,7 @@ class Menu:
 @dataclass
 class MenuStrip:
     window_title: str
+    screen: str
     menus: list[Menu] = field(default_factory=list)
 
     def find(self, text: str) -> MenuItem | None:
@@ -105,7 +106,7 @@ def parse_menu_strip(text: str) -> MenuStrip:
     wm = _WINDOW_RE.match(lines[0])
     if wm is None:
         raise MenuParseError(f"unrecognised window line: {lines[0]!r}")
-    strip = MenuStrip(window_title=wm["title"])
+    strip = MenuStrip(window_title=wm["title"], screen=wm["screen"])
 
     current_menu: Menu | None = None
     current_item: MenuItem | None = None

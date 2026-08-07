@@ -62,6 +62,25 @@ static const char *read_token(const char *p, char *dst, size_t cap)
     return p;
 }
 
+/* Consumes an optional "SCREEN=<value>" token at *pp -- same
+ * KEYWORD=value idiom LAUNCH's own "STACK=<n>" already uses, but
+ * <value> is a token (quotable the same way a window pattern is,
+ * via read_token above) rather than a fixed-digit number. Writes
+ * <value> into dst (cap bytes) and advances *pp past it plus any
+ * following whitespace if the prefix is present; leaves *pp and dst
+ * untouched otherwise (dst already reads as "" from AmipArexxParse's
+ * own memset). */
+static void parse_optional_screen_prefix(const char **pp, char *dst, size_t cap)
+{
+    const char *p = *pp;
+
+    if (ci_streq_prefix(p, "SCREEN=")) {
+        p += 7; /* strlen("SCREEN=") */
+        p = read_token(p, dst, cap);
+        *pp = skip_ws(p);
+    }
+}
+
 int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
 {
     char kw[16];
@@ -90,10 +109,12 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
     else if (ci_streq(kw, "FSGET"))    out->type = AMIP_AREXX_CMD_FSGET;
     else if (ci_streq(kw, "MENU"))     out->type = AMIP_AREXX_CMD_MENU;
     else if (ci_streq(kw, "MENUPICK")) out->type = AMIP_AREXX_CMD_MENUPICK;
+    else if (ci_streq(kw, "SCREENS"))  out->type = AMIP_AREXX_CMD_SCREENS;
     else if (ci_streq(kw, "QUIT"))     out->type = AMIP_AREXX_CMD_QUIT;
     else { out->type = AMIP_AREXX_CMD_UNKNOWN; return -1; }
 
-    if (out->type == AMIP_AREXX_CMD_QUIT || out->type == AMIP_AREXX_CMD_VERSION) {
+    if (out->type == AMIP_AREXX_CMD_QUIT || out->type == AMIP_AREXX_CMD_VERSION
+        || out->type == AMIP_AREXX_CMD_SCREENS) {
         return 0;
     }
 
@@ -116,6 +137,7 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
         char numbuf[16];
 
         p = skip_ws(p);
+        parse_optional_screen_prefix(&p, out->screenPattern, sizeof(out->screenPattern));
         if (*p == '\0') {
             out->type = AMIP_AREXX_CMD_UNKNOWN;
             return -1;
@@ -180,8 +202,13 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
     }
 
     /* Every other command starts with either a window-pattern argument
-     * or a "@<logical-name>" manifest locator (see arexx_cmd.h). */
+     * or a "@<logical-name>" manifest locator (see arexx_cmd.h), with
+     * an optional leading "SCREEN=<substring>" ahead of the classic
+     * form (a "SCREEN=x @name" combination is syntactically accepted
+     * but the screen filter is simply not applied to the "@name"
+     * form -- documented non-goal in arexx_cmd.h, not an error). */
     p = skip_ws(p);
+    parse_optional_screen_prefix(&p, out->screenPattern, sizeof(out->screenPattern));
     if (*p == '\0') {
         out->type = AMIP_AREXX_CMD_UNKNOWN;
         return -1;

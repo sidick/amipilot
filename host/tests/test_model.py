@@ -7,7 +7,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 from amipilot.model import TreeParseError, parse_tree  # noqa: E402
 
 TREE_TEXT = (
-    'window "GadTools" [10,20 300x120]\n'
+    'window "GadTools" screen="Workbench Screen" [10,20 300x120]\n'
     '  gadget id=1 role=BUTTON class="" label="Connect" [10,90 80x14]\n'
     '  gadget id=2 role=STRING class="" label="Host" value="aminet.net" '
     "[10,20 200x14]\n"
@@ -18,6 +18,7 @@ class ParseTree(unittest.TestCase):
     def test_window_header(self):
         window = parse_tree(TREE_TEXT)
         self.assertEqual(window.title, "GadTools")
+        self.assertEqual(window.screen, "Workbench Screen")
         self.assertEqual((window.left, window.top, window.width, window.height),
                           (10, 20, 300, 120))
 
@@ -41,7 +42,7 @@ class ParseTree(unittest.TestCase):
         self.assertIsNone(parse_tree(TREE_TEXT).find(99))
 
     def test_window_with_no_gadgets(self):
-        window = parse_tree('window "Empty" [0,0 10x10]\n')
+        window = parse_tree('window "Empty" screen="" [0,0 10x10]\n')
         self.assertEqual(window.gadgets, [])
 
     def test_empty_payload_raises(self):
@@ -54,7 +55,7 @@ class ParseTree(unittest.TestCase):
 
     def test_garbage_gadget_line_raises(self):
         with self.assertRaises(TreeParseError):
-            parse_tree('window "W" [0,0 1x1]\n  not a gadget line\n')
+            parse_tree('window "W" screen="S" [0,0 1x1]\n  not a gadget line\n')
 
 
 if __name__ == "__main__":

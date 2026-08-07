@@ -52,6 +52,9 @@ GADTOOLS_APP_BIN := $(BUILD)/fixtures/GTApp
 CLASSACT_APP_SRC := fixtures/classact-app/src/main.c
 CLASSACT_APP_BIN := $(BUILD)/fixtures/CAApp
 
+SECONDSCREEN_APP_SRC := fixtures/second-screen-app/src/main.c
+SECONDSCREEN_APP_BIN := $(BUILD)/fixtures/SecondScreenApp
+
 # --- server/ (phase 0.2, in progress -- see docs/implementation-plan.md) --
 ACTION_SRCDIR := server/src
 ACTION_INCDIR := server/include
@@ -96,7 +99,7 @@ all: amiga
 
 amiga: $(INSPECT_BIN)
 
-fixtures: $(GADTOOLS_APP_BIN) $(CLASSACT_APP_BIN)
+fixtures: $(GADTOOLS_APP_BIN) $(CLASSACT_APP_BIN) $(SECONDSCREEN_APP_BIN)
 
 server: $(CLICKTEST_BIN) $(SETMOUSE_BIN) $(AMIPILOTD_BIN)
 
@@ -122,6 +125,10 @@ $(GADTOOLS_APP_BIN): $(GADTOOLS_APP_SRC)
 $(CLASSACT_APP_BIN): $(CLASSACT_APP_SRC)
 	@mkdir -p $(BUILD)/fixtures
 	$(CC) $(CFLAGS) -o $@ $(CLASSACT_APP_SRC) -lamiga
+
+$(SECONDSCREEN_APP_BIN): $(SECONDSCREEN_APP_SRC)
+	@mkdir -p $(BUILD)/fixtures
+	$(CC) $(CFLAGS) -o $@ $(SECONDSCREEN_APP_SRC)
 
 $(ACTION_LIB): $(ACTION_SRC) $(ACTION_INCDIR)/action_engine.h
 	@mkdir -p $(BUILD)

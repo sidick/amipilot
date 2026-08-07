@@ -75,7 +75,7 @@ int main(void)
         return RETURN_FAIL;
     }
 
-    target = AmipFindWindow((CONST_STRPTR)args.windowTitle);
+    target = AmipFindWindow(NULL, (CONST_STRPTR)args.windowTitle);
     if (target == NULL) {
         fprintf(stderr, "AmiClickTest: no matching window found\n");
         rc = RETURN_WARN;

@@ -31,6 +31,7 @@ typedef enum {
     AMIP_AREXX_CMD_FSGET,    /* FSGET <path> */
     AMIP_AREXX_CMD_MENU,     /* MENU <window-pattern> */
     AMIP_AREXX_CMD_MENUPICK, /* MENUPICK <window-pattern> <menu-num> <item-num> [<sub-num>] */
+    AMIP_AREXX_CMD_SCREENS,  /* SCREENS */
     AMIP_AREXX_CMD_QUIT      /* QUIT */
 } AmipArexxCmdType;
 
@@ -56,6 +57,10 @@ enum {
 typedef struct {
     AmipArexxCmdType type;
     char windowPattern[AMIP_AREXX_MAX_WINDOW]; /* TREE/CLICK/TYPE/GETTEXT (classic form) */
+    char screenPattern[AMIP_AREXX_MAX_WINDOW]; /* optional "SCREEN=<substring>" prefix on
+                                                * TREE/CLICK/TYPE/GETTEXT/MENU/MENUPICK's
+                                                * classic form; empty = unset (search every
+                                                * screen, today's unchanged behavior) */
     long gadgetId;                             /* CLICK/TYPE/GETTEXT (classic form) */
     char manifestName[AMIP_AREXX_MAX_NAME];    /* CLICK/TYPE/GETTEXT "@name" form;
                                                 * empty = classic form was used */
@@ -106,6 +111,19 @@ typedef struct {
  * AmipWalkMenuStrip() stamps onto its model (see MENU's own output)
  * and Intuition itself reports via IDCMP_MENUPICK's MENUNUM()/
  * ITEMNUM()/SUBNUM() macros.
+ *
+ * TREE/CLICK/TYPE/GETTEXT/MENU (classic form only, not "@name") and
+ * MENUPICK all additionally accept an optional leading
+ * "SCREEN=<substring>" token before the window-pattern -- same
+ * "consume a KEYWORD=value prefix, then fall through to the normal
+ * parse" idiom LAUNCH's own "STACK=<n>" already uses. Narrows the
+ * window search to screens whose DefaultTitle contains the substring
+ * (server/src/action.c's AmipFindWindow -- deliberately DefaultTitle,
+ * not the live Title field, which tracks whichever window is
+ * currently active on that screen rather than naming the screen
+ * itself). Omitted = today's unchanged behavior: search every screen.
+ *
+ * SCREENS takes no arguments, like VERSION/QUIT.
  *
  * Returns 0 on success, -1 on an unknown command or a missing required
  * argument (map to AMIP_AREXX_RC_ERROR) -- out->type is

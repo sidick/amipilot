@@ -514,16 +514,22 @@ BOOL AmipClickGadget(struct Window *window, struct Gadget *gadget)
  * moved here from server/src/clicktest/main.c once the ARexx commodity
  * needed the exact same lookups. */
 
-struct Window *AmipFindWindow(CONST_STRPTR titleSubstring)
+struct Window *AmipFindWindow(CONST_STRPTR screenSubstring, CONST_STRPTR titleSubstring)
 {
     struct Screen *screen;
     struct Window *window;
+    BOOL wantScreenFilter = (screenSubstring != NULL && screenSubstring[0] != '\0');
 
     if (IntuitionBase == NULL) {
         return NULL;
     }
 
     for (screen = IntuitionBase->FirstScreen; screen != NULL; screen = screen->NextScreen) {
+        if (wantScreenFilter
+            && (screen->DefaultTitle == NULL
+                || strstr((const char *)screen->DefaultTitle, (const char *)screenSubstring) == NULL)) {
+            continue;
+        }
         for (window = screen->FirstWindow; window != NULL; window = window->NextWindow) {
             if (window->Title != NULL
                 && strstr((const char *)window->Title, (const char *)titleSubstring) != NULL) {

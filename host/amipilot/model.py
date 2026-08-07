@@ -4,7 +4,7 @@ fixed by `AppendGadgetLine`/`BuildTreeResult` in
 server/src/amipilotserver/main.c (identical to AmiInspect's own
 `PrintModel`, amiinspect/src/main.c):
 
-    window "<title>" [<left>,<top> <width>x<height>]
+    window "<title>" screen="<screen-title>" [<left>,<top> <width>x<height>]
       gadget id=<id> role=<ROLE> class="<class>" label="<label>" [value="<value>"] [<left>,<top> <width>x<height>]
 
 This is plain text, not a grammar meant to grow -- see the plan's
@@ -18,8 +18,8 @@ import re
 from dataclasses import dataclass, field
 
 _WINDOW_RE = re.compile(
-    r'^window "(?P<title>.*)" \[(?P<left>-?\d+),(?P<top>-?\d+) '
-    r"(?P<width>\d+)x(?P<height>\d+)\]$"
+    r'^window "(?P<title>.*)" screen="(?P<screen>[^"]*)" '
+    r"\[(?P<left>-?\d+),(?P<top>-?\d+) (?P<width>\d+)x(?P<height>\d+)\]$"
 )
 _GADGET_RE = re.compile(
     r"^  gadget id=(?P<id>\d+) role=(?P<role>\S+) "
@@ -52,6 +52,7 @@ class Gadget:
 @dataclass
 class Window:
     title: str
+    screen: str
     left: int
     top: int
     width: int
@@ -81,6 +82,7 @@ def parse_tree(text: str) -> Window:
         raise TreeParseError(f"unrecognised window line: {lines[0]!r}")
     window = Window(
         title=m["title"],
+        screen=m["screen"],
         left=int(m["left"]),
         top=int(m["top"]),
         width=int(m["width"]),

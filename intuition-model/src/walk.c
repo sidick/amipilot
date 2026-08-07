@@ -319,6 +319,9 @@ static AmipWindowModel *WalkOneWindow(struct Window *window)
     }
 
     model->title = CopyString(window->Title);
+    model->screenTitle = (window->WScreen != NULL)
+                              ? CopyString(window->WScreen->DefaultTitle)
+                              : NULL;
     model->left = window->LeftEdge;
     model->top = window->TopEdge;
     model->width = window->Width;
@@ -400,6 +403,9 @@ void AmipFreeWindowModel(AmipWindowModel *model)
 
         if (model->title != NULL) {
             FreeVec(model->title);
+        }
+        if (model->screenTitle != NULL) {
+            FreeVec(model->screenTitle);
         }
         FreeVec(model);
         model = nextWindow;

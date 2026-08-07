@@ -28,7 +28,12 @@ until it receives `QUIT` or a break signal (Ctrl-C).
 
 Every command's first argument is a **window-title substring** — the
 same matching `AmiInspect WINDOW=` uses, across every screen, first
-match wins. Quote it if it contains spaces.
+match wins. Quote it if it contains spaces. `TREE`/`CLICK`/`TYPE`/
+`GETTEXT`/`MENU`/`MENUPICK`'s classic form additionally accept an
+optional leading `SCREEN=<substring>` token right after the command
+keyword, narrowing the search to screens whose own name contains it —
+for disambiguating two same-titled windows on different screens; see
+[Screens](Wire-Protocol.md#screens).
 
 | Command | Arguments | What it does |
 |---------|-----------|---------------|
@@ -44,6 +49,7 @@ match wins. Quote it if it contains spaces.
 | `FSMKDIR` | `<path>` | Creates a directory. Its parent must already exist and be inside a granted root. |
 | `FSDELETE` | `<path>` | Deletes a file or empty directory. |
 | `FSGET` | `<path>` | Returns a file's full contents (`RESULT` is the raw bytes, capped at the server's own small internal buffer — a test-staging channel, not a file manager). There is no `FSPUT`: writing files host-to-Amiga needs a wire feature that doesn't exist yet. |
+| `SCREENS` | (none) | Lists every open screen: title, position, size, and whether it's frontmost. Title is each screen's own name (`DefaultTitle`), not the live title-bar text a window's `WA_ScreenTitle` can override. |
 | `MENU` | `<window-pattern>` | Returns the matched window's full menu strip — every pulldown menu, its items, and (one level deep) their submenu items, with checkit/checked/enabled state and any keyboard shortcut, in the same text shape `AmiInspect` prints. |
 | `MENUPICK` | `<window-pattern> <menu-num> <item-num> [<sub-num>]` | Selects a menu item via its keyboard shortcut (Right-Amiga + the shortcut character) — the numbers are the same 0-based chain positions `MENU`'s own output reports. `RC=20` if the item is disabled or has no keyboard shortcut (pointer-based selection for shortcut-less items isn't built yet). See [Wire Protocol](Wire-Protocol.md#menus) for the full contract. |
 | `QUIT` | (none) | Shuts the commodity down cleanly. |
