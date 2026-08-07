@@ -367,7 +367,7 @@ Lands in phase 0.2 onward -- see
   a `DRAG` genuinely reached GadTools' real slider-tracking code, not
   just that input.device events were injected.
 
-- **Wait/expectation primitives (phase 0.5):**
+- **Wait/expectation primitives (phase 0.5, shipped in v0.5):**
   `WAITFOR [SCREEN=<s>] WINDOW=<pattern> [TIMEOUT=<n>]` polls until a
   window matching `<pattern>` appears; `WAITFOR [SCREEN=<s>]
   NOWINDOW=<pattern> [TIMEOUT=<n>]` polls until none does. `TIMEOUT`
@@ -436,7 +436,7 @@ Lands in phase 0.2 onward -- see
   deliberately-too-short `TIMEOUT=` reliably reports as `RC 15`
   (confirmed live, not just theoretically distinguishable).
 
-- **MUI-ARexx bridge tier (phase 0.5):** `MUIREXX <app-base> [TIMEOUT=<n>]
+- **MUI-ARexx bridge tier (phase 0.5, shipped in v0.5):** `MUIREXX <app-base> [TIMEOUT=<n>]
   <command...>` sends `<command>` verbatim to the ARexx port of the MUI
   application whose `MUIA_Application_Base` is `<app-base>` (e.g.
   `MUIREXX MUIDEMO info title`), exactly as an ARexx script's own
