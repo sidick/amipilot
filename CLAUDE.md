@@ -14,7 +14,7 @@ read that before making architectural decisions; this file only covers
 what's needed to build and navigate the code day to day.
 
 **Current state:** v0.2 released; phase 0.3 (the wire, the host client)
-and most of phase 0.4 (reach) are complete on main, not yet tagged.
+and phase 0.4 (reach) are complete on main, not yet tagged.
 `intuition-model/` (the walker library) and `amiinspect/` (the Shell
 command) are real, building, and verified on-target. `server/` is
 real: the action engine (`server/src/action.c`, click/type/geometry/
@@ -35,9 +35,17 @@ allowlist-scoped file API (`FSLIST`/`FSSTAT`/`FSMKDIR`/`FSDELETE`/
 `FSGET`, `server/src/fs.c` — `FSPUT` deliberately deferred, needs a
 wire protocol addition), menu walking + shortcut-based selection
 (`MENU`/`MENUPICK`, `intuition-model`'s `AmipWalkMenuStrip()` —
-pointer-based selection for shortcut-less items not yet built), and
+pointer-based selection for shortcut-less items not yet built),
 multi-screen support (`SCREENS`/`SCREEN=`, keyed off
-`Screen->DefaultTitle`, not the live `Title` field). See
+`Screen->DefaultTitle`, not the live `Title` field), tier-2 semantic
+locators (`ROLE=`/`LABEL=`/`INDEX=` on CLICK/TYPE/GETTEXT's classic
+form, resolved via a fresh `AmipWalkWindow()` walk — proximity-to-
+label matching deliberately not built, an honest limit not a gap),
+and `DRAG` (`server/src/action.c`'s `AmipDragAt()`/
+`AmipDragGadgetBy()`/`AmipDragGadgetToGadget()` — an offset form for
+sliders/scrollers and a gadget-to-gadget form for drag-and-drop,
+built on a single press/absolute-jump/release, not synthesized
+continuous motion). See
 `server/README.md` for the full verb set and what's verified for each.
 `manifest/` carries the manifest contract (`manifest/SPEC.md`, parsed
 by `server/src/manifest.c` — no screen-awareness yet, `SCREEN=` only
@@ -244,11 +252,13 @@ every `CreateGadget` tag list, or the `_` shortcut markers in labels
 render as literal underscores instead of underlined shortcuts.
 
 **`server/`, `host/`, `manifest/`, `tests/`** — see "Current state"
-above for what's real in each. Remaining phase 0.4 scope: drag and
-tier-2 semantic locators. (TCP access control — `TCPALLOW`/
-`TCPPASSWORD` — landed; see "Current state" above.) Read the
-corresponding `README.md`, `server/WIRE.md`, and the implementation
-plan's "Phases" section before starting work in any of these.
+above for what's real in each. Phase 0.4 scope is now complete: TCP
+transport + hardening (`TCPALLOW`/`TCPPASSWORD`), string entry, menus,
+launch, the file API, tier-2 semantic locators (`ROLE=`/`LABEL=`/
+`INDEX=`), and drag (`DRAG`, both the offset and gadget-to-gadget
+forms) have all landed on main. Read the corresponding `README.md`,
+`server/WIRE.md`, and the implementation plan's "Phases" section
+before starting work in any of these.
 
 ## House conventions (this repo and its siblings)
 

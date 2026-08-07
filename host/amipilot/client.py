@@ -1,9 +1,9 @@
 """The AmiPilot object API: a Pythonic client over `WireClient`
 (server/WIRE.md framing) matching the verb set `AmiPilotServer`
 currently implements (TREE/CLICK/TYPE/GETTEXT/MANIFEST/LAUNCH/
-FSLIST/FSSTAT/FSMKDIR/FSDELETE/FSGET/MENU/MENUPICK/SCREENS/VERSION/
-QUIT -- see server/README.md; windows/list, find, drag, and fs-put are
-still 0.4+ scope, not invented here ahead of the server actually
+FSLIST/FSSTAT/FSMKDIR/FSDELETE/FSGET/MENU/MENUPICK/DRAG/SCREENS/
+VERSION/QUIT -- see server/README.md; windows/list, find, and fs-put
+are still 0.4+ scope, not invented here ahead of the server actually
 offering them).
 
 Quoting matches the ARexx port's own command grammar (arexx_cmd.c):
@@ -364,6 +364,59 @@ class Amipilot:
             f"GETTEXT {_screen_prefix(screen)}{_quote(window_pattern)} "
             f"{_role_locator(role, label, index)}"
         ).text
+
+    def drag(
+        self,
+        window_pattern: str,
+        gadget_id: int,
+        dx: int,
+        dy: int,
+        *,
+        screen: str | None = None,
+    ) -> None:
+        """DRAG <window-pattern> <gadget-id> <dx> <dy> -- a genuine
+        press/move/release drag of the gadget's current center by a
+        pixel offset. The natural shape for adjusting a slider/
+        scroller (GadTools SLIDER_KIND/PROP_KIND), which is a delta
+        operation. Raises NotFound (no such window/gadget) or
+        ActionFailed (event injection didn't deliver). `screen`
+        narrows the window search the same way `tree()`'s does."""
+        self._run(
+            f"DRAG {_screen_prefix(screen)}{_quote(window_pattern)} {gadget_id} {dx} {dy}"
+        )
+
+    def drag_by_name(self, name: str, dx: int, dy: int) -> None:
+        """DRAG @<name> <dx> <dy> -- the manifest-locator form of
+        `drag()`; requires a manifest loaded first via `manifest()`."""
+        self._run(f"DRAG @{name} {dx} {dy}")
+
+    def drag_to(
+        self,
+        window_pattern: str,
+        src_gadget_id: int,
+        dest_gadget_id: int,
+        *,
+        screen: str | None = None,
+    ) -> None:
+        """DRAG <window-pattern> <src-gadget-id> TO <dest-gadget-id> --
+        drags src's current center onto dest's, both resolved live at
+        action time and both in the same window -- zero coordinates in
+        the caller's script, for drag-and-drop/reorder cases (e.g.
+        dragging one listview item onto another). Raises NotFound (no
+        such window/either gadget) or ActionFailed (event injection
+        didn't deliver)."""
+        self._run(
+            f"DRAG {_screen_prefix(screen)}{_quote(window_pattern)} "
+            f"{src_gadget_id} TO {dest_gadget_id}"
+        )
+
+    def drag_to_by_name(self, src_name: str, dest_name: str) -> None:
+        """DRAG @<src-name> TO @<dest-name> -- the manifest-locator
+        form of `drag_to()`; both names must resolve to the same
+        window (the server rejects a cross-window destination
+        explicitly -- server/src/amipilotserver/main.c's
+        HandleCommand())."""
+        self._run(f"DRAG @{src_name} TO @{dest_name}")
 
     def manifest(self, path: str) -> str:
         """MANIFEST <path> -- loads (replacing any previous) manifest

@@ -152,6 +152,7 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
     else if (ci_streq(kw, "FSGET"))    out->type = AMIP_AREXX_CMD_FSGET;
     else if (ci_streq(kw, "MENU"))     out->type = AMIP_AREXX_CMD_MENU;
     else if (ci_streq(kw, "MENUPICK")) out->type = AMIP_AREXX_CMD_MENUPICK;
+    else if (ci_streq(kw, "DRAG"))     out->type = AMIP_AREXX_CMD_DRAG;
     else if (ci_streq(kw, "SCREENS"))  out->type = AMIP_AREXX_CMD_SCREENS;
     else if (ci_streq(kw, "AUTH"))     out->type = AMIP_AREXX_CMD_AUTH;
     else if (ci_streq(kw, "QUIT"))     out->type = AMIP_AREXX_CMD_QUIT;
@@ -363,6 +364,59 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
             }
             strncpy(out->text, p, sizeof(out->text) - 1);
             out->text[sizeof(out->text) - 1] = '\0';
+        }
+    }
+
+    if (out->type == AMIP_AREXX_CMD_DRAG) {
+        p = skip_ws(p);
+        if (*p == '\0') {
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+        /* "TO" as a standalone token (not a prefix of a longer word --
+         * checked via the char right after it being whitespace or
+         * end-of-line) selects the gadget-to-gadget form; anything
+         * else is the offset form's first number. */
+        if (ci_streq_prefix(p, "TO")
+            && (p[2] == ' ' || p[2] == '\t' || p[2] == '\0')) {
+            int trunc;
+            out->dragIsOffset = 0;
+            p = skip_ws(p + 2);
+            if (*p == '\0') {
+                out->type = AMIP_AREXX_CMD_UNKNOWN;
+                return -1;
+            }
+            if (*p == '@') {
+                p++;
+                p = read_token(p, out->dragToManifestName,
+                               sizeof(out->dragToManifestName), &trunc);
+                if (fail_if_trunc(trunc, out)) return -1;
+                if (out->dragToManifestName[0] == '\0') {
+                    out->type = AMIP_AREXX_CMD_UNKNOWN;
+                    return -1;
+                }
+            } else {
+                char idbuf[16];
+                p = read_token(p, idbuf, sizeof(idbuf), &trunc);
+                if (fail_if_trunc(trunc, out)) return -1;
+                out->dragToGadgetId = strtol(idbuf, NULL, 10);
+            }
+        } else {
+            char numbuf[16];
+            int trunc;
+            out->dragIsOffset = 1;
+            p = read_token(p, numbuf, sizeof(numbuf), &trunc);
+            if (fail_if_trunc(trunc, out)) return -1;
+            out->dragDx = strtol(numbuf, NULL, 10);
+
+            p = skip_ws(p);
+            if (*p == '\0') {
+                out->type = AMIP_AREXX_CMD_UNKNOWN;
+                return -1;
+            }
+            p = read_token(p, numbuf, sizeof(numbuf), &trunc);
+            if (fail_if_trunc(trunc, out)) return -1;
+            out->dragDy = strtol(numbuf, NULL, 10);
         }
     }
 

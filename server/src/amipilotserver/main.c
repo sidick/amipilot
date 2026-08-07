@@ -504,6 +504,37 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
         cmd->gadgetId = id;
     }
 
+    /* DRAG's SECOND locator ("TO @<dest-name>") -- same manifest
+     * resolution as above, but only the gadgetId half is kept:
+     * dragToGadgetId is resolved against the SAME window as the
+     * source (arexx_cmd.h's DRAG doc comment), so a destination whose
+     * own manifest entry names a DIFFERENT window is a real,
+     * explicit error rather than a silent wrong-window drag. */
+    if (cmd->type == AMIP_AREXX_CMD_DRAG && cmd->dragToManifestName[0] != '\0') {
+        const char *destTitle;
+        long destId;
+
+        if (!g_manifestLoaded) {
+            strncpy(g_resultBuf, "no manifest loaded", sizeof(g_resultBuf) - 1);
+            *resultOut = g_resultBuf;
+            return AMIP_AREXX_RC_ERROR;
+        }
+        if (AmipManifestResolve(&g_manifest, cmd->dragToManifestName, &destTitle, &destId) != 0) {
+            snprintf(g_resultBuf, sizeof(g_resultBuf),
+                     "no such name in manifest: %s", cmd->dragToManifestName);
+            *resultOut = g_resultBuf;
+            return AMIP_AREXX_RC_ERROR;
+        }
+        if (strcmp((const char *)cmd->windowPattern, destTitle) != 0) {
+            snprintf(g_resultBuf, sizeof(g_resultBuf),
+                     "drag destination @%s is in a different window (%s) than the source (%s)",
+                     cmd->dragToManifestName, destTitle, cmd->windowPattern);
+            *resultOut = g_resultBuf;
+            return AMIP_AREXX_RC_ERROR;
+        }
+        cmd->dragToGadgetId = destId;
+    }
+
     switch (cmd->type) {
         case AMIP_AREXX_CMD_MANIFEST:
             rc = LoadManifest(cmd->path, g_resultBuf, sizeof(g_resultBuf));
@@ -525,7 +556,7 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                      "AMIPILOT " XSTR(VERSION) "." XSTR(REVISION) " PROTOCOL 1\n"
                      "STABLE VERSION\n"
                      "EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH "
-                     "FSLIST FSSTAT FSMKDIR FSDELETE FSGET MENU MENUPICK "
+                     "FSLIST FSSTAT FSMKDIR FSDELETE FSGET MENU MENUPICK DRAG "
                      "SCREENS AUTH QUIT\n");
             result = g_resultBuf;
             break;
@@ -605,6 +636,41 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                 break;
             }
             result = g_resultBuf;
+            break;
+        }
+
+        case AMIP_AREXX_CMD_DRAG: {
+            struct Window *w = AmipFindWindow((CONST_STRPTR)cmd->screenPattern, (CONST_STRPTR)cmd->windowPattern);
+            struct Gadget *src;
+
+            if (w == NULL) {
+                rc = AMIP_AREXX_RC_WARN;
+                break;
+            }
+            src = ResolveTargetGadget(w, cmd, &rc);
+            if (src == NULL || !AmipIsWindowOpen(w)) {
+                rc = AMIP_AREXX_RC_WARN;
+                break;
+            }
+            if (cmd->dragIsOffset) {
+                if (!AmipDragGadgetBy(w, src, (WORD)cmd->dragDx, (WORD)cmd->dragDy)) {
+                    rc = AMIP_AREXX_RC_FAIL;
+                }
+            } else {
+                /* Destination resolved by plain numeric ID only (no
+                 * ROLE=/LABEL= locator for the "TO" side -- see
+                 * arexx_cmd.h's DRAG doc comment) -- @name was already
+                 * resolved into dragToGadgetId up front, above,
+                 * alongside the primary "@name" resolution. */
+                struct Gadget *dest = AmipFindGadgetById(w, (ULONG)cmd->dragToGadgetId);
+                if (dest == NULL) {
+                    rc = AMIP_AREXX_RC_WARN;
+                    break;
+                }
+                if (!AmipDragGadgetToGadget(w, src, dest)) {
+                    rc = AMIP_AREXX_RC_FAIL;
+                }
+            }
             break;
         }
 

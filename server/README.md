@@ -316,6 +316,51 @@ Lands in phase 0.2 onward -- see
   pair to disambiguate, not just a single unambiguous instance
   `ROLE=`/`LABEL=` alone could already find.
 
+- **Drag (phase 0.4, in progress):** `DRAG <window-pattern> <locator>
+  <dx> <dy>` -- a genuine press/move/release drag of the target
+  gadget's current center by a pixel offset, the natural shape for
+  adjusting a slider/scroller (GadTools `SLIDER_KIND`/`PROP_KIND`,
+  which is inherently a delta operation). `DRAG <window-pattern>
+  <locator> TO <dest-gadget-id>` (or `TO @<dest-name>`) is the
+  gadget-to-gadget form instead: drags the source onto a second
+  gadget's center, both resolved live at action time, zero
+  coordinates in the caller's script -- for drag-and-drop/reorder
+  cases (e.g. dragging one listview item onto another). The
+  destination is always resolved against the SAME window as the
+  source; a `TO @<dest-name>` whose own manifest entry names a
+  different window is rejected explicitly (`RC 10`), not silently
+  dragged into the wrong window. The source locator is exactly
+  CLICK/TYPE/GETTEXT's (numeric `GA_ID`, tier-2 `ROLE=`/`LABEL=`/
+  `INDEX=`, or `@name`) -- DRAG gets tier-2 source locators for free
+  from the same parser path. No `ROLE=`/`LABEL=` form for the
+  destination, keeping this verb's scope contained.
+
+  `AmipDragAt()` (`server/src/action.c`) is the raw primitive: a real
+  `IECLASS_RAWMOUSE` button-down, an absolute `IEPointerPixel` jump to
+  the destination, a real button-up -- built on the same
+  `AmipMoveMouseTo()`/button-injection code `AmipClickAt()` already
+  uses (`AmipGadgetCenter()`, refactored out of `AmipClickGadget()`,
+  is the shared geometry-resolution step both now call). **Honest
+  limit:** the move between press and release is a single absolute
+  jump, not synthesized continuous motion -- sufficient for
+  Intuition's own built-in prop-gadget/window-drag tracking (which
+  watches ordinary mouse-move events regardless of how many arrive),
+  but an application with its OWN per-frame-delta-sensitive drag
+  handling could in principle behave differently than under a real
+  human drag across every intervening pixel. Narrows to "the
+  endpoints are always genuine input.device events reaching the real
+  event path," not full motion-stream fidelity.
+
+  Verified live against a real `AmiPilotServer` (Amiberry, not just
+  build/lint): a `SLIDER_KIND` gadget added to `fixtures/gadtools-app`
+  for this purpose (range 0..100, starts at 0) whose `IDCMP_GADGETUP`
+  handler writes the live level GadTools itself reports (the event's
+  own `Code` field, its documented contract for `SLIDER_KIND`/
+  `PROP_KIND`) into the Host string gadget -- the same observable-
+  marker technique the Cancel button/menu items already use, proving
+  a `DRAG` genuinely reached GadTools' real slider-tracking code, not
+  just that input.device events were injected.
+
 - **Screens (phase 0.4, in progress):** `SCREENS` (no arguments) lists
   every open screen -- title, position, size, and whether it's
   frontmost. Every window-targeting verb (`TREE`/`CLICK`/`TYPE`/

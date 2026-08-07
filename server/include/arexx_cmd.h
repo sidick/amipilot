@@ -37,6 +37,10 @@ typedef enum {
     AMIP_AREXX_CMD_FSGET,    /* FSGET <path> */
     AMIP_AREXX_CMD_MENU,     /* MENU <window-pattern> */
     AMIP_AREXX_CMD_MENUPICK, /* MENUPICK <window-pattern> <menu-num> <item-num> [<sub-num>] */
+    AMIP_AREXX_CMD_DRAG,     /* DRAG <window-pattern> (<gadget-id> | ROLE=<r> [LABEL=<l>] [INDEX=<n>]) <dx> <dy> |
+                              * DRAG <window-pattern> (<gadget-id> | ROLE=<r> [LABEL=<l>] [INDEX=<n>]) TO (<dest-gadget-id> | @<dest-name>) |
+                              * DRAG @<name> <dx> <dy> |
+                              * DRAG @<name> TO (<dest-gadget-id> | @<dest-name>) */
     AMIP_AREXX_CMD_SCREENS,  /* SCREENS */
     AMIP_AREXX_CMD_AUTH,     /* AUTH <password> */
     AMIP_AREXX_CMD_QUIT      /* QUIT */
@@ -119,6 +123,27 @@ typedef struct {
     long menuNum, itemNum;                      /* MENUPICK */
     long subNum;                                /* MENUPICK; -1 = a top-level
                                                   * item, not a submenu entry */
+    int dragIsOffset;                           /* DRAG: 1 = dragDx/dragDy below are
+                                                  * the destination (offset form);
+                                                  * 0 = dragToGadgetId/
+                                                  * dragToManifestName are (gadget-to-
+                                                  * gadget form, via "TO ..."). */
+    long dragDx, dragDy;                        /* DRAG offset form: pixels from the
+                                                  * source gadget's current center. */
+    long dragToGadgetId;                        /* DRAG gadget-to-gadget form:
+                                                  * destination GA_ID, in the same
+                                                  * window as the source locator.
+                                                  * Filled in directly from a numeric
+                                                  * "TO <n>" token, or resolved from
+                                                  * dragToManifestName below (same
+                                                  * up-front manifest-resolution pass
+                                                  * the primary locator's @name form
+                                                  * already gets, see
+                                                  * amipilotserver/main.c). */
+    char dragToManifestName[AMIP_AREXX_MAX_NAME]; /* DRAG gadget-to-gadget form:
+                                                    * "TO @<dest-name>"; empty =
+                                                    * dragToGadgetId was given
+                                                    * directly instead. */
     int argTooLong;                             /* set when some argument didn't
                                                   * fit its field (see the
                                                   * AMIP_AREXX_MAX_* caps above)
@@ -212,6 +237,32 @@ typedef struct {
  * not the live Title field, which tracks whichever window is
  * currently active on that screen rather than naming the screen
  * itself). Omitted = today's unchanged behavior: search every screen.
+ *
+ * DRAG's SOURCE locator is parsed exactly like CLICK/TYPE/GETTEXT's
+ * (classic <window-pattern> + numeric-or-ROLE/LABEL/INDEX locator, or
+ * "@<name>", with the same optional leading "SCREEN=<substring>" on
+ * the classic form) -- it gets tier-2 locators for free from the same
+ * code path. After the source locator, DRAG takes exactly one of:
+ *   - "<dx> <dy>" -- two signed integers, the offset form
+ *     (dragIsOffset=1, dragDx/dragDy set): drags the source gadget's
+ *     current center by that pixel offset. The natural shape for
+ *     adjusting a slider/scroller (GadTools SLIDER_KIND/PROP_KIND),
+ *     which is a delta operation.
+ *   - "TO <dest-gadget-id>" or "TO @<dest-name>" -- the gadget-to-
+ *     gadget form (dragIsOffset=0): drags the source gadget's current
+ *     center onto the destination's, both resolved live at action
+ *     time. The destination is always resolved against the SAME
+ *     window as the source (no cross-window drag) -- "TO @<dest-name>"
+ *     resolves dragToManifestName into dragToGadgetId the same way the
+ *     primary "@name" locator resolves into windowPattern/gadgetId
+ *     (server/src/amipilotserver/main.c's HandleCommand(), a second,
+ *     parallel resolution pass for this second locator). Note the
+ *     destination locator is numeric-or-@name ONLY -- no ROLE=/LABEL=
+ *     form for the destination, keeping this verb's scope contained.
+ * Which of the two forms is present is determined by whether the next
+ * token after the source locator is (case-insensitively) "TO" -- not
+ * by argument count, since both forms could otherwise be ambiguous
+ * with a stray trailing token.
  *
  * SCREENS takes no arguments, like VERSION/QUIT.
  *
