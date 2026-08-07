@@ -32,11 +32,27 @@ needs installing beyond Python 3.9+.
   inspector" (`docs/implementation-plan.md`): connects, prints a
   window's gadget tree (`--format text`, the same shape `AmiInspect`
   prints) or quirk-profile-ready name suggestions (`--format python`).
+- **Golden-tree fixtures** (`amipilot.golden`, phase 0.5 --
+  `docs/implementation-plan.md`'s "Golden trees": "a saved dump
+  doubles as a structural fixture"): `assert_golden(window, path)`
+  compares a live `tree()` against a checked-in text snapshot,
+  auto-creating it the first time and raising `GoldenMismatch` (with a
+  unified diff) on drift thereafter. `amipilot dump <window> --golden
+  PATH [--update-golden]` is the CLI form of the same check --
+  `Amipilot.assert_tree_matches()` is the one-liner for use inside a
+  test. **Locale matters here**: the rendered text includes window/
+  screen titles verbatim, which a real (catalog-driven) application's
+  own localization can change without any UI change at all -- see
+  `tests/copperline/README.md`'s "Golden-tree fixtures and Locale"
+  section before treating a golden file as portable across machines
+  with different Locale preferences.
 - Verified end to end against a real guest under Copperline
   (`tests/copperline/run.sh`'s wire check, and `amipilot dump` run by
   hand against the same session): connect, handshake, `TREE`/`TYPE`/
   `GETTEXT`/`CLICK` all round-trip correctly, RC-5 (not found) surfaces
-  as a clean CLI error.
+  as a clean CLI error. The golden-tree check (`run_golden_check`) is
+  verified the same way, against real checked-in golden files for
+  both fixtures.
 
 - **`amipilot.pytest_plugin`** -- the pytest plugin (auto-registered via
   the `pytest11` entry point once `host/` is installed): the

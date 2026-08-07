@@ -9,43 +9,11 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 
 from .client import Amipilot, AmipilotError
-from .model import Window
-
-
-def _escape(s: str) -> str:
-    """Re-escapes a field model.py already unescaped, so render_text()'s
-    output stays parseable by the same fixed format it claims to match
-    (`AmiInspect`'s own text) -- a title/label containing a literal `"`
-    must round-trip through this the same way it does over the wire."""
-    return s.replace("\\", "\\\\").replace('"', '\\"')
-
-
-def render_text(window: Window) -> str:
-    lines = [f'window "{_escape(window.title)}" screen="{_escape(window.screen)}" '
-             f"[{window.left},{window.top} {window.width}x{window.height}]"]
-    for g in window.gadgets:
-        value = f' value="{_escape(g.value)}"' if g.value is not None else ""
-        lines.append(
-            f"  gadget id={g.gadget_id} role={g.role} "
-            f'class="{_escape(g.class_name)}" label="{_escape(g.label)}"{value} '
-            f"[{g.left},{g.top} {g.width}x{g.height}]"
-        )
-    return "\n".join(lines)
-
-
-def render_python(window: Window) -> str:
-    """A quirk-profile-ready form: one `# name = <id>` suggestion per
-    gadget, commented so it's copy/paste starting material, not a
-    guess at final naming."""
-    lines = [f'# window "{window.title}"']
-    for g in window.gadgets:
-        label = g.label or g.role.lower()
-        slug = "".join(c if c.isalnum() else "_" for c in label.lower()).strip("_")
-        lines.append(f"# {slug or 'gadget'} = {g.gadget_id}  "
-                      f"# role={g.role} label={g.label!r}")
-    return "\n".join(lines)
+from .golden import GoldenMismatch, assert_golden
+from .render import render_python, render_text
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -65,6 +33,18 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--format", choices=["text", "python"], default="text",
                         help="text: same format AmiInspect prints; "
                              "python: quirk-profile-ready name suggestions")
+    parser.add_argument("--golden", default=None, metavar="PATH",
+                        help="compare the live tree against a golden-tree "
+                             "file instead of printing it -- exits 1 with a "
+                             "diff on a mismatch, 0 on a match. Ignores "
+                             "--format (golden files always use the text "
+                             "shape). A path that doesn't exist yet is "
+                             "created, same as --update-golden.")
+    parser.add_argument("--update-golden", action="store_true",
+                        help="with --golden, (re)write the golden file from "
+                             "the live tree instead of comparing against it "
+                             "-- use once a UI change is confirmed "
+                             "intentional")
     args = parser.parse_args(argv)
 
     try:
@@ -77,6 +57,18 @@ def main(argv: list[str] | None = None) -> int:
         print(f"amipilot dump: could not connect to {args.host}:{args.port}: {e}",
               file=sys.stderr)
         return 1
+
+    if args.golden:
+        golden_path = Path(args.golden)
+        wrote = args.update_golden or not golden_path.exists()
+        try:
+            assert_golden(window, golden_path, update=args.update_golden)
+        except GoldenMismatch as e:
+            print(f"amipilot dump: {e}", file=sys.stderr)
+            return 1
+        print(f"amipilot dump: wrote {golden_path}" if wrote
+              else f"amipilot dump: {golden_path} matches")
+        return 0
 
     render = render_text if args.format == "text" else render_python
     print(render(window))

@@ -52,6 +52,30 @@ make amiga fixtures
 make test-target
 ```
 
+### Golden-tree fixtures and Locale
+
+`run.sh` also asserts each fixture's live window/gadget tree still
+matches a checked-in golden file (`fixtures/gadtools-app/GTApp.golden`,
+`fixtures/classact-app/CAApp.golden` — see `host/amipilot/golden.py`).
+These two golden files are locale-invariant for this repository's own
+fixtures specifically, because `fixtures/gadtools-app/src/main.c` and
+`fixtures/classact-app/src/main.c` hardcode their gadget labels and
+window titles as plain C string literals — no `locale.library` catalog
+lookup, so no text in their golden files can change with the running
+system's Locale preference.
+
+**That is a property of these two fixtures, not of golden trees in
+general.** A golden file taken against a real, localized application
+(one that resolves its window title or gadget labels through a
+catalog) will only reproduce on a machine set to the same Locale that
+generated it — the window/screen title lines in the rendered text are
+literal strings the running OS/app supplied, and comparison is an
+exact match with no locale-awareness built in. If you generate golden
+files for your own application under test, regenerate them against a
+single, documented reference Locale (or keep one canonical machine/CI
+environment that owns golden-file generation) rather than letting
+each contributor's own Workbench install produce a slightly different
+"golden" and fight over spurious diffs.
 ## Ad hoc smoke testing (debugging, new fixtures)
 
 For anything `run.sh` doesn't already assert on, write

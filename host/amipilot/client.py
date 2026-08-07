@@ -21,8 +21,10 @@ from __future__ import annotations
 
 import socket
 import time
+from pathlib import Path
 
 from .fs import FsEntry, parse_fs_entries, parse_fs_entry
+from .golden import assert_golden
 from .menu import MenuStrip, parse_menu_strip
 from .model import Window, parse_tree
 from .screen import Screen, parse_screens
@@ -341,6 +343,27 @@ class Amipilot:
         existed."""
         reply = self._run(f"TREE {_screen_prefix(screen)}{_quote(window_pattern)}")
         return parse_tree(reply.text)
+
+    def assert_tree_matches(
+        self,
+        window_pattern: str,
+        golden_path: str | Path,
+        *,
+        screen: str | None = None,
+        update: bool = False,
+    ) -> None:
+        """One-line golden-tree assertion (docs/implementation-plan.md,
+        "The inspector": "a saved dump doubles as a structural fixture
+        -- 'this app's UI still has this shape'"): fetches the live
+        tree() and compares it against the file at `golden_path`
+        (created automatically the first time), raising
+        golden.GoldenMismatch with a unified diff on any drift.
+        `update=True` regenerates the file instead of comparing --
+        use once a UI change is confirmed intentional, matching
+        `amipilot dump --golden ... --update-golden`'s own CLI form
+        of this same check."""
+        window = self.tree(window_pattern, screen=screen)
+        assert_golden(window, golden_path, update=update)
 
     def click(
         self,

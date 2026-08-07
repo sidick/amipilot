@@ -877,5 +877,43 @@ class ConnectWithRetry(unittest.TestCase):
         self.assertFalse(fake_sock.closed)
 
 
+class AssertTreeMatches(unittest.TestCase):
+    """assert_tree_matches() composes tree() with golden.assert_golden()
+    -- see host/tests/test_golden.py for assert_golden()'s own
+    coverage; these tests only confirm the wire round trip and that a
+    mismatch raises through to the caller."""
+
+    TREE_PAYLOAD = (
+        'window "GadTools" screen="Workbench Screen" [0,0 10x10]\n'
+        '  gadget id=1 role=BUTTON class="" label="Connect" [0,0 1x1]\n'
+    )
+
+    def _client(self):
+        payload = self.TREE_PAYLOAD.encode()
+        return client_with(b"RC 0 %d\n%s" % (len(payload), payload))
+
+    def test_creates_golden_file_on_first_run(self):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "GTApp.golden"
+            self._client().assert_tree_matches("GadTools", path)
+            self.assertIn("Connect", path.read_text(encoding="latin-1"))
+
+    def test_mismatch_raises_golden_mismatch(self):
+        import tempfile
+        from pathlib import Path
+
+        from amipilot.golden import GoldenMismatch
+
+        with tempfile.TemporaryDirectory() as d:
+            path = Path(d) / "GTApp.golden"
+            path.write_text('window "Something Else" screen="" [0,0 1x1]\n',
+                             encoding="latin-1")
+            with self.assertRaises(GoldenMismatch):
+                self._client().assert_tree_matches("GadTools", path)
+
+
 if __name__ == "__main__":
     unittest.main()

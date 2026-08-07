@@ -23,10 +23,19 @@ just a documented convention for community-authored, third-party-app
 manifests carrying known-oddity notes as comment lines -- see
 `manifest/SPEC.md`'s own "Quirk profiles" section. The honest-limits
 toolkit-to-tier table lives in
-`userdocs/Locator-Tiers-and-Limits.md`. Remaining 0.5 scope: the
-MUI-ARexx bridge tier (deferred -- needs a MUI development
-environment not currently available), golden-tree fixtures, and the
-stock-app conformance set.
+`userdocs/Locator-Tiers-and-Limits.md`. Golden-tree fixtures are real
+too: `amipilot.golden`'s `assert_golden()`/`GoldenMismatch`, wired
+into `amipilot dump --golden`/`Amipilot.assert_tree_matches()` and
+into `tests/copperline/run.sh`'s `run_golden_check` against real,
+checked-in golden files for both fixtures
+(`fixtures/gadtools-app/GTApp.golden`,
+`fixtures/classact-app/CAApp.golden`) -- see
+`tests/copperline/README.md`'s "Golden-tree fixtures and Locale"
+section for the real reproducibility caveat found while building
+this (window/screen titles, and a real app's catalog-driven labels,
+aren't Locale-invariant). Remaining 0.5 scope: the MUI-ARexx bridge
+tier (deferred -- needs a MUI development environment not currently
+available) and the stock-app conformance set.
 `intuition-model/` (the walker library) and `amiinspect/` (the Shell
 command) are real, building, and verified on-target. `server/` is
 real: the action engine (`server/src/action.c`, click/type/geometry/
