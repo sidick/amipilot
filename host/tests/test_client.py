@@ -346,6 +346,37 @@ class WaitFor(unittest.TestCase):
                 c.wait_for_screen("Second", timeout=1.0, poll_interval=0.5)
 
 
+class Connect(unittest.TestCase):
+    """Amipilot.connect() (the single-attempt path, distinct from
+    connect_with_retry()'s own retry loop) sends AUTH the same way."""
+
+    def test_sends_auth_with_default_password(self):
+        version_payload = (
+            b"AMIPILOT 0.3 PROTOCOL 1\n"
+            b"STABLE VERSION\n"
+            b"EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST QUIT\n"
+        )
+        c = client_with(b"RC 0 %d\n%s" % (len(version_payload), version_payload),
+                         b"RC 0 0\n")  # VERSION, then AUTH
+        with mock.patch.object(WireClient, "connect", lambda *a, **kw: c._wire):
+            Amipilot.connect("127.0.0.1", 1234)
+        self.assertEqual(c._wire._t.sent[0], b"VERSION\n")
+        self.assertEqual(c._wire._t.sent[1], b"AUTH amipilot\n")
+
+    def test_wrong_password_raises_and_closes(self):
+        version_payload = (
+            b"AMIPILOT 0.3 PROTOCOL 1\n"
+            b"STABLE VERSION\n"
+            b"EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST QUIT\n"
+        )
+        auth_payload = b"authentication failed: wrong password"
+        c = client_with(b"RC 0 %d\n%s" % (len(version_payload), version_payload),
+                         b"RC 10 %d\n%s" % (len(auth_payload), auth_payload))
+        with mock.patch.object(WireClient, "connect", lambda *a, **kw: c._wire):
+            with self.assertRaises(CommandError):
+                Amipilot.connect("127.0.0.1", 1234, password="wrong")
+
+
 class FakeSocket:
     """A connected-socket stand-in for connect_with_retry's post-
     connect path: settimeout/sendall/recv/close, no real TCP. `chunks`
@@ -357,12 +388,13 @@ class FakeSocket:
     def __init__(self, chunks=()):
         self._chunks = list(chunks)
         self.closed = False
+        self.sent: list[bytes] = []
 
     def settimeout(self, _t):
         pass
 
-    def sendall(self, _data):
-        pass
+    def sendall(self, data):
+        self.sent.append(data)
 
     def recv(self, _n):
         if not self._chunks:
@@ -390,7 +422,10 @@ class ConnectWithRetry(unittest.TestCase):
 
     def test_succeeds_after_transient_connect_refusals(self):
         attempts = {"n": 0}
-        fake_sock = FakeSocket([b"RC 0 %d\n%s" % (len(VERSION_PAYLOAD), VERSION_PAYLOAD)])
+        fake_sock = FakeSocket([
+            b"RC 0 %d\n%s" % (len(VERSION_PAYLOAD), VERSION_PAYLOAD),
+            b"RC 0 0\n",  # AUTH, sent automatically by connect_with_retry()
+        ])
 
         def fake_create_connection(addr, timeout=10.0):
             attempts["n"] += 1
@@ -408,7 +443,10 @@ class ConnectWithRetry(unittest.TestCase):
 
     def test_reuses_the_same_socket_not_a_new_one_per_attempt(self):
         calls = {"n": 0}
-        fake_sock = FakeSocket([b"RC 0 %d\n%s" % (len(VERSION_PAYLOAD), VERSION_PAYLOAD)])
+        fake_sock = FakeSocket([
+            b"RC 0 %d\n%s" % (len(VERSION_PAYLOAD), VERSION_PAYLOAD),
+            b"RC 0 0\n",  # AUTH, sent automatically by connect_with_retry()
+        ])
 
         def fake_create_connection(addr, timeout=10.0):
             calls["n"] += 1
@@ -437,6 +475,50 @@ class ConnectWithRetry(unittest.TestCase):
              mock.patch.object(time, "sleep", lambda _s: None):
             with self.assertRaisesRegex(TimeoutError, "never answered VERSION"):
                 Amipilot.connect_with_retry("127.0.0.1", 1234, deadline_seconds=0.1)
+        self.assertTrue(fake_sock.closed)
+
+    def test_sends_auth_with_default_password_after_handshake(self):
+        fake_sock = FakeSocket([
+            b"RC 0 %d\n%s" % (len(VERSION_PAYLOAD), VERSION_PAYLOAD),
+            b"RC 0 0\n",
+        ])
+
+        with mock.patch.object(socket, "create_connection",
+                                lambda addr, timeout=10.0: fake_sock), \
+             mock.patch.object(time, "sleep", lambda _s: None):
+            Amipilot.connect_with_retry("127.0.0.1", 1234, deadline_seconds=5)
+
+        self.assertEqual(fake_sock.sent[0], b"VERSION\n")
+        self.assertEqual(fake_sock.sent[1], b"AUTH amipilot\n")
+
+    def test_sends_auth_with_custom_password(self):
+        fake_sock = FakeSocket([
+            b"RC 0 %d\n%s" % (len(VERSION_PAYLOAD), VERSION_PAYLOAD),
+            b"RC 0 0\n",
+        ])
+
+        with mock.patch.object(socket, "create_connection",
+                                lambda addr, timeout=10.0: fake_sock), \
+             mock.patch.object(time, "sleep", lambda _s: None):
+            Amipilot.connect_with_retry("127.0.0.1", 1234, deadline_seconds=5,
+                                         password="hunter2")
+
+        self.assertEqual(fake_sock.sent[1], b"AUTH hunter2\n")
+
+    def test_wrong_password_raises_command_error_and_closes_socket(self):
+        payload = b"authentication failed: wrong password"
+        fake_sock = FakeSocket([
+            b"RC 0 %d\n%s" % (len(VERSION_PAYLOAD), VERSION_PAYLOAD),
+            b"RC 10 %d\n%s" % (len(payload), payload),
+        ])
+
+        with mock.patch.object(socket, "create_connection",
+                                lambda addr, timeout=10.0: fake_sock), \
+             mock.patch.object(time, "sleep", lambda _s: None):
+            with self.assertRaises(CommandError):
+                Amipilot.connect_with_retry("127.0.0.1", 1234, deadline_seconds=5,
+                                             password="wrong")
+
         self.assertTrue(fake_sock.closed)
 
 

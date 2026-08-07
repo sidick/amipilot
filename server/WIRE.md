@@ -21,7 +21,14 @@ sides stay binary-safe with zero escaping and a 68000-friendly parser.
   TCPPORT=n`), listen-mode only — the server binds and listens,
   the host connects in. One connection is treated as active at a
   time (a new one replaces the old); see `server/README.md` for the
-  full option set and what's verified. A guest-initiated (dial-out)
+  full option set and what's verified.
+  **SECURITY: this transport is meant for a trusted LAN or a direct
+  machine-to-machine link — never expose it on an open/internet-facing
+  port.** `TCPALLOW`/`TCPPASSWORD` (`server/README.md`) narrow who can
+  connect and require the `AUTH` verb below to succeed first, but
+  neither makes this internet-safe: there's no TLS, the `AUTH` default
+  is a fixed string checked into this public repo, and there's no
+  rate-limiting on repeated guesses. A guest-initiated (dial-out)
   mode — the Amiga connecting out to a configured host, useful for
   real hardware or an emulator behind NAT with no inbound path — is
   a proposed future addition, not yet built (tracked as
@@ -78,7 +85,7 @@ A client's first command after opening the transport SHOULD be
 ```
 AMIPILOT <major>.<minor> PROTOCOL 1
 STABLE VERSION
-EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH FSLIST FSSTAT FSMKDIR FSDELETE FSGET MENU MENUPICK SCREENS QUIT
+EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH FSLIST FSSTAT FSMKDIR FSDELETE FSGET MENU MENUPICK SCREENS AUTH QUIT
 ```
 
 - Line 1: server version (from `version.mk`) and the wire protocol
@@ -91,6 +98,18 @@ EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH FSLIST FSSTAT FSMKDIR FSDEL
 
 `VERSION` is also available over ARexx (same payload as the RESULT
 string) so on-Amiga scripts can feature-test too.
+
+## Authentication: `AUTH`
+
+`AUTH <password>` is answerable on every transport, but only ever
+**gates** anything on TCP — ARexx and serial.device keep their
+existing implicit trust boundaries (local machine, physical cable)
+and never check whether it succeeded. On TCP, until `AUTH` succeeds,
+every command except `VERSION` and `QUIT` returns `RC 10` without
+being dispatched. Right password → `RC 0 0`; wrong password → `RC 10`
+with a one-line reason. No rate-limiting or lockout on repeated
+guesses — deliberate, see the SECURITY note under "Transport" above
+and `server/README.md`'s TCP section.
 
 ## Sessions and lifecycle
 

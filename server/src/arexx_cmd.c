@@ -110,6 +110,7 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
     else if (ci_streq(kw, "MENU"))     out->type = AMIP_AREXX_CMD_MENU;
     else if (ci_streq(kw, "MENUPICK")) out->type = AMIP_AREXX_CMD_MENUPICK;
     else if (ci_streq(kw, "SCREENS"))  out->type = AMIP_AREXX_CMD_SCREENS;
+    else if (ci_streq(kw, "AUTH"))     out->type = AMIP_AREXX_CMD_AUTH;
     else if (ci_streq(kw, "QUIT"))     out->type = AMIP_AREXX_CMD_QUIT;
     else { out->type = AMIP_AREXX_CMD_UNKNOWN; return -1; }
 
@@ -123,7 +124,8 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
         out->type == AMIP_AREXX_CMD_FSSTAT ||
         out->type == AMIP_AREXX_CMD_FSMKDIR ||
         out->type == AMIP_AREXX_CMD_FSDELETE ||
-        out->type == AMIP_AREXX_CMD_FSGET) {
+        out->type == AMIP_AREXX_CMD_FSGET ||
+        out->type == AMIP_AREXX_CMD_AUTH) {
         p = skip_ws(p);
         if (*p == '\0') {
             out->type = AMIP_AREXX_CMD_UNKNOWN;

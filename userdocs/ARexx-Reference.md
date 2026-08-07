@@ -52,6 +52,7 @@ for disambiguating two same-titled windows on different screens; see
 | `SCREENS` | (none) | Lists every open screen: title, position, size, and whether it's frontmost. Title is each screen's own name (`DefaultTitle`), not the live title-bar text a window's `WA_ScreenTitle` can override. |
 | `MENU` | `<window-pattern>` | Returns the matched window's full menu strip — every pulldown menu, its items, and (one level deep) their submenu items, with checkit/checked/enabled state and any keyboard shortcut, in the same text shape `AmiInspect` prints. |
 | `MENUPICK` | `<window-pattern> <menu-num> <item-num> [<sub-num>]` | Selects a menu item via its keyboard shortcut (Right-Amiga + the shortcut character) — the numbers are the same 0-based chain positions `MENU`'s own output reports. `RC=20` if the item is disabled or has no keyboard shortcut (pointer-based selection for shortcut-less items isn't built yet). See [Wire Protocol](Wire-Protocol.md#menus) for the full contract. |
+| `AUTH` | `<password>` | Authenticates a TCP connection (no effect on ARexx or serial.device, which have their own implicit trust boundaries). Until it succeeds, the TCP transport refuses every command except `VERSION`/`AUTH`/`QUIT` with `RC=10`. See [Securing TCP](Wire-Protocol.md#securing-tcp). |
 | `QUIT` | (none) | Shuts the commodity down cleanly. |
 
 The same command set is also reachable from a host machine over
