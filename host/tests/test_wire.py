@@ -16,6 +16,7 @@ from amipilot.wire import (  # noqa: E402
     Reply,
     WireClient,
     WireError,
+    _SerialTransport,
 )
 
 
@@ -134,6 +135,74 @@ class Handshake(unittest.TestCase):
     def test_error_rc_raises(self):
         with self.assertRaises(WireError):
             WireClient(FakeTransport(b"RC 10 0\n")).handshake()
+
+
+class FakeSerial:
+    """Stands in for pyserial's Serial object -- just the surface
+    _SerialTransport actually touches (.write/.read/.close/.port/
+    .timeout), so these tests don't need pyserial installed at all
+    (it's an optional dependency, deliberately absent from the
+    make test-host environment -- see pyproject.toml)."""
+
+    def __init__(self, read_queue=(), port="/dev/fake0", timeout=5.0):
+        self.port = port
+        self.timeout = timeout
+        self.written = b""
+        self._read_queue = list(read_queue)
+        self.closed = False
+
+    def write(self, data: bytes) -> None:
+        self.written += data
+
+    def read(self, _n: int) -> bytes:
+        return self._read_queue.pop(0) if self._read_queue else b""
+
+    def close(self) -> None:
+        self.closed = True
+
+
+class SerialTransport(unittest.TestCase):
+    def test_sendall_writes_through(self):
+        ser = FakeSerial()
+        t = _SerialTransport(ser)
+        t.sendall(b"TREE GadTools\n")
+        self.assertEqual(ser.written, b"TREE GadTools\n")
+
+    def test_recv_reads_through(self):
+        ser = FakeSerial(read_queue=[b"RC 0 0\n"])
+        t = _SerialTransport(ser)
+        self.assertEqual(t.recv(4096), b"RC 0 0\n")
+
+    def test_recv_empty_raises_timeout_not_silent_close(self):
+        # pyserial's own read() returns b"" purely on ITS OWN timeout
+        # elapsing, not because anything closed -- WireClient._recv()
+        # would otherwise misdiagnose an empty read as "the peer closed
+        # the connection" (correct for a real socket, wrong here), so
+        # this must surface as an explicit TimeoutError instead.
+        ser = FakeSerial(read_queue=[b""], port="/dev/fake0", timeout=3.0)
+        t = _SerialTransport(ser)
+        with self.assertRaises(TimeoutError) as ctx:
+            t.recv(4096)
+        self.assertIn("/dev/fake0", str(ctx.exception))
+
+    def test_close_closes_through(self):
+        ser = FakeSerial()
+        t = _SerialTransport(ser)
+        t.close()
+        self.assertTrue(ser.closed)
+
+
+class ConnectSerial(unittest.TestCase):
+    def test_without_pyserial_raises_runtime_error(self):
+        try:
+            import serial  # noqa: F401
+        except ImportError:
+            pass
+        else:
+            self.skipTest("pyserial is installed in this environment")
+        with self.assertRaises(RuntimeError) as ctx:
+            WireClient.connect_serial("/dev/nonexistent", 19200)
+        self.assertIn("pyserial", str(ctx.exception))
 
 
 if __name__ == "__main__":

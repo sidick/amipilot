@@ -147,6 +147,38 @@ class Amipilot:
         return client
 
     @classmethod
+    def connect_serial(
+        cls,
+        device: str,
+        baud: int = 19200,
+        *,
+        timeout: float = 10.0,
+        password: str = DEFAULT_TCP_PASSWORD,
+    ) -> "Amipilot":
+        """The serial-port analog of `connect()` -- see
+        `WireClient.connect_serial()` for `device`/`baud`/`timeout`
+        (an OS-specific device path, matching the Amiga side's own
+        `BAUD`, and a per-read timeout respectively). Sends `AUTH
+        {password}` the same as `connect()` does for every transport
+        -- harmless here since serial.device never gates on it
+        server-side (see `connect()`'s own docstring), kept for one
+        consistent connect sequence regardless of transport. Same
+        close-on-failure guarantee as `connect()`: a failed handshake
+        or AUTH never leaks the port it just opened.
+
+        Requires `pyserial` (`pip install amipilot[serial]`) --
+        raises `RuntimeError` immediately if it isn't installed, via
+        `WireClient.connect_serial()`."""
+        client = cls(WireClient.connect_serial(device, baud, timeout=timeout))
+        try:
+            client.handshake()
+            client._run(f"AUTH {_quote(password)}")
+        except BaseException:
+            client.close()
+            raise
+        return client
+
+    @classmethod
     def connect_with_retry(
         cls,
         host: str,

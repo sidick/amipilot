@@ -67,10 +67,13 @@ def _request(tmp_path, **overrides):
         "--amipilot-copperline-ctl": "fake-ctl",
         "--amipilot-wire-port": 1234,
         "--amipilot-boot-timeout": 0.3,
+        "--amipilot-serial-device": None,
+        "--amipilot-serial-baud": 19200,
     }
     options.update(overrides)
     ini = {"amipilot_copperline_args": _DEFAULT_COPPERLINE_ARGS,
-           "amipilot_config": None}
+           "amipilot_config": None,
+           "amipilot_serial_device": None}
     return FakeRequest(options, ini)
 
 
@@ -207,3 +210,37 @@ class TestFixtureWiring:
         )
         result = pytester.runpytest()
         result.assert_outcomes(skipped=1)
+
+    def test_serial_and_config_together_raises_usage_error(self, pytester, tmp_path):
+        # Both connection modes configured at once is a config mistake,
+        # not something that should silently pick one -- see the
+        # amipilot fixture's own docstring.
+        pytester.syspathinsert(HOST_DIR)
+        cfg = tmp_path / "cfg.toml"
+        cfg.write_text("")
+        pytester.makepyfile(
+            test_it="def test_uses_amipilot(amipilot):\n    assert False\n"
+        )
+        result = pytester.runpytest(
+            f"--amipilot-config={cfg}",
+            "--amipilot-serial-device=/dev/nonexistent",
+        )
+        result.assert_outcomes(errors=1)
+        result.stdout.fnmatch_lines(["*mutually exclusive*"])
+
+    def test_serial_device_without_pyserial_raises_clear_error(self, pytester):
+        try:
+            import serial  # noqa: F401
+        except ImportError:
+            pass
+        else:
+            pytest.skip("pyserial is installed in this environment")
+        pytester.syspathinsert(HOST_DIR)
+        pytester.makepyfile(
+            test_it="def test_uses_amipilot(amipilot):\n    assert False\n"
+        )
+        result = pytester.runpytest(
+            "--amipilot-serial-device=/dev/nonexistent",
+        )
+        result.assert_outcomes(errors=1)
+        result.stdout.fnmatch_lines(["*pyserial*"])

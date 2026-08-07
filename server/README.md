@@ -23,6 +23,12 @@ Lands in phase 0.2 onward -- see
   `--serial tcp` bridge, handshakes, TYPEs into the fixture's string
   gadget, reads the value back, clicks Connect, and confirms the
   window died -- the phase 0.3 loop minus pytest, host-driven.
+  `SERDEVICE`/`SERUNIT`/`BAUD` were already configurable server-side
+  from day one; the host had no matching way to reach a REAL serial
+  port until `WireClient.connect_serial()`/`Amipilot.connect_serial()`
+  and the pytest plugin's `--amipilot-serial-device`/
+  `--amipilot-serial-baud` (optional `pyserial` dependency) --
+  see [Wire Protocol](../userdocs/Wire-Protocol.md#connecting-from-a-real-serial-port-host-side).
 - **TCP (phase 0.4, in progress):** the same wire over
   bsdsocket.library, listen-mode -- `src/tcp.c`, enabled with
   `AmiPilotServer TCP TCPPORT=n` (`SERIAL` and `TCP` are independent;
