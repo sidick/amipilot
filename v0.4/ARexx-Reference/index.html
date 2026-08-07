@@ -1,0 +1,1382 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Object-level GUI automation for classic AmigaOS">
+      
+      
+      
+        <link rel="canonical" href="https://sidick.github.io/amipilot/v0.4/ARexx-Reference/">
+      
+      
+        <link rel="prev" href="../Locator-Tiers-and-Limits/">
+      
+      
+        <link rel="next" href="../Wire-Protocol/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>ARexx Reference - AmiPilot</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#arexx-reference" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="AmiPilot" class="md-header__button md-logo" aria-label="AmiPilot" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            AmiPilot
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              ARexx Reference
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/sidick/amipilot" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sidick/amipilot
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="AmiPilot" class="md-nav__button md-logo" aria-label="AmiPilot" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    AmiPilot
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/sidick/amipilot" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sidick/amipilot
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting going
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting going
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using AmiInspect
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Using AmiInspect
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../AmiInspect-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AmiInspect Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Locator-Tiers-and-Limits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Locator Tiers and Limits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Driving GUIs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Driving GUIs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ARexx Reference
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ARexx Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#starting-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Starting it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commands
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#manifest-locators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manifest locators
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tier-2-semantic-locators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier-2 semantic locators
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#return-codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Return codes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-it-needs-open" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it needs open
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Wire-Protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wire Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Help
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Help
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting-and-FAQ/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting and FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Building-and-Testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building and Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#starting-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Starting it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#commands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Commands
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#manifest-locators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Manifest locators
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#tier-2-semantic-locators" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Tier-2 semantic locators
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#example" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Example
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#return-codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Return codes
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-it-needs-open" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What it needs open
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next steps
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/sidick/amipilot/edit/main/userdocs/ARexx-Reference.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="arexx-reference">ARexx Reference<a class="headerlink" href="#arexx-reference" title="Permanent link">&para;</a></h1>
+<p><code>AmiPilotServer</code> is a small commodity that hosts AmiPilot's action engine
+(genuine <code>input.device</code> click/type synthesis) and the <code>intuition-model</code>
+walker behind a public ARexx port — so an ARexx script running on the
+<em>same</em> Amiga can locate and drive another program's GUI. No host
+machine, transport, or emulator involved.</p>
+<h2 id="starting-it">Starting it<a class="headerlink" href="#starting-it" title="Permanent link">&para;</a></h2>
+<pre><code>&gt; Run SRC:AmiPilotServer
+</code></pre>
+<p>(or wherever you've copied it — see <a href="../Installation/">Installation</a>). It
+opens an ARexx port named <code>AMIPILOT.1</code> (or the next free slot —
+<code>AMIPILOT.2</code>, <code>AMIPILOT.3</code>, ... — if more than one instance is running)
+and prints the name it actually got:</p>
+<pre><code>AmiPilotServer: ARexx port AMIPILOT.1 ready
+</code></pre>
+<p>It has no window of its own; it just sits waiting for ARexx commands
+until it receives <code>QUIT</code> or a break signal (Ctrl-C).</p>
+<h2 id="commands">Commands<a class="headerlink" href="#commands" title="Permanent link">&para;</a></h2>
+<p>Every command's first argument is a <strong>window-title substring</strong> — the
+same matching <code>AmiInspect WINDOW=</code> uses, across every screen, first
+match wins. Quote it if it contains spaces. <code>TREE</code>/<code>CLICK</code>/<code>TYPE</code>/
+<code>GETTEXT</code>/<code>MENU</code>/<code>MENUPICK</code>'s classic form additionally accept an
+optional leading <code>SCREEN=&lt;substring&gt;</code> token right after the command
+keyword, narrowing the search to screens whose own name contains it —
+for disambiguating two same-titled windows on different screens; see
+<a href="../Wire-Protocol/#screens">Screens</a>.</p>
+<table>
+<thead>
+<tr>
+<th>Command</th>
+<th>Arguments</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>TREE</code></td>
+<td><code>&lt;window-pattern&gt;</code></td>
+<td>Returns the matched window's full gadget tree as a multi-line string, in the same format <code>AmiInspect</code> prints (<code>RESULT</code> gains embedded newlines — most REXX interpreters handle that fine in a variable).</td>
+</tr>
+<tr>
+<td><code>CLICK</code></td>
+<td><code>&lt;window-pattern&gt; (&lt;gadget-id&gt; \| ROLE=&lt;r&gt; [LABEL=&lt;l&gt;] [INDEX=&lt;n&gt;])</code></td>
+<td>Clicks the target gadget — a genuine <code>input.device</code> click, not a shortcut. Either a numeric <code>GA_ID</code>, or a <a href="#tier-2-semantic-locators">tier-2 locator</a> below.</td>
+</tr>
+<tr>
+<td><code>TYPE</code></td>
+<td><code>&lt;window-pattern&gt; (&lt;gadget-id&gt; \| ROLE=&lt;r&gt; [LABEL=&lt;l&gt;] [INDEX=&lt;n&gt;]) &lt;text...&gt;</code></td>
+<td>Clicks the gadget (to focus it), then types <code>text</code> into it via real <code>IECLASS_RAWKEY</code> events, human-paced. Everything after the locator is taken verbatim as the text — no quoting needed unless the text itself starts with <code>"</code>.</td>
+</tr>
+<tr>
+<td><code>GETTEXT</code></td>
+<td><code>&lt;window-pattern&gt; (&lt;gadget-id&gt; \| ROLE=&lt;r&gt; [LABEL=&lt;l&gt;] [INDEX=&lt;n&gt;])</code></td>
+<td>Returns that gadget's current text: a string/integer gadget's live value if it has one, otherwise its label.</td>
+</tr>
+<tr>
+<td><code>MANIFEST</code></td>
+<td><code>&lt;file-path&gt;</code></td>
+<td>Loads an application's manifest (see below). Replaces any previously loaded one. <code>RESULT</code> reports what loaded (<code>loaded GTApp: 1 windows, 3 gadgets</code>); a rejected manifest returns <code>RC=10</code> with the reason (including line number) in <code>RESULT</code>.</td>
+</tr>
+<tr>
+<td><code>VERSION</code></td>
+<td>(none)</td>
+<td>Returns the server version, wire-protocol number, and the stable/experimental verb lists (multi-line, same payload the <a href="../Wire-Protocol/">wire handshake</a> uses) — for feature-testing from a script.</td>
+</tr>
+<tr>
+<td><code>LAUNCH</code></td>
+<td><code>[STACK=&lt;n&gt;] &lt;command-line...&gt;</code></td>
+<td>Starts <code>command-line</code> as an AmigaDOS process (asynchronous — the commodity keeps servicing the port while it runs). <code>STACK</code> sets the new process's stack in bytes (default 4000, AmigaDOS's own <code>CreateNewProc()</code> default — most Intuition/ReAction GUI apps need more). <code>RC=0</code> means the process itself could be created, <strong>not</strong> that the command was found or ran successfully; assert on the expected effect (a window appearing) instead. See <a href="../Wire-Protocol/#launch">Wire Protocol</a> for the full contract and its honest limits.</td>
+</tr>
+<tr>
+<td><code>FSLIST</code></td>
+<td><code>&lt;path&gt;</code></td>
+<td>Lists a directory's entries (name, file/dir, size, protection, date, comment). Only works inside a root granted at startup — see <a href="../Wire-Protocol/#file-api">File API</a>.</td>
+</tr>
+<tr>
+<td><code>FSSTAT</code></td>
+<td><code>&lt;path&gt;</code></td>
+<td>The metadata for a single file or directory, without listing its contents.</td>
+</tr>
+<tr>
+<td><code>FSMKDIR</code></td>
+<td><code>&lt;path&gt;</code></td>
+<td>Creates a directory. Its parent must already exist and be inside a granted root.</td>
+</tr>
+<tr>
+<td><code>FSDELETE</code></td>
+<td><code>&lt;path&gt;</code></td>
+<td>Deletes a file or empty directory.</td>
+</tr>
+<tr>
+<td><code>FSGET</code></td>
+<td><code>&lt;path&gt;</code></td>
+<td>Returns a file's full contents (<code>RESULT</code> is the raw bytes, capped at the server's own small internal buffer — a test-staging channel, not a file manager). There is no <code>FSPUT</code>: writing files host-to-Amiga needs a wire feature that doesn't exist yet.</td>
+</tr>
+<tr>
+<td><code>SCREENS</code></td>
+<td>(none)</td>
+<td>Lists every open screen: title, position, size, and whether it's frontmost. Title is each screen's own name (<code>DefaultTitle</code>), not the live title-bar text a window's <code>WA_ScreenTitle</code> can override.</td>
+</tr>
+<tr>
+<td><code>MENU</code></td>
+<td><code>&lt;window-pattern&gt;</code></td>
+<td>Returns the matched window's full menu strip — every pulldown menu, its items, and (one level deep) their submenu items, with checkit/checked/enabled state and any keyboard shortcut, in the same text shape <code>AmiInspect</code> prints.</td>
+</tr>
+<tr>
+<td><code>MENUPICK</code></td>
+<td><code>&lt;window-pattern&gt; &lt;menu-num&gt; &lt;item-num&gt; [&lt;sub-num&gt;]</code></td>
+<td>Selects a menu item via its keyboard shortcut (Right-Amiga + the shortcut character) — the numbers are the same 0-based chain positions <code>MENU</code>'s own output reports. <code>RC=20</code> if the item is disabled or has no keyboard shortcut (pointer-based selection for shortcut-less items isn't built yet). See <a href="../Wire-Protocol/#menus">Wire Protocol</a> for the full contract.</td>
+</tr>
+<tr>
+<td><code>DRAG</code></td>
+<td><code>&lt;window-pattern&gt; &lt;locator&gt; &lt;dx&gt; &lt;dy&gt;</code> or <code>&lt;window-pattern&gt; &lt;locator&gt; TO (&lt;dest-gadget-id&gt; \| @&lt;dest-name&gt;)</code></td>
+<td>A genuine press/move/release drag. The offset form (<code>&lt;dx&gt; &lt;dy&gt;</code>) moves the gadget's current center by a pixel delta — the natural shape for a slider/scroller. The <code>TO</code> form drags onto a second gadget's center instead, both resolved live, for drag-and-drop/reorder — the destination must be in the same window as the source. <code>&lt;locator&gt;</code> is the same numeric <code>GA_ID</code>, <code>ROLE=</code>/<code>LABEL=</code>/<code>INDEX=</code>, or <code>@name</code> form CLICK/TYPE/GETTEXT accept.</td>
+</tr>
+<tr>
+<td><code>AUTH</code></td>
+<td><code>&lt;password&gt;</code></td>
+<td>Authenticates a TCP connection (no effect on ARexx or serial.device, which have their own implicit trust boundaries). Until it succeeds, the TCP transport refuses every command except <code>VERSION</code>/<code>AUTH</code>/<code>QUIT</code> with <code>RC=10</code>. See <a href="../Wire-Protocol/#securing-tcp">Securing TCP</a>.</td>
+</tr>
+<tr>
+<td><code>QUIT</code></td>
+<td>(none)</td>
+<td>Shuts the commodity down cleanly.</td>
+</tr>
+</tbody>
+</table>
+<p>The same command set is also reachable from a host machine over
+serial.device — see <a href="../Wire-Protocol/">Wire Protocol</a>.</p>
+<h2 id="manifest-locators">Manifest locators<a class="headerlink" href="#manifest-locators" title="Permanent link">&para;</a></h2>
+<p>If the application you're driving ships an
+<a href="https://github.com/sidick/amipilot/blob/main/manifest/SPEC.md">AmiPilot manifest</a>
+— a small text file mapping stable logical names to its window titles
+and <code>GA_ID</code>s — load it with <code>MANIFEST</code>, and <code>CLICK</code>/<code>TYPE</code>/<code>GETTEXT</code>
+then accept <code>@&lt;logical-name&gt;</code> in place of the
+<code>&lt;window-pattern&gt; &lt;gadget-id&gt;</code> pair:</p>
+<pre><code class="language-rexx">'MANIFEST Prog:MyApp.manifest'
+'TYPE @host_field aminet.net'
+'CLICK @connect_button'
+</code></pre>
+<p>No <code>GA_ID</code>, window title, or position appears in the script at all —
+the manifest pins the <em>identity</em> of each target, and the actual window
+and gadget are still located live at action time. Relayout, relabelling,
+and translation can't break the script; only a <code>GA_ID</code> change would
+touch anything, and then only the manifest.</p>
+<p>Using <code>@name</code> with no manifest loaded, or with a name the manifest
+doesn't define, is <code>RC=10</code> with the reason in <code>RESULT</code>.</p>
+<h2 id="tier-2-semantic-locators">Tier-2 semantic locators<a class="headerlink" href="#tier-2-semantic-locators" title="Permanent link">&para;</a></h2>
+<p>For an application with no manifest, <code>CLICK</code>/<code>TYPE</code>/<code>GETTEXT</code> also
+accept a locator by <strong>role and label text</strong> in place of the bare
+<code>GA_ID</code> — one or more of <code>ROLE=&lt;name&gt;</code>, <code>LABEL=&lt;substring&gt;</code>, and
+<code>INDEX=&lt;n&gt;</code>, at least one of <code>ROLE=</code>/<code>LABEL=</code> required:</p>
+<pre><code class="language-rexx">'CLICK GadTools ROLE=button LABEL=Connect'
+'GETTEXT GadTools ROLE=string LABEL=Host'
+</code></pre>
+<p><code>ROLE=</code> matches the same role name <code>TREE</code>'s own output prints for a
+gadget (<code>button</code>, <code>string</code>, <code>checkbox</code>, <code>slider</code>, ... — case doesn't
+matter). <code>LABEL=</code> is a <strong>case-sensitive</strong> substring match against the
+gadget's label, quoted the same way a window pattern is if it
+contains a space (<code>LABEL="Connect Now"</code>) — same convention window/
+screen patterns already use, not a separate rule to learn. <code>INDEX=</code>
+(0-based, default the first match) picks between several gadgets that
+share a role and/or label, e.g. <code>ROLE=button INDEX=1</code> for the second
+button in a window.</p>
+<p>This is honest and useful, but fragile against relabelling in a way
+<code>@name</code> isn't — prefer a manifest when the target application ships
+one. No match (nothing with that role/label, or <code>INDEX=</code> past the
+last match) is <code>RC=5</code>, the same class an unmatched <code>GA_ID</code> already
+uses.</p>
+<h2 id="example">Example<a class="headerlink" href="#example" title="Permanent link">&para;</a></h2>
+<pre><code class="language-rexx">/* rexx */
+OPTIONS RESULTS
+ADDRESS 'AMIPILOT.1'
+
+'CLICK GadTools 2'
+'TYPE GadTools 2 hello amipilot'
+'GETTEXT GadTools 2'
+SAY 'Host field now reads: 'RESULT
+
+'CLICK GadTools 1'
+'QUIT'
+</code></pre>
+<p>Run it with <code>rx myscript.rexx</code> (<code>rx</code> is the standard AmigaOS ARexx
+launcher; <code>AmiPilotServer</code> needs a real resident <code>RexxMast</code> to talk to,
+same as any other ARexx-scriptable application). <code>OPTIONS RESULTS</code> is
+required — without it ARexx never asks the host for a <code>RESULT</code> string at
+all.</p>
+<h2 id="return-codes">Return codes<a class="headerlink" href="#return-codes" title="Permanent link">&para;</a></h2>
+<p>Same convention this project's sibling tools use for their own ARexx
+ports:</p>
+<table>
+<thead>
+<tr>
+<th><code>RC</code></th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0</code></td>
+<td>Success.</td>
+</tr>
+<tr>
+<td><code>5</code></td>
+<td>Warning — the window or gadget wasn't found. The command was well-formed; there was just nothing to act on.</td>
+</tr>
+<tr>
+<td><code>10</code></td>
+<td>Error — unknown command, or a required argument was missing.</td>
+</tr>
+<tr>
+<td><code>20</code></td>
+<td>Failure — the action itself didn't deliver (the underlying <code>input.device</code> event injection failed).</td>
+</tr>
+</tbody>
+</table>
+<h2 id="what-it-needs-open">What it needs open<a class="headerlink" href="#what-it-needs-open" title="Permanent link">&para;</a></h2>
+<p><code>AmiPilotServer</code> always opens <code>intuition.library</code> (V37+; fails outright
+without it), <code>input.device</code>, and <code>rexxsyslib.library</code> (fails outright
+without it — there's no point running with no ARexx port).
+<code>gadtools.library</code> and <code>keymap.library</code> are opened opportunistically:
+without the former, the same button/checkbox discrimination gap
+<code>AmiInspect</code> has applies; without the latter, <code>TYPE</code> fails outright
+(there's no way to synthesize keypresses without it) but every other
+command still works.</p>
+<h2 id="next-steps">Next steps<a class="headerlink" href="#next-steps" title="Permanent link">&para;</a></h2>
+<p>See <a href="../Locator-Tiers-and-Limits/">Locator Tiers and Limits</a> for what a
+<code>window-pattern</code>/<code>gadget-id</code> pair can and can't reach today (the same
+structural limits <code>AmiInspect</code> documents apply here too — a gadget has
+to be visible to the walker before <code>AmiPilotServer</code> can click or type
+into it).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../Locator-Tiers-and-Limits/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Locator Tiers and Limits">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Locator Tiers and Limits
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../Wire-Protocol/" class="md-footer__link md-footer__link--next" aria-label="Next: Wire Protocol">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Wire Protocol
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      AmiPilot — object-level GUI automation for classic AmigaOS. BSD 2-Clause.
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.footer", "content.action.edit"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
