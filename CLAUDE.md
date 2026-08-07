@@ -14,30 +14,43 @@ read that before making architectural decisions; this file only covers
 what's needed to build and navigate the code day to day.
 
 **Current state:** v0.2 released; phase 0.3 (the wire, the host client)
-complete on main, not yet tagged. `intuition-model/` (the walker
-library) and `amiinspect/` (the Shell command) are real, building, and
-verified on-target. `server/` is real: the action engine
-(`server/src/action.c`, click/type/geometry) and `AmiPilotServer`
-(`server/src/amipilotserver/`), a commodity hosting both behind a
-genuine public ARexx port **and** (0.3) the serial wire transport
-(`server/src/serial.c`, framing contract in `server/WIRE.md`) — see
-`server/README.md` for the verb set and what's verified. `manifest/`
-carries the manifest contract (`manifest/SPEC.md`, parsed by
-`server/src/manifest.c`). `host/` is a real, installable package now:
-the wire client (`host/amipilot/wire.py`), the TREE-text parser
-(`host/amipilot/model.py`), the object API (`host/amipilot/client.py` —
-`Amipilot`, what test code actually imports), `amipilot dump`
-(`host/amipilot/dump.py`, a console script via `host/pyproject.toml`),
-and the pytest plugin (`host/amipilot/pytest_plugin.py`, auto-
-registered via the `pytest11` entry point) — its session-scoped
-`amipilot` fixture boots a Copperline config and hands a test a
-connected client, which is phase 0.3's actual release gate ("a host
-pytest clicks a button and asserts a label changed, deterministically,
-under the emulator") verified live via
-`tests/copperline/pytest-example/`. All of it has real test coverage
-(`make test-host` runs pytest — a superset that also collects the
-stdlib-unittest files here — with `host/` editable-installed first so
-the plugin's entry point is real, not force-loaded).
+and most of phase 0.4 (reach) are complete on main, not yet tagged.
+`intuition-model/` (the walker library) and `amiinspect/` (the Shell
+command) are real, building, and verified on-target. `server/` is
+real: the action engine (`server/src/action.c`, click/type/geometry/
+menu-pick) and `AmiPilotServer` (`server/src/amipilotserver/`), a
+commodity hosting both behind a genuine public ARexx port, the serial
+wire transport (`server/src/serial.c`), and (0.4) TCP
+(`server/src/tcp.c`, listen-mode only, no access control yet — a real,
+open gap, not yet addressed) — framing contract in `server/WIRE.md`.
+Phase 0.4 additions beyond TCP: `LAUNCH` (start a test subject over
+the wire), the allowlist-scoped file API (`FSLIST`/`FSSTAT`/
+`FSMKDIR`/`FSDELETE`/`FSGET`, `server/src/fs.c` — `FSPUT` deliberately
+deferred, needs a wire protocol addition), menu walking + shortcut-
+based selection (`MENU`/`MENUPICK`, `intuition-model`'s
+`AmipWalkMenuStrip()` — pointer-based selection for shortcut-less
+items not yet built), and multi-screen support (`SCREENS`/`SCREEN=`,
+keyed off `Screen->DefaultTitle`, not the live `Title` field). See
+`server/README.md` for the full verb set and what's verified for each.
+`manifest/` carries the manifest contract (`manifest/SPEC.md`, parsed
+by `server/src/manifest.c` — no screen-awareness yet, `SCREEN=` only
+applies to the classic locator form). `host/` is a real, installable
+package: the wire client (`host/amipilot/wire.py`), text-format
+parsers (`host/amipilot/model.py` for TREE, `menu.py` for MENU,
+`screen.py` for SCREENS, `fs.py` for the file API), the object API
+(`host/amipilot/client.py` — `Amipilot`, what test code actually
+imports, including `wait_for_window()`/`wait_for_screen()` polling
+helpers), `amipilot dump` (`host/amipilot/dump.py`, a console script
+via `host/pyproject.toml`), and the pytest plugin
+(`host/amipilot/pytest_plugin.py`, auto-registered via the `pytest11`
+entry point) — its session-scoped `amipilot` fixture boots a
+Copperline config and hands a test a connected client, which is phase
+0.3's actual release gate ("a host pytest clicks a button and asserts
+a label changed, deterministically, under the emulator") verified
+live via `tests/copperline/pytest-example/`. All of it has real test
+coverage (`make test-host` runs pytest — a superset that also collects
+the stdlib-unittest files here — with `host/` editable-installed first
+so the plugin's entry point is real, not force-loaded).
 User-facing documentation lives in `userdocs/` (built
 as a MkDocs site,
 `mkdocs.yml`) and mirrored to AmigaGuide via `make guide`
@@ -88,8 +101,10 @@ before using any API newer than V37, or anything requiring an FPU.
 
 ## On-target testing
 
-No automated harness exists yet (that's phase 0.3/0.4). Two ways to
-actually run code against real AmigaOS behavior today:
+`make test-target` (`tests/copperline/run.sh`) is now a real automated
+harness — a dozen-plus checks covering every verb, run live against a
+real Copperline boot; see the "Build commands" section above. Two ways
+to actually run code against real AmigaOS behavior interactively:
 
 **Preferred: Copperline** (`brew install copperline`), a deterministic,
 scriptable emulator — see `tests/copperline/README.md` for full setup.
@@ -205,10 +220,12 @@ every `CreateGadget` tag list, or the `_` shortcut markers in labels
 render as literal underscores instead of underlined shortcuts.
 
 **`server/`, `host/`, `manifest/`, `tests/`** — see "Current state"
-above for what's real in each. Next up: phase 0.4 (TCP transport,
-program launch, file API, menus/drag, tier-2 semantic locators). Read
-the corresponding `README.md`, `server/WIRE.md`, and the implementation
-plan's "Phases" section before starting work in any of these.
+above for what's real in each. Remaining phase 0.4 scope: drag,
+tier-2 semantic locators, and TCP access control (the listening port
+currently accepts any connection with no allowlist/auth — a real,
+flagged gap, not yet addressed). Read the corresponding `README.md`,
+`server/WIRE.md`, and the implementation plan's "Phases" section
+before starting work in any of these.
 
 ## House conventions (this repo and its siblings)
 
