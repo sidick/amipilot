@@ -367,6 +367,56 @@ Lands in phase 0.2 onward -- see
   a `DRAG` genuinely reached GadTools' real slider-tracking code, not
   just that input.device events were injected.
 
+- **Wait/expectation primitives (phase 0.5, in progress):**
+  `WAITFOR [SCREEN=<s>] WINDOW=<pattern> [TIMEOUT=<n>]` polls until a
+  window matching `<pattern>` appears; `WAITFOR [SCREEN=<s>]
+  NOWINDOW=<pattern> [TIMEOUT=<n>]` polls until none does. `TIMEOUT`
+  defaults to 10 seconds; a condition that never becomes true is
+  `RC 15` (`AMIP_AREXX_RC_TIMEOUT`), a new RC distinct from `RC 5`
+  (nothing matched at all) and `RC 20` (an action's own injection
+  failed) -- "the condition never became true in time" is a genuinely
+  different outcome a test author may want to handle differently from
+  either.
+
+  `CLICK` additionally accepts a trailing `EXPECT=WINDOW=<pattern>` or
+  bare `EXPECT=NOWINDOW` (no argument) plus `[TIMEOUT=<n>]`, composing
+  the click atomically with a server-side wait -- one wire round trip,
+  not an action followed by separate host-side polling. The two
+  `NOWINDOW` forms are deliberately asymmetric: `CLICK`'s bare
+  `EXPECT=NOWINDOW` means "the window this click itself just resolved
+  and acted on has closed," checked by pointer identity via the
+  existing `AmipIsWindowOpen()` (the exact `struct Window *` the click
+  already has in hand, free) -- not a pattern re-search, and therefore
+  precise even if a different, similarly-titled window happens to
+  exist afterward. `WAITFOR`'s own `NOWINDOW=<pattern>` has no prior
+  action to anchor an identity to, so it's necessarily a fresh
+  `AmipFindWindow()` pattern search each poll -- an honest, slightly
+  weaker guarantee, not a bug. The click itself always happens
+  regardless of `EXPECT=`; a timeout waiting for the expected effect
+  is `RC 15`, reported distinctly from the click's own injection
+  failing outright (`RC 20`, unchanged).
+
+  Polling is entirely server-side (`~100ms` between checks, blocking
+  that one request/response for up to `TIMEOUT` seconds -- safe here
+  since `HandleCommand()`'s dispatch is strictly single-threaded and
+  TCP's own "one active client at a time" model means there's no
+  second connection to starve), which is the actual point: this closes
+  the classic click-then-check race a host-side poll loop can still
+  lose on a fast transition, not just a convenience wrapper around one.
+  **Scope for this pass:** only `WINDOW=`/`NOWINDOW=` conditions, and
+  only `CLICK` composes with `EXPECT=` -- `TYPE`/`DRAG`/`MENUPICK`
+  callers use a separate `WAITFOR` call instead. Gadget-text/state
+  waiting isn't built -- a real, documented follow-up, not a silent
+  gap.
+
+  `fixtures/gadtools-app` carries a button (`Open Req`) whose
+  `IDCMP_GADGETUP` handler doesn't open a second window until a full
+  two seconds after receiving the event -- a genuine, measurable race
+  (not a hypothetical) that an immediate post-click check reliably
+  misses, that `EXPECT=`/`WAITFOR` reliably don't, and that a
+  deliberately-too-short `TIMEOUT=` reliably reports as `RC 15`
+  (confirmed live, not just theoretically distinguishable).
+
 - **Screens (phase 0.4, shipped in v0.4):** `SCREENS` (no arguments) lists
   every open screen -- title, position, size, and whether it's
   frontmost. Every window-targeting verb (`TREE`/`CLICK`/`TYPE`/

@@ -31,6 +31,18 @@
  * and genuinely confirms the drag reached GadTools' real slider-
  * tracking code, not just that input.device events were injected.
  *
+ * A third button (Open Req) opens a second, plain window (no gadgets
+ * or IDCMP of its own, purely decorative -- see the "No WA_IDCMP"
+ * comment at its own OpenWindowTags call) after a deliberate ~2s
+ * Delay() in its own IDCMP_GADGETUP handler. This exists specifically
+ * to give AmiPilot's WAITFOR/CLICK EXPECT= (phase 0.5) a REAL race to
+ * close, not a hypothetical: AmiPilotServer's CLICK returns RC 0 as
+ * soon as the input.device event is injected, well before this
+ * handler even runs, and this fixture doesn't start opening the
+ * window until a full two seconds after receiving the GADGETUP event -- an
+ * immediate post-click check reliably misses it, exactly the scenario
+ * docs/implementation-plan.md's own success criteria call for.
+ *
  * Also carries a menu strip (phase 0.4 MENU/MENUPICK conformance):
  * one "Project" menu with an "About" item (shortcut A, sets the Host
  * string gadget's text so a MENUPICK-by-shortcut round trip is
@@ -52,6 +64,7 @@
 #include <proto/intuition.h>
 #include <proto/gadtools.h>
 #include <proto/graphics.h>
+#include <proto/dos.h>
 #include <stdio.h>
 
 struct IntuitionBase *IntuitionBase;
@@ -63,6 +76,7 @@ struct Library *GadToolsBase;
 #define GID_ENABLED  3
 #define GID_CANCEL   4
 #define GID_SLIDER   5
+#define GID_OPENREQ  6
 
 #define MENUNUM_PROJECT   0
 #define ITEMNUM_ABOUT     0
@@ -84,6 +98,7 @@ int main(void)
 {
     struct Screen *screen = NULL;
     struct Window *window = NULL;
+    struct Window *reqWindow = NULL;
     struct Gadget *glist = NULL;
     struct Gadget *gad;
     struct Gadget *hostGad = NULL;
@@ -195,6 +210,15 @@ int main(void)
                         GT_Underscore, '_',
                         TAG_DONE);
 
+    /* See this file's own header comment -- the deliberate ~2s Delay()
+     * in this button's own IDCMP_GADGETUP handler (below) is what
+     * gives WAITFOR/CLICK EXPECT= (phase 0.5) a real race to close. */
+    ng.ng_TopEdge += 24;
+    ng.ng_GadgetText = (UBYTE *)"_Open Req";
+    ng.ng_GadgetID = GID_OPENREQ;
+    ng.ng_Flags = PLACETEXT_IN;
+    gad = CreateGadget(BUTTON_KIND, gad, &ng, GT_Underscore, '_', TAG_DONE);
+
     if (gad == NULL) {
         rc = RETURN_FAIL;
         goto cleanup;
@@ -212,7 +236,7 @@ int main(void)
 
     window = OpenWindowTags(NULL,
                              WA_Left, 40, WA_Top, 40,
-                             WA_Width, 220, WA_Height, 190,
+                             WA_Width, 220, WA_Height, 214,
                              WA_Title, (ULONG)"AmiPilot GadTools Fixture",
                              WA_Gadgets, (ULONG)glist,
                              WA_CloseGadget, TRUE,
@@ -267,6 +291,48 @@ int main(void)
                         sprintf(levelText, "slider=%d", (int)msg->Code);
                         GT_SetGadgetAttrs(hostGad, window, NULL,
                                           GTST_String, (ULONG)levelText, TAG_DONE);
+                    } else if (((struct Gadget *)msg->IAddress)->GadgetID == GID_OPENREQ) {
+                        /* Deliberate delay BEFORE opening the second
+                         * window -- see this file's own header
+                         * comment for why. Blocking this app's own
+                         * event loop for ~2s is the point: it's what
+                         * makes the race real and measurable from the
+                         * outside, not a hypothetical. 2s (not ~1s)
+                         * so a 1-second EXPECT=/WAITFOR TIMEOUT=
+                         * (whole seconds only, per the wire grammar)
+                         * reliably exercises the RC_TIMEOUT path too,
+                         * not just the "it eventually appears" path --
+                         * confirmed live: a 1s window was too close to
+                         * a ~1s delay's own poll-tick jitter to
+                         * reliably time out either way. */
+                        Delay(100);
+                        if (reqWindow == NULL) {
+                            /* No WA_IDCMP: this window generates no
+                             * messages of its own (IDCMPFlags default
+                             * to 0) -- deliberately, to avoid the
+                             * real complexity of sharing an IDCMP port
+                             * between two windows (there's no
+                             * OpenWindowTags-time tag for that in
+                             * classic Intuition; it needs opening with
+                             * no IDCMP, then manually assigning
+                             * window->UserPort and calling
+                             * ModifyIDCMP() -- more machinery than
+                             * this fixture needs). Its close gadget is
+                             * purely decorative as a result; automated
+                             * verification uses TREE/WAITFOR to see it
+                             * appear, not manual interaction with it.
+                             * Cleaned up at app quit either way (see
+                             * cleanup: below). */
+                            reqWindow = OpenWindowTags(NULL,
+                                WA_Left, 60, WA_Top, 60,
+                                WA_Width, 160, WA_Height, 50,
+                                WA_Title, (ULONG)"Async Dialog",
+                                WA_CloseGadget, TRUE,
+                                WA_DragBar, TRUE,
+                                WA_Activate, TRUE,
+                                WA_PubScreen, (ULONG)screen,
+                                TAG_DONE);
+                        }
                     }
                     break;
                 /* Diagnostic: IDCMP_MOUSEBUTTONS only arrives for clicks
@@ -309,6 +375,11 @@ int main(void)
     }
 
 cleanup:
+    /* reqWindow shares window's own UserPort (WA_UserPort above) --
+     * must close before window itself, which owns that port. */
+    if (reqWindow != NULL) {
+        CloseWindow(reqWindow);
+    }
     if (window != NULL) {
         ClearMenuStrip(window);
         CloseWindow(window);

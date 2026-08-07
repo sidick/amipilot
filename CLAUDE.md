@@ -13,8 +13,10 @@ protocol, and phase sequencing live in `docs/implementation-plan.md` —
 read that before making architectural decisions; this file only covers
 what's needed to build and navigate the code day to day.
 
-**Current state:** v0.3 released; phase 0.4 (reach) is complete on
-main, released as v0.4.
+**Current state:** v0.4 released (phase 0.4, reach, complete). Phase
+0.5 has started on main, not yet tagged: `WAITFOR` and `CLICK`'s
+`EXPECT=` (wait/expectation primitives, docs/implementation-plan.md's
+"Async by design" section) -- see `server/README.md`'s own section.
 `intuition-model/` (the walker library) and `amiinspect/` (the Shell
 command) are real, building, and verified on-target. `server/` is
 real: the action engine (`server/src/action.c`, click/type/geometry/

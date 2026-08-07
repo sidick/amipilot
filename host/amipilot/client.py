@@ -1,10 +1,10 @@
 """The AmiPilot object API: a Pythonic client over `WireClient`
 (server/WIRE.md framing) matching the verb set `AmiPilotServer`
 currently implements (TREE/CLICK/TYPE/GETTEXT/MANIFEST/LAUNCH/
-FSLIST/FSSTAT/FSMKDIR/FSDELETE/FSGET/MENU/MENUPICK/DRAG/SCREENS/
-VERSION/QUIT -- see server/README.md; windows/list, find, and fs-put
-are still 0.4+ scope, not invented here ahead of the server actually
-offering them).
+FSLIST/FSSTAT/FSMKDIR/FSDELETE/FSGET/MENU/MENUPICK/DRAG/WAITFOR/
+SCREENS/VERSION/QUIT -- see server/README.md; windows/list, find, and
+fs-put are still future scope, not invented here ahead of the server
+actually offering them).
 
 Quoting matches the ARexx port's own command grammar (arexx_cmd.c):
 window-pattern/path arguments containing a space, a literal '"', or a
@@ -26,7 +26,7 @@ from .fs import FsEntry, parse_fs_entries, parse_fs_entry
 from .menu import MenuStrip, parse_menu_strip
 from .model import Window, parse_tree
 from .screen import Screen, parse_screens
-from .wire import RC_ERROR, RC_FAIL, RC_OK, RC_WARN, Reply, ServerInfo, WireClient
+from .wire import RC_ERROR, RC_FAIL, RC_OK, RC_TIMEOUT, RC_WARN, Reply, ServerInfo, WireClient
 
 
 class AmipilotError(Exception):
@@ -47,11 +47,25 @@ class CommandError(AmipilotError):
     """RC 10 -- bad syntax, unknown command, or bad locator."""
 
 
+class Timeout(AmipilotError):
+    """RC 15 -- a WAITFOR/CLICK(expect=...) condition never became true
+    within its timeout. Distinct from NotFound/ActionFailed: for
+    CLICK(expect=...) specifically, the click itself already happened
+    (see click()'s own docstring) -- this means the expected FOLLOW-ON
+    effect didn't show up in time, not that the click failed to
+    deliver or that a locator didn't match anything at all."""
+
+
 class ActionFailed(AmipilotError):
     """RC 20 -- the action itself didn't deliver."""
 
 
-_ERROR_CLASSES = {RC_WARN: NotFound, RC_ERROR: CommandError, RC_FAIL: ActionFailed}
+_ERROR_CLASSES = {
+    RC_WARN: NotFound,
+    RC_ERROR: CommandError,
+    RC_TIMEOUT: Timeout,
+    RC_FAIL: ActionFailed,
+}
 
 
 def _quote(s: str) -> str:
@@ -71,6 +85,38 @@ def _screen_prefix(screen: str | None) -> str:
     include/arexx_cmd.h) -- empty string when `screen` is None, so
     callers can just prepend the result unconditionally."""
     return f"SCREEN={_quote(screen)} " if screen is not None else ""
+
+
+def _render_condition(condition: str) -> str:
+    """Translates the "window:<pattern>" / "nowindow"[:<pattern>]
+    mini-syntax (docs/implementation-plan.md's own `click(button,
+    expect="window:Settings")` example) into the wire's own
+    "WINDOW=<pattern>" / "NOWINDOW"[=<pattern>] token -- shared by
+    click()/click_by_name()/click_by_role()'s `expect=` and
+    `wait_for()`'s `condition`, since both ultimately compose the same
+    server-side vocabulary (arexx_cmd.h's WAITFOR/CLICK EXPECT= doc
+    comment). "window:<pattern>" always needs a pattern (a NEW window
+    to find). "nowindow" alone (no pattern) is only valid for
+    click()'s own `expect=` -- it means the window the click itself
+    just acted on, checked by identity server-side, not a pattern
+    search; wait_for()'s own standalone WAITFOR has no prior action to
+    anchor an identity to, so its "nowindow:<pattern>" always needs
+    one (enforced server-side, not here -- an omitted pattern on
+    wait_for() reaches the server as bare NOWINDOW, which WAITFOR's
+    own parser rejects as a syntax error, arexx_cmd.c's
+    patternRequired)."""
+    kind, _, pattern = condition.partition(":")
+    kind = kind.strip().lower()
+    if kind == "window":
+        if not pattern:
+            raise ValueError(f'expect="window:<pattern>" needs a pattern: {condition!r}')
+        return f"WINDOW={_quote(pattern)}"
+    if kind == "nowindow":
+        return f"NOWINDOW={_quote(pattern)}" if pattern else "NOWINDOW"
+    raise ValueError(
+        f'unrecognised condition {condition!r} -- expected "window:<pattern>" '
+        f'or "nowindow"[:<pattern>]'
+    )
 
 
 def _role_locator(role: str | None, label: str | None, index: int) -> str:
@@ -296,18 +342,47 @@ class Amipilot:
         reply = self._run(f"TREE {_screen_prefix(screen)}{_quote(window_pattern)}")
         return parse_tree(reply.text)
 
-    def click(self, window_pattern: str, gadget_id: int, *, screen: str | None = None) -> None:
+    def click(
+        self,
+        window_pattern: str,
+        gadget_id: int,
+        *,
+        screen: str | None = None,
+        expect: str | None = None,
+        timeout: float = 10.0,
+    ) -> None:
         """CLICK <window-pattern> <gadget-id> -- a genuine input.device
         click. Raises NotFound (no such window/gadget) or ActionFailed
         (event injection didn't deliver). `screen` narrows the window
         search the same way `tree()`'s does; the target screen is
-        brought to front as part of the click regardless."""
-        self._run(f"CLICK {_screen_prefix(screen)}{_quote(window_pattern)} {gadget_id}")
+        brought to front as part of the click regardless.
 
-    def click_by_name(self, name: str) -> None:
+        `expect`, if given, composes the click atomically with a
+        server-side wait -- "window:<pattern>" (a new window matching
+        <pattern> appears) or "nowindow" (the window this click just
+        acted on closes, checked by identity, not a pattern re-search
+        -- see `_render_condition()`'s own docstring for why that's
+        the precise "snapshot the delta" guarantee a naive
+        click-then-poll can't give you). The click itself always still
+        happens; a timeout waiting for `expect` raises `Timeout` (RC
+        15), distinct from the click's own injection failing outright
+        (`ActionFailed`, RC 20). `timeout` (seconds, default 10) only
+        matters when `expect` is given."""
+        suffix = ""
+        if expect is not None:
+            suffix = f" EXPECT={_render_condition(expect)} TIMEOUT={int(timeout)}"
+        self._run(f"CLICK {_screen_prefix(screen)}{_quote(window_pattern)} {gadget_id}{suffix}")
+
+    def click_by_name(
+        self, name: str, *, expect: str | None = None, timeout: float = 10.0
+    ) -> None:
         """CLICK @<name> -- the manifest-locator form; requires a
-        manifest loaded first via `manifest()`."""
-        self._run(f"CLICK @{name}")
+        manifest loaded first via `manifest()`. `expect`/`timeout` --
+        see `click()`'s own docstring."""
+        suffix = ""
+        if expect is not None:
+            suffix = f" EXPECT={_render_condition(expect)} TIMEOUT={int(timeout)}"
+        self._run(f"CLICK @{name}{suffix}")
 
     def click_by_role(
         self,
@@ -317,6 +392,8 @@ class Amipilot:
         label: str | None = None,
         index: int = 0,
         screen: str | None = None,
+        expect: str | None = None,
+        timeout: float = 10.0,
     ) -> None:
         """CLICK <window-pattern> ROLE=<r> [LABEL=<l>] [INDEX=<n>] --
         the tier-2 semantic locator (docs/implementation-plan.md's
@@ -326,10 +403,14 @@ class Amipilot:
         `index` (0-based, default the first match) disambiguates when
         more than one gadget matches. Raises NotFound if the window or
         no matching gadget exists, ActionFailed if the click itself
-        didn't deliver."""
+        didn't deliver. `expect`/`timeout` -- see `click()`'s own
+        docstring."""
+        suffix = ""
+        if expect is not None:
+            suffix = f" EXPECT={_render_condition(expect)} TIMEOUT={int(timeout)}"
         self._run(
             f"CLICK {_screen_prefix(screen)}{_quote(window_pattern)} "
-            f"{_role_locator(role, label, index)}"
+            f"{_role_locator(role, label, index)}{suffix}"
         )
 
     def type(
@@ -596,7 +677,17 @@ class Amipilot:
         method rather than every caller hand-rolling it, the way
         tests/copperline/launch-test.py originally did. Raises
         TimeoutError (not NotFound) once the deadline passes, chained
-        from the last NotFound via `__cause__`."""
+        from the last NotFound via `__cause__`.
+
+        Host-side polling (one `TREE` round trip per `poll_interval`)
+        -- for waiting on something not tied to an action THIS client
+        just took (e.g. an externally-launched or `launch()`ed
+        process's own window appearing, with no click of yours to
+        anchor to). If you just called `click()` and want to wait for
+        its effect, prefer `click(..., expect="window:<pattern>")` or
+        `wait_for("window:<pattern>")` instead -- a single server-side
+        round trip with a much tighter poll interval, not N host round
+        trips at this method's own 0.5s default."""
         deadline = time.monotonic() + timeout
         last_error: NotFound | None = None
         while time.monotonic() < deadline:
@@ -621,7 +712,10 @@ class Amipilot:
         program that opens its own custom screen) rather than a
         window on an already-open one. Filtering is done here, host-
         side: SCREENS itself always returns every screen, same as
-        `screens()`. Raises TimeoutError once the deadline passes."""
+        `screens()`. Raises TimeoutError once the deadline passes. No
+        server-side equivalent exists for screens (WAITFOR/EXPECT=
+        only understand WINDOW=/NOWINDOW= -- see `wait_for()`'s own
+        docstring), so this stays the only way to wait for one."""
         deadline = time.monotonic() + timeout
         while time.monotonic() < deadline:
             for screen in self.screens():
@@ -630,6 +724,33 @@ class Amipilot:
             time.sleep(poll_interval)
         raise TimeoutError(
             f"no screen matching {screen_pattern!r} appeared within {timeout:.0f}s"
+        )
+
+    def wait_for(
+        self, condition: str, *, screen: str | None = None, timeout: float = 10.0
+    ) -> None:
+        """WAITFOR [SCREEN=<substring>] <condition> [TIMEOUT=<n>] --
+        polls entirely server-side (one wire round trip, not a host
+        loop) until `condition` becomes true or `timeout` elapses.
+
+        `condition` is "window:<pattern>" (a window matching <pattern>
+        appears) or "nowindow:<pattern>" (no window matches <pattern>
+        -- always a fresh pattern re-search each poll, since a
+        standalone WAITFOR has no prior action to anchor an exact
+        window identity to; if you need "the window my last click()
+        acted on has closed" specifically, use
+        `click(..., expect="nowindow")` instead, which checks by
+        identity, not by pattern -- see `click()`'s own docstring).
+
+        Raises `Timeout` (RC 15) once `timeout` elapses. This is the
+        general-purpose wait primitive for anything not already tied
+        to an action you just took; `wait_for_window()`/
+        `wait_for_screen()` remain the right tool for polling for a
+        window/screen with no accompanying action (they also cover
+        screens, which WAITFOR's condition vocabulary doesn't)."""
+        self._run(
+            f"WAITFOR {_screen_prefix(screen)}{_render_condition(condition)} "
+            f"TIMEOUT={int(timeout)}"
         )
 
     def quit(self) -> None:
