@@ -333,10 +333,22 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
             out->type = AMIP_AREXX_CMD_UNKNOWN;
             return -1;
         }
-        if (parse_expect_condition(&p, out, /* patternRequired */ 1) != 0) {
-            return -1;
+        if (ci_streq_prefix(p, "WINDOW=") || ci_streq_prefix(p, "NOWINDOW=")) {
+            if (parse_expect_condition(&p, out, /* patternRequired */ 1) != 0) {
+                return -1;
+            }
+            return 0;
         }
-        return 0;
+        /* Not WINDOW=/NOWINDOW= -- this is the TEXT= form instead: a
+         * window-pattern-or-"@name" plus a gadget locator, exactly
+         * like CLICK/TYPE/GETTEXT/DRAG's own (arexx_cmd.h's doc
+         * comment on AmipArexxParse). Deliberately falls through into
+         * that exact same shared parsing below rather than duplicating
+         * it -- SCREEN= is already consumed above, so the shared
+         * block's own parse_optional_screen_prefix() call is a
+         * harmless no-op for this path. The WAITFOR-specific
+         * "TEXT=<value> [TIMEOUT=<n>]" tail is handled after that
+         * shared parsing, alongside TYPE/CLICK/DRAG's own tails. */
     }
 
     /* Every other command starts with either a window-pattern argument
@@ -509,6 +521,33 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
             p = read_token(p, numbuf, sizeof(numbuf), &trunc);
             if (fail_if_trunc(trunc, out)) return -1;
             out->dragDy = strtol(numbuf, NULL, 10);
+        }
+    }
+
+    /* WAITFOR's TEXT= form (arrived here via the fall-through above,
+     * having already consumed SCREEN= and the window-pattern-or-
+     * "@name" + gadget locator through the shared parsing this block
+     * follows) -- requires "TEXT=<value>", then an optional trailing
+     * "TIMEOUT=<n>". */
+    if (out->type == AMIP_AREXX_CMD_WAITFOR) {
+        int trunc;
+        p = skip_ws(p);
+        if (!ci_streq_prefix(p, "TEXT=")) {
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+        p += 5; /* strlen("TEXT=") */
+        out->expectMode = 3;
+        p = read_token(p, out->expectText, sizeof(out->expectText), &trunc);
+        if (fail_if_trunc(trunc, out)) return -1;
+
+        p = skip_ws(p);
+        if (ci_streq_prefix(p, "TIMEOUT=")) {
+            char numbuf[16];
+            p += 8; /* strlen("TIMEOUT=") */
+            p = read_token(p, numbuf, sizeof(numbuf), &trunc);
+            if (fail_if_trunc(trunc, out)) return -1;
+            out->expectTimeout = strtol(numbuf, NULL, 10);
         }
     }
 

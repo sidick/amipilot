@@ -395,6 +395,32 @@ static BOOL WaitForWindowClosed(struct Window *target, long timeoutSeconds)
     }
 }
 
+/* WAITFOR's TEXT=<value> form: polls FindGadgetText() (the same
+ * value-or-label logic GETTEXT itself uses) until it EXACTLY equals
+ * wantText or timeoutSeconds elapses. Takes an already-resolved
+ * window and a numeric gadgetId (not a struct Gadget*) since
+ * FindGadgetText() re-walks the window by ID each call anyway, same
+ * as GETTEXT's own dispatch already does -- no different from polling
+ * any other live state through this project's copy-out model. */
+static BOOL WaitForGadgetText(struct Window *window, ULONG gadgetId,
+                              const char *wantText, long timeoutSeconds)
+{
+    ULONG ticksTotal = (ULONG)(timeoutSeconds > 0 ? timeoutSeconds : AMIP_EXPECT_DEFAULT_TIMEOUT) * 50;
+    ULONG ticksWaited = 0;
+    char buf[AMIP_RESULT_BUF_SIZE];
+
+    for (;;) {
+        if (FindGadgetText(window, gadgetId, buf, sizeof(buf)) && strcmp(buf, wantText) == 0) {
+            return TRUE;
+        }
+        if (ticksWaited >= ticksTotal) {
+            return FALSE;
+        }
+        Delay(AMIP_EXPECT_POLL_TICKS);
+        ticksWaited += AMIP_EXPECT_POLL_TICKS;
+    }
+}
+
 /* Resolves CLICK/TYPE/GETTEXT's (and DRAG's, 0.4) target gadget --
  * either the classic numeric cmd->gadgetId (today's original,
  * unchanged path: a plain AmipFindGadgetById lookup) or, when
@@ -932,23 +958,49 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
         }
 
         case AMIP_AREXX_CMD_WAITFOR: {
-            BOOL ok;
-            CONST_STRPTR screenPattern = cmd->screenPattern[0] != '\0'
-                ? (CONST_STRPTR)cmd->screenPattern : NULL;
+            if (cmd->expectMode == 3) {
+                /* TEXT=<value>: cmd->windowPattern/gadgetId/
+                 * gadgetLocatorMode/etc. were filled in by the same
+                 * shared window-pattern-or-@name + gadget-locator
+                 * parsing CLICK/TYPE/GETTEXT/DRAG use (arexx_cmd.c),
+                 * so resolution here is identical to CLICK's own. */
+                struct Window *w = AmipFindWindow((CONST_STRPTR)cmd->screenPattern,
+                                                  (CONST_STRPTR)cmd->windowPattern);
+                struct Gadget *g;
 
-            if (cmd->expectMode == 1) {
-                ok = WaitForWindowPattern(screenPattern, (CONST_STRPTR)cmd->expectPattern,
-                                          cmd->expectTimeout, TRUE);
+                if (w == NULL) {
+                    rc = AMIP_AREXX_RC_WARN;
+                    break;
+                }
+                g = ResolveTargetGadget(w, cmd, &rc);
+                if (g == NULL || !AmipIsWindowOpen(w)) {
+                    rc = AMIP_AREXX_RC_WARN;
+                    break;
+                }
+                if (!WaitForGadgetText(w, g->GadgetID, (const char *)cmd->expectText,
+                                       cmd->expectTimeout)) {
+                    rc = AMIP_AREXX_RC_TIMEOUT;
+                }
             } else {
-                /* expectMode == 2 (NOWINDOW=<pattern>) is the only
-                 * other value AmipArexxParse() ever sets for WAITFOR
-                 * -- parse_expect_condition() rejects anything else
-                 * as a parse error before this dispatch is reached. */
-                ok = WaitForWindowPattern(screenPattern, (CONST_STRPTR)cmd->expectPattern,
-                                          cmd->expectTimeout, FALSE);
-            }
-            if (!ok) {
-                rc = AMIP_AREXX_RC_TIMEOUT;
+                BOOL ok;
+                CONST_STRPTR screenPattern = cmd->screenPattern[0] != '\0'
+                    ? (CONST_STRPTR)cmd->screenPattern : NULL;
+
+                if (cmd->expectMode == 1) {
+                    ok = WaitForWindowPattern(screenPattern, (CONST_STRPTR)cmd->expectPattern,
+                                              cmd->expectTimeout, TRUE);
+                } else {
+                    /* expectMode == 2 (NOWINDOW=<pattern>) is the only
+                     * other value AmipArexxParse() ever sets here --
+                     * parse_expect_condition() rejects anything else
+                     * as a parse error before this dispatch is
+                     * reached. */
+                    ok = WaitForWindowPattern(screenPattern, (CONST_STRPTR)cmd->expectPattern,
+                                              cmd->expectTimeout, FALSE);
+                }
+                if (!ok) {
+                    rc = AMIP_AREXX_RC_TIMEOUT;
+                }
             }
             break;
         }
