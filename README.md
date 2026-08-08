@@ -17,19 +17,32 @@ full design, phase sequencing, and minimum requirements, and
 
 ## Status
 
-**v0.1 released** -- `intuition-model` (the Intuition/BOOPSI walker
-library) and `AmiInspect` (the standalone Shell command that prints any
-window's gadget tree), verified against real AmigaOS 3.2.3. See the
-[Changelog](userdocs/Changelog.md) for what's in it and its known gaps,
-and the implementation plan's "Phases" section for what comes next.
+**v0.5 released; phase 1.0 work in progress on `main`, not yet tagged.**
+What shipped in v0.1 (`intuition-model`, the standalone `AmiInspect`
+Shell command) is still there, but this is no longer a read-only
+inspector: `AmiPilotServer`, an on-Amiga commodity, actually drives a
+GUI with genuine synthesized `input.device` events -- click, type,
+drag, move/resize windows, work menus -- reachable both from ARexx and
+over the wire (serial or TCP) via the host Python client, so a test
+suite on a different machine can launch, click through, assert on, and
+screenshot real AmigaOS software end to end. Verified against both
+Copperline and Amiberry, including a growing set of real, OS-shipped
+stock applications (not just purpose-built fixtures), MUI's own
+ARexx-driven apps, and real Picasso96/RTG hardware emulation. See the
+[Changelog](userdocs/Changelog.md) for what's in each release and its
+known gaps, `CLAUDE.md`'s "Current state" section for what's real on
+`main` right now, and the implementation plan's "Phases" section for
+what 1.0 itself still needs.
 
 ## Repository layout
 
 ```
 intuition-model/  the reusable Intuition walker/role/reader library
 amiinspect/       standalone on-Amiga Shell command (phase 0.1)
-server/           the AmiPilot server commodity (phase 0.2+)
-host/             Python client + pytest plugin (phase 0.3+)
+server/           AmiPilotServer: the commodity (action engine, wire
+                  transports, launch, file API -- phase 0.2+)
+host/             Python client + pytest plugin + amipilot dump CLI
+                  (phase 0.3+, installable via `pip install -e host/`)
 manifest/         the manifest-ID locator contract (phase 0.3)
 fixtures/         conformance test apps + their manifests
 tests/            host-side pytest suites (CI entry point, phase 0.3+);
@@ -45,9 +58,15 @@ Requires Bebbo's m68k-amigaos GCC. Either install it locally (set
 `PATH` so `m68k-amigaos-gcc` resolves) or use the shared container image:
 
 ```sh
-make amiga    # build locally
-make docker   # build inside ghcr.io/sidick/amiga-dev
+make amiga fixtures server  # build locally
+make docker                 # cross-compile inside ghcr.io/sidick/amiga-dev
+make test-host               # host-side pytest (host/ editable-installed first)
+make test-target             # on-target Copperline conformance check
 ```
+
+See [Building and Testing](userdocs/Building-and-Testing.md) for the
+full breakdown of every build/test target, including the host Python
+package and `make test-target`'s own on-target check suite.
 
 Minimum target: AmigaOS 2.04 (V37), plain 68000, no FPU. See the
 implementation plan's "Minimum requirements" section for the full
