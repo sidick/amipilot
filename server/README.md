@@ -374,30 +374,36 @@ Lands in phase 0.2 onward -- see
   opens there and every one of these checks exercises the classic
   planar path exactly as before issue #44 -- a real, live confirmation
   that adding optional P96 support didn't disturb the common case.
-  **The P96-ACTIVE capture path is now verified too**, manually
-  against real Picasso96 3.6 + `uaegfx` under Amiberry (not
-  Copperline, which still has no RTG emulation at all -- this is
-  interactive/manual verification, not a `make test-target`
-  regression check, since there's no automated Amiberry harness in
-  this project yet). Both P96 pixel-format shapes were exercised
-  against a genuine P96 screen with a known pattern painted onto it:
-  a CLUT (8-bit palette) screen decoded back an exact, pixel-for-pixel
-  match of the painted pen pattern; a truecolor (16-bit) screen using
-  the byte-swapped `R5G6B5PC` layout decoded back colour values
-  matching the expected 5/6/5-bit quantization exactly (not corrupted,
-  not byte-order-garbled) -- real confirmation that the SDK's own
-  `p96LockBitMap()`/`RGBFormat` contract and this module's own
-  `PC`-suffix byte-swap handling both work as documented against
-  genuine RTG hardware emulation, not just against the SDK's paper
-  interface. The parsing/encoding logic itself (exact byte layout
+  **The P96-ACTIVE capture path is now verified too, and automated
+  (GitHub issue #55).** First verified manually against real Picasso96
+  3.6 + `uaegfx` under Amiberry: both P96 pixel-format shapes were
+  exercised against a genuine P96 screen with a known pattern painted
+  onto it -- a CLUT (8-bit palette) screen decoded back an exact,
+  pixel-for-pixel match of the painted pen pattern; a truecolor
+  (16-bit) screen using the byte-swapped `R5G6B5PC` layout decoded
+  back colour values matching the expected 5/6/5-bit quantization
+  exactly (not corrupted, not byte-order-garbled) -- real confirmation
+  that the SDK's own `p96LockBitMap()`/`RGBFormat` contract and this
+  module's own `PC`-suffix byte-swap handling both work as documented
+  against genuine RTG hardware emulation, not just against the SDK's
+  paper interface. Copperline 0.15 then shipped its own `[rtg]`
+  support, closing the gap that made this Amiberry-only: reproduced
+  the same CLUT verification under Copperline itself and wired it into
+  `make test-target` for real (`run_screenshot_p96_check`,
+  `fixtures/p96-app`, `tests/copperline/screenshot-p96-test.py`) --
+  **skip-safe by design**, since most machines won't have `[rtg]`
+  configured (opt-in) or the matching Picasso96 monitor driver
+  installed; the fixture detects and reports exactly that as a genuine
+  skip, not a failure. See `tests/copperline/README.md`'s own
+  "P96/Picasso96 RTG" section for the two real, non-obvious things
+  that had to be fixed to get this working at all (a CPU/address-space
+  conflict between RTG and this project's own default A1200 profile,
+  and a missing monitor driver for the specific hardware Copperline
+  emulates). The parsing/encoding logic itself (exact byte layout
   including the P96 pixel-format decode table, IFF chunk shape, PNG
   chunk CRCs, IDAT round-trip) has its own dedicated host-side unit
   tests (`host/tests/test_screenshot.py`) against synthetic captures
-  of both shapes too, independent of any emulator. **Still not
-  automated:** this verification isn't wired into `make test-target`
-  or CI -- Copperline's own lack of RTG emulation means there's no
-  path to that without standing up an Amiberry-based harness, tracked
-  as real follow-up work, not silently claimed as done.
+  of both shapes too, independent of any emulator.
 
 - **`WINDOWMOVE [SCREEN=<substring>] <window-pattern> <dx> <dy>` /
   `WINDOWSIZE [SCREEN=<substring>] <window-pattern> <width> <height>`

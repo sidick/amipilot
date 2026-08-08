@@ -349,12 +349,12 @@ SDK's own docs mark them hardware-only) is sent raw over the wire and
 decoded host-side, including the documented `PC`-suffix byte-swap
 pitfall (16-bit `PC` formats are little-endian, non-`PC` big-endian —
 never assumed uniform). The P96-active capture path has been verified
-manually against real Picasso96 3.6 + `uaegfx` under Amiberry (both a
-CLUT and a truecolor screen, each decoding back correctly) — Copperline
-(this project's automated on-target test environment) still has no RTG
-emulation at all, so this is a hands-on confirmation, not a `make
-test-target` regression check yet; see `server/README.md`'s own
-SCREENSHOT section for the fuller story.
+against real Picasso96 3.6 + `uaegfx` under Amiberry (both a CLUT and
+a truecolor screen, each decoding back correctly), and — since
+Copperline 0.15 added its own RTG support — is now a real, automated
+`make test-target` regression check too (`run_screenshot_p96_check`),
+skip-safe on machines without an RTG board configured; see
+`server/README.md`'s own SCREENSHOT section for the fuller story.
 
 With both `screen`/`window` omitted, `screenshot()` captures the
 frontmost/default public screen; `screen` alone selects one by

@@ -62,8 +62,8 @@ EOF
 
 	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
 	rm -f "$info"
-	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
-		--fast 8M --noaudio --control :0 --control-info "$info" \
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --control :0 --control-info "$info" \
 		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
 	COPPERLINE_PID=$!
 
@@ -152,8 +152,8 @@ EOF
 
 	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
 	rm -f "$info"
-	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
-		--fast 8M --noaudio --control :0 --control-info "$info" \
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --control :0 --control-info "$info" \
 		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
 	COPPERLINE_PID=$!
 
@@ -214,8 +214,8 @@ EOF
 
 	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
 	rm -f "$info"
-	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
-		--fast 8M --noaudio --control :0 --control-info "$info" \
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --control :0 --control-info "$info" \
 		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
 	COPPERLINE_PID=$!
 
@@ -284,8 +284,8 @@ EOF
 
 	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
 	rm -f "$info"
-	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
-		--fast 8M --noaudio --control :0 --control-info "$info" \
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --control :0 --control-info "$info" \
 		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
 	COPPERLINE_PID=$!
 
@@ -352,8 +352,8 @@ EOF
 
 	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
 	rm -f "$info"
-	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
-		--fast 8M --noaudio --control :0 --control-info "$info" \
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --control :0 --control-info "$info" \
 		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
 	COPPERLINE_PID=$!
 
@@ -425,8 +425,8 @@ EOF
 
 	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
 	rm -f "$info"
-	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
-		--fast 8M --noaudio --control :0 --control-info "$info" \
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --control :0 --control-info "$info" \
 		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
 	COPPERLINE_PID=$!
 
@@ -499,8 +499,8 @@ EOF
 
 	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
 	rm -f "$info"
-	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
-		--fast 8M --noaudio --serial tcp --control :0 --control-info "$info" \
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --serial tcp --control :0 --control-info "$info" \
 		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
 	COPPERLINE_PID=$!
 
@@ -594,8 +594,8 @@ EOF
 
 	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
 	rm -f "$info"
-	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
-		--fast 8M --noaudio --hostsocket-net host --control :0 --control-info "$info" \
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --hostsocket-net host --control :0 --control-info "$info" \
 		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
 	COPPERLINE_PID=$!
 
@@ -673,8 +673,8 @@ EOF
 
 	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
 	rm -f "$info"
-	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
-		--fast 8M --noaudio --serial tcp --control :0 --control-info "$info" \
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --serial tcp --control :0 --control-info "$info" \
 		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
 	COPPERLINE_PID=$!
 
@@ -763,8 +763,8 @@ EOF
 
 	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
 	rm -f "$info"
-	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
-		--fast 8M --noaudio --serial tcp --control :0 --control-info "$info" \
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --serial tcp --control :0 --control-info "$info" \
 		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
 	COPPERLINE_PID=$!
 
@@ -827,6 +827,125 @@ EOF
 	fi
 }
 
+# --- SCREENSHOT P96/Picasso96 RTG check (phase 1.0, GitHub issue #55) -----
+# Unlike run_screenshot_check above (classic planar only -- Copperline
+# had no RTG emulation until 0.15), this exercises the P96-ACTIVE
+# capture path against a REAL Picasso96/RTG board under Copperline
+# itself, using its own [rtg] card=picasso2 support. SKIP-SAFE BY
+# DESIGN: most machines running make test-target won't have [rtg]
+# configured in their own copperline.local.toml at all (it's opt-in --
+# see copperline.example.toml), and even with a board configured, the
+# right monitor driver has to be installed and bound on the Workbench
+# disk before Picasso96API.library can offer any display mode (a real
+# gap this project hit and fixed live -- see this directory's own
+# README). fixtures/p96-app itself detects and reports exactly this
+# via a real SRC:build/p96-status.txt status file
+# (tests/copperline/screenshot-p96-test.py reads it directly off the
+# host filesystem, not over the wire -- Run's own >file redirection
+# was confirmed unreliable for a launched process's real stdout during
+# this feature's development); a `SKIP ...` status is a genuine,
+# honest skip here, not a failure, matching the whole make test-target
+# gate's own "skip cleanly, don't falsely pass" precedent for
+# copperline.local.toml itself.
+#
+# Every check in this file (not just this one) uses --cpu 68020
+# (32-bit address bus) + --accelerator 8M (fast RAM at 0x08000000)
+# rather than the --model A1200 default's own 68EC020 (24-bit) +
+# --fast 8M (Zorro II, $200000) -- discovered getting THIS check
+# working: RTG needs real Zorro II autoconfig space, and the 24-bit
+# profile doesn't have room for it once 8M of Zorro II fast RAM claims
+# most of it, so a board here autoconfigures at address $00000000 and
+# gets shut down by the OS's own Expansion Board Diagnostic, which
+# also blocks headless boot outright (needs a manual "Continue"
+# click). Applied to every check, not just this one, both because it's
+# a straightforwardly more correct default (CLAUDE.md's own
+# "Recommended/CI-tested config" already says plain "68020", not
+# "68EC020" -- this project's own A1200 checks were quietly emulating
+# the wrong CPU variant all along) and because a real A1200 has no
+# built-in Zorro II slots at all -- actual A1200 fast-RAM upgrades are
+# always accelerator-slot cards, so --accelerator is the more
+# historically accurate choice too, not just a workaround for this one
+# check's own needs.
+run_screenshot_p96_check() {
+	echo "run.sh: SCREENSHOT P96/Picasso96 RTG"
+
+	rm -f "$BUILD/screenshot-p96-result.txt" "$BUILD/marker-screenshot-p96-ready.txt" "$BUILD/p96-status.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+Run >NIL: SRC:build/AmiPilotServer SERIAL
+Wait 5
+Echo "READY" >SRC:build/marker-screenshot-p96-ready.txt
+EOF
+
+	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
+	rm -f "$info"
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 \
+		--chip 2M --accelerator 8M --noaudio --serial tcp --control :0 \
+		--control-info "$info" \
+		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
+	COPPERLINE_PID=$!
+
+	tries=0
+	while [ ! -f "$info" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 100 ]; then
+			echo "run.sh: FAIL (screenshot-p96): copperline never wrote $info"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			return
+		fi
+		sleep 0.1
+	done
+
+	"$COPPERLINE_CTL" --info "$info" run_until '{"seconds": 600}' > /dev/null 2>&1 &
+
+	tries=0
+	while [ ! -f "$BUILD/marker-screenshot-p96-ready.txt" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 120 ]; then
+			echo "run.sh: FAIL (screenshot-p96): guest never became ready -- crash or hang"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			rm -f "$info"
+			return
+		fi
+		sleep 0.5
+	done
+
+	python3 "$REPO_ROOT/tests/copperline/screenshot-p96-test.py" 127.0.0.1:1234 \
+		> "$BUILD/screenshot-p96-result.txt" 2>&1 || true
+
+	kill "$COPPERLINE_PID" 2>/dev/null || true
+	COPPERLINE_PID=""
+	rm -f "$info"
+
+	if grep -qF 'P96 SKIP' "$BUILD/screenshot-p96-result.txt" 2>/dev/null; then
+		echo "run.sh: SKIP (SCREENSHOT P96/Picasso96 RTG): $(grep -F 'P96 SKIP' "$BUILD/screenshot-p96-result.txt")"
+		return
+	fi
+
+	ok=1
+	for pattern in \
+		'WINDOW PASS' \
+		'CAPTURE PASS' \
+		'RAMP PASS' \
+		'CLOSE PASS'; do
+		if ! grep -qF "$pattern" "$BUILD/screenshot-p96-result.txt" 2>/dev/null; then
+			echo "run.sh: FAIL (screenshot-p96): expected line not found: $pattern"
+			ok=0
+		fi
+	done
+
+	if [ "$ok" -eq 1 ]; then
+		echo "run.sh: PASS (SCREENSHOT P96/Picasso96 RTG)"
+	else
+		echo "run.sh:   --- actual output ---"
+		sed 's/^/run.sh:   /' "$BUILD/screenshot-p96-result.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+	fi
+}
+
 # --- WBLAUNCH check (phase 1.0, docs/implementation-plan.md's "Program
 # launch": "Workbench launch, done properly... The launched program
 # experiences a real Workbench start") -----------------------------------
@@ -854,8 +973,8 @@ EOF
 
 	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
 	rm -f "$info"
-	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
-		--fast 8M --noaudio --serial tcp --control :0 --control-info "$info" \
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --serial tcp --control :0 --control-info "$info" \
 		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
 	COPPERLINE_PID=$!
 
@@ -943,8 +1062,8 @@ EOF
 
 	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
 	rm -f "$info"
-	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
-		--fast 8M --noaudio --serial tcp --control :0 --control-info "$info" \
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --serial tcp --control :0 --control-info "$info" \
 		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
 	COPPERLINE_PID=$!
 
@@ -1039,8 +1158,8 @@ EOF
 
 	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
 	rm -f "$info"
-	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
-		--fast 8M --noaudio --serial tcp --control :0 --control-info "$info" \
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --serial tcp --control :0 --control-info "$info" \
 		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
 	COPPERLINE_PID=$!
 
@@ -1127,8 +1246,8 @@ EOF
 
 	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
 	rm -f "$info"
-	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
-		--fast 8M --noaudio --serial tcp --control :0 --control-info "$info" \
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --serial tcp --control :0 --control-info "$info" \
 		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
 	COPPERLINE_PID=$!
 
@@ -1218,8 +1337,8 @@ EOF
 
 	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
 	rm -f "$info"
-	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
-		--fast 8M --noaudio --serial tcp --control :0 --control-info "$info" \
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --serial tcp --control :0 --control-info "$info" \
 		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
 	COPPERLINE_PID=$!
 
@@ -1307,8 +1426,8 @@ EOF
 
 	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
 	rm -f "$info"
-	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
-		--fast 8M --noaudio --serial tcp --control :0 --control-info "$info" \
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --serial tcp --control :0 --control-info "$info" \
 		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
 	COPPERLINE_PID=$!
 
@@ -1395,8 +1514,8 @@ EOF
 
 	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
 	rm -f "$info"
-	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
-		--fast 8M --noaudio --serial tcp --control :0 --control-info "$info" \
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --serial tcp --control :0 --control-info "$info" \
 		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
 	COPPERLINE_PID=$!
 
@@ -1490,8 +1609,8 @@ EOF
 
 	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
 	rm -f "$info"
-	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
-		--fast 8M --noaudio --serial tcp --control :0 --control-info "$info" \
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --serial tcp --control :0 --control-info "$info" \
 		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
 	COPPERLINE_PID=$!
 
@@ -1601,6 +1720,7 @@ run_tcp_host_check
 run_launch_check
 run_wblaunch_check
 run_screenshot_check
+run_screenshot_p96_check
 run_stock_app_check
 run_mui_check
 run_fs_check

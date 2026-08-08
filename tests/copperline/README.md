@@ -115,6 +115,69 @@ root-caused yet. Stock-app conformance testing is explicitly meant to
 surface exactly this kind of gap against real, OS-shipped software,
 not just prove the happy path.
 
+### P96/Picasso96 RTG (phase 1.0, GitHub issue #55)
+
+`run_screenshot_p96_check` exercises `SCREENSHOT`'s P96-active capture
+path (`server/src/screenshot.c`, issue #44) against a REAL Picasso96/
+RTG board under Copperline itself, using its 0.15-and-later `[rtg]`
+support — the missing piece `server/README.md`'s own SCREENSHOT
+section used to call "honestly unverified," since Copperline had no
+RTG emulation at all before 0.15.
+
+**Skip-safe by design, opt-in.** Most contributors' own
+`copperline.local.toml` won't have `[rtg]` configured — it's not in
+`copperline.example.toml` by default. `fixtures/p96-app` detects this
+itself (no P96 mode available at all) and writes a real `SKIP ...`
+status rather than crashing or hanging; `run.sh` reports this as a
+genuine skip, not a failure, the same "skip cleanly, don't falsely
+pass" precedent the whole `make test-target` gate already sets for
+`copperline.local.toml` itself being absent. If you want this check to
+actually exercise the real capture path rather than skip:
+
+```toml
+[rtg]
+card = "picasso2"
+vram = "2M"
+```
+
+Two real, non-obvious things had to be true before this worked, found
+live getting it running:
+
+1. **CPU/address-space, not a Copperline bug -- and fixed for every
+   check, not just this one.** The `--model A1200` default profile
+   uses a 68EC020 (24-bit/16MB address bus); `--fast 8M` at `$200000`
+   consumes nearly all the scarce Zorro II autoconfig space, leaving
+   none for the RTG board's VRAM, which then autoconfigures at address
+   `$00000000` and gets shut down by the OS's own Expansion Board
+   Diagnostic screen -- which also blocks headless boot outright,
+   since it needs a manual "Continue" click. Every check in `run.sh`
+   now uses `--cpu 68020 --chip 2M --accelerator 8M` (fast RAM at the
+   accelerator slot, `0x08000000`, well outside the 24-bit space)
+   instead of `--model A1200`'s own 68EC020 + `--fast 8M` (Zorro II).
+   Not a workaround scoped to this one check: `CLAUDE.md`'s own
+   "Recommended/CI-tested config" already says plain "68020", not
+   "68EC020" -- every check here was quietly emulating the wrong CPU
+   variant before this -- and a real A1200 has no built-in Zorro II
+   slots at all, so `--accelerator` (an accelerator-slot card) is the
+   historically accurate choice for A1200 fast RAM anyway, not just a
+   fix for RTG's own address-space needs.
+2. **The right monitor driver has to be bound, not just the board
+   present.** Even with the board autoconfiguring cleanly,
+   `Picasso96API.library` can open fine and correctly report the board
+   (`p96GetBoardDataTags` naming it `"PicassoII"`) while still having
+   **zero display modes registered** if the Workbench install's own
+   Picasso96 setup doesn't have a monitor driver matching the specific
+   hardware Copperline's `picasso2` emulates (CL-GD5426) -- e.g. a
+   Workbench disk set up for Amiberry's own `uaegfx` virtual card
+   won't necessarily have this. Install the matching Picasso96 monitor
+   driver on the Workbench disk if `p96BestModeIDTags()` keeps
+   returning `INVALID_ID` even after fixing (1).
+
+Once both are true, verified pixel-for-pixel identical results to the
+manual Amiberry verification (`server/README.md`'s SCREENSHOT
+section): a known `x%4` pen-ramp pattern painted on a genuine P96 CLUT
+screen decodes back exactly.
+
 ## Ad hoc smoke testing (debugging, new fixtures)
 
 For anything `run.sh` doesn't already assert on, write
