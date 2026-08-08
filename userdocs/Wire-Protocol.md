@@ -97,9 +97,11 @@ RC <code> <byte-count>
 
 followed by exactly `<byte-count>` bytes of payload. The codes are the
 same as the ARexx port's `RC` values: `0` OK, `5` warning (nothing
-matched), `10` error (bad command), `20` failure (the action didn't
-deliver). Parse payloads by the byte count, never by scanning for
-delimiters — a `TREE` payload contains newlines.
+matched), `10` error (bad command), `15` timeout (an awaited condition
+or payload — `WAITFOR`, `CLICK ... EXPECT=`, `FSPUT` — never arrived
+within `TIMEOUT=`), `20` failure (the action didn't deliver). Parse
+payloads by the byte count, never by scanning for delimiters — a
+`TREE` payload contains newlines.
 
 A quick manual session over the Copperline bridge:
 
@@ -256,10 +258,29 @@ internal buffer (`server/src/fs.c`'s `AMIP_FS_BUF_SIZE`, currently
 is a test-staging channel for small fixtures, config, and log files,
 not a general file transfer mechanism.
 
-**There is no `fs_put()`.** Writing a file host-to-Amiga needs a
-binary request body, and the wire's request grammar today is strictly
-single LF-terminated text lines — a real protocol addition, deferred
-as its own follow-up rather than bolted on here.
+**`fs_put(path, data, *, timeout=30.0)` writes a file host-to-Amiga**,
+creating it if it doesn't exist and overwriting it if it does:
+
+```python
+    client.fs_put("Work:amipilot-staging/results.log", b"hello\x00world")
+    assert client.fs_get("Work:amipilot-staging/results.log") == b"hello\x00world"
+```
+
+This is the wire's first request to carry a raw binary body: on the
+wire it's `FSPUT <path> <byte-count> [TIMEOUT=<n>]`, the request-line
+declaring how many raw bytes immediately follow it (no delimiter, no
+escaping — the same length-prefixed idea the response side already
+uses, just inverted). `fs_put()` is **wire-only** — there is no ARexx
+equivalent at all, because `RexxMsg`/`ARG0()` only ever carries string
+arguments, so there's genuinely no channel to receive a binary payload
+over that transport. Same allowlist/containment rules and
+`AMIP_FS_BUF_SIZE` cap as `fs_get()`. `timeout` (default 30s, longer
+than most other waits here — a real multi-KB payload over a slow
+serial link needs it) bounds how long the server waits for the
+declared payload to fully arrive after the request line; if it
+doesn't, `fs_put()` raises `Timeout` (`RC 15`), distinct from
+`ActionFailed` (`RC 20`) on a write that fails after a complete
+payload arrived (e.g. disk full).
 
 ## Menus
 

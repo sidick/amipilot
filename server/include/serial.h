@@ -62,4 +62,22 @@ BOOL AmipSerialLastLineOverflowed(const AmipSerial *serial);
  * (io_Error non-zero) -- rare enough that the caller just logs it. */
 BOOL AmipSerialWrite(AmipSerial *serial, const void *data, ULONG len);
 
+/* Blocks (polling the same standing-async-read-plus-drain mechanism
+ * AmipSerialNextLine() itself uses internally, at ~100ms granularity)
+ * until exactly `len` raw bytes have been received into `buf`, or
+ * `timeoutSeconds` elapses (0 = a 30s default -- longer than
+ * WAITFOR's own 10s: a real multi-KB payload over a slow serial link
+ * genuinely needs it). Starts by draining whatever's already buffered
+ * from the request line that preceded this call, same as any other
+ * bytes this module receives. Returns FALSE on timeout or a device
+ * error -- CMD_READ itself has no built-in timeout (confirmed against
+ * the NDK autodoc; it queues until satisfied), so this function's own
+ * Delay()-based bound is what keeps a silent/dead sender from wedging
+ * the whole server. On FALSE, `buf`'s contents are whatever partial
+ * bytes arrived -- not meaningful, the caller must not act on them.
+ * len == 0 always succeeds immediately without touching the
+ * transport. FSPUT (phase 1.0) is this function's only caller today. */
+BOOL AmipSerialReadExact(AmipSerial *serial, UBYTE *buf, ULONG len,
+                          long timeoutSeconds);
+
 #endif /* AMIPILOT_SERIAL_H */

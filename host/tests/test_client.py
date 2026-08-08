@@ -460,6 +460,45 @@ class Verbs(unittest.TestCase):
         with self.assertRaises(CommandError):
             c.fs_list("SYS:")
 
+    def test_fs_put_sends_line_then_payload_and_does_not_raise_on_ok(self):
+        c = client_with(b"RC 0 7\nwritten")
+        c.fs_put("Work:build/data", b"hello\x00world")
+        self.assertEqual(
+            c._wire._t.sent[0],
+            b"FSPUT Work:build/data 11 TIMEOUT=30\nhello\x00world",
+        )
+
+    def test_fs_put_quotes_spaced_path(self):
+        c = client_with(b"RC 0 0\n")
+        c.fs_put("Work:My Dir/data", b"x")
+        self.assertEqual(
+            c._wire._t.sent[0], b'FSPUT "Work:My Dir/data" 1 TIMEOUT=30\nx'
+        )
+
+    def test_fs_put_parent_missing_raises_not_found(self):
+        payload = b"parent directory does not exist"
+        c = client_with(b"RC 5 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(NotFound):
+            c.fs_put("Work:nosuchdir/data", b"x")
+
+    def test_fs_put_outside_allowlist_raises_command_error(self):
+        payload = b"path not under any granted root (granted: Work:)"
+        c = client_with(b"RC 10 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(CommandError):
+            c.fs_put("SYS:data", b"x")
+
+    def test_fs_put_timeout_raises_timeout(self):
+        payload = b"FSPUT payload never fully arrived within TIMEOUT"
+        c = client_with(b"RC 15 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(Timeout):
+            c.fs_put("Work:build/data", b"x")
+
+    def test_fs_put_short_write_raises_action_failed(self):
+        payload = b"short write (disk full?)"
+        c = client_with(b"RC 20 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(ActionFailed):
+            c.fs_put("Work:build/data", b"x")
+
     def test_menu_parses_payload(self):
         payload = (
             'window "GadTools" screen="Workbench Screen" [0,0 10x10]\n'

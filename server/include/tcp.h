@@ -82,6 +82,20 @@ BOOL AmipTcpLastLineOverflowed(const AmipTcp *tcp);
  * that the caller just logs it, same as AmipSerialWrite. */
 BOOL AmipTcpWrite(AmipTcp *tcp, const void *data, ULONG len);
 
+/* Blocks (a Delay()-based poll, ~100ms granularity, over a briefly
+ * non-blocking socket -- see tcp.c's own comment for why) until
+ * exactly `len` raw bytes have been received into `buf`, or
+ * `timeoutSeconds` elapses (0 = a 30s default -- longer than
+ * WAITFOR's own 10s: a real multi-KB payload genuinely needs it).
+ * Starts by draining whatever's already buffered from the request
+ * line that preceded this call. Returns FALSE on timeout or if the
+ * connection closes mid-read (in which case it's already been torn
+ * down, same as AmipTcpWait()'s own handling) -- on FALSE, `buf`'s
+ * contents are whatever partial bytes arrived, not meaningful. len ==
+ * 0 always succeeds immediately without touching the socket. FSPUT
+ * (phase 1.0) is this function's only caller today. */
+BOOL AmipTcpReadExact(AmipTcp *tcp, UBYTE *buf, ULONG len, long timeoutSeconds);
+
 /* Grants one TCPALLOW entry -- "a.b.c.d" (an exact address) or
  * "a.b.c.d/nn" (a CIDR range, nn 0-32) -- parsed by hand
  * (ParseDottedQuad(), tcp.c), NOT via inet_aton(): that call turned

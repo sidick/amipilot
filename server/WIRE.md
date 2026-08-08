@@ -95,7 +95,10 @@ RC <code> <byte-count>\n
 - `<code>` is the same RC policy the ARexx port uses (`arexx_cmd.h`):
   `0` success, `5` warning (well-formed but nothing to act on — window or
   gadget not found), `10` error (bad syntax / unknown command / bad
-  locator), `20` failure (the action itself didn't deliver).
+  locator), `15` timeout (`WAITFOR`/`CLICK ... EXPECT=`/`FSPUT`'s own
+  awaited condition or payload never arrived within `TIMEOUT=` — the
+  action or a well-formed request was accepted, just not satisfied in
+  time), `20` failure (the action itself didn't deliver).
 - `<byte-count>` is a decimal byte count, possibly `0`. The payload is
   raw bytes — no escaping, no terminator of its own; the next `RC` header
   begins immediately after. Payload text (TREE output, GETTEXT values,
@@ -109,6 +112,38 @@ RC <code> <byte-count>\n
 A client MUST parse by byte count, never by scanning for delimiters in
 the payload.
 
+## Request payloads
+
+Every request above is a single LF-terminated line — until `FSPUT`
+(phase 1.0, `server/README.md`'s "File API"), nothing on the request
+side ever carried a raw binary body. `FSPUT` introduces the request-
+side mirror of the response framing above:
+
+```
+FSPUT <path> <byte-count> [TIMEOUT=<n>]\n
+<byte-count bytes of raw payload, no terminator of its own>
+```
+
+The request line itself declares `<byte-count>`; the payload follows
+immediately, with no delimiter — the next request's own line begins
+right after the last payload byte, exactly as the next `RC` header
+begins right after a response payload. `<byte-count>` is capped at the
+server's own internal buffer size (`AMIP_FS_BUF_SIZE`/
+`AMIP_AREXX_MAX_FSPUT`, 16KB) and rejected outright, at parse time, if
+it exceeds that or is negative — before any attempt to read the
+payload. Once a valid byte-count has been parsed, though, the server
+unconditionally drains exactly that many bytes off the wire before
+replying, even if the request is then rejected for some other reason
+(`FSROOT` disabled, path outside the allowlist): those bytes are
+already in flight, and not consuming them would desync the connection
+for whatever request comes next. A client MUST send exactly
+`<byte-count>` bytes immediately after the line — sending more, fewer,
+or with a delay past the request's own `TIMEOUT=` (default 30s) will
+desync or time out the exchange.
+
+This mechanism is deliberately narrow: it exists for `FSPUT` alone
+today, not as a general request-body facility every verb can opt into.
+
 ## Handshake: `VERSION`
 
 A client's first command after opening the transport SHOULD be
@@ -117,7 +152,7 @@ A client's first command after opening the transport SHOULD be
 ```
 AMIPILOT <major>.<minor> PROTOCOL 1
 STABLE VERSION
-EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH FSLIST FSSTAT FSMKDIR FSDELETE FSGET MENU MENUPICK DRAG WAITFOR SCREENS AUTH MUIREXX QUIT
+EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH FSLIST FSSTAT FSMKDIR FSDELETE FSGET FSPUT MENU MENUPICK DRAG WAITFOR SCREENS AUTH MUIREXX QUIT
 ```
 
 - Line 1: server version (from `version.mk`) and the wire protocol

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Drives AmiPilotServer's file API (FSLIST/FSSTAT/FSMKDIR/FSDELETE/
-FSGET, phase 0.4) end to end for the on-target regression check
-(tests/copperline/run.sh).
+FSGET/FSPUT, phases 0.4-1.0) end to end for the on-target regression
+check (tests/copperline/run.sh).
 
 The server is started with `FSROOT=RAM:amipilot-fs-test` (see this
 check's smoke.script in run.sh, which creates that directory first via
@@ -64,6 +64,27 @@ def main() -> int:
         return 1
     except NotFound:
         print("FSDELETE PASS")
+
+    # FSPUT (phase 1.0) round trip: write a file host-to-Amiga over
+    # this check's own transport (serial.device, via Copperline's
+    # `--serial tcp` bridge -- see run.sh's own comment), then read it
+    # straight back to confirm the bytes (including an embedded NUL)
+    # survived intact.
+    put_data = b"written by fs_put\x00trailer"
+    client.fs_put(f"{ROOT}/put.dat", put_data)
+    got = client.fs_get(f"{ROOT}/put.dat")
+    if got == put_data:
+        print("FSPUT PASS")
+    else:
+        print(f"FSPUT FAIL got={got!r}")
+        return 1
+
+    try:
+        client.fs_put("SYS:amipilot-fsput-reject.dat", b"x")
+        print("FSPUT-CONTAINMENT FAIL SYS: was served")
+        return 1
+    except CommandError:
+        print("FSPUT-CONTAINMENT PASS SYS: rejected")
 
     try:
         client.fs_list("SYS:")

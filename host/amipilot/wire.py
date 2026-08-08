@@ -168,9 +168,19 @@ class WireClient:
         if close is not None:
             close()
 
-    def command(self, line: str | bytes) -> Reply:
+    def command(self, line: str | bytes, payload: bytes | None = None) -> Reply:
         """Send one command line, return its Reply. The terminator is
-        added here; passing a line containing one is an error."""
+        added here; passing a line containing one is an error.
+
+        `payload`, if given, is sent as raw bytes immediately after the
+        line -- the request-side mirror of how a Reply's own `.payload`
+        already carries a length-prefixed binary body back. The line
+        itself must declare `payload`'s exact length up front (FSPUT's
+        own `<path> <byte-count>` grammar, server/WIRE.md) -- this
+        method has no idea what the line means and does no such
+        checking; it just sends `len(payload)` raw bytes right after
+        the terminator, matching what the server's FSPUT handler reads
+        off the wire before even looking at the request further."""
         if isinstance(line, str):
             line = line.encode("latin-1")
         if b"\n" in line or b"\r" in line:
@@ -180,7 +190,7 @@ class WireClient:
                 f"command line too long ({len(line) + 1} bytes including "
                 f"the terminator, server max {MAX_LINE}): {line[:64]!r}..."
             )
-        self._t.sendall(line + b"\n")
+        self._t.sendall(line + b"\n" + payload if payload else line + b"\n")
 
         header = self._read_line()
         parts = header.split()

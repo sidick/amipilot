@@ -98,6 +98,8 @@ struct Library *SocketBase = NULL;
  * as a shorter, different, unintended command. */
 #define AMIP_LINE_TOO_LONG_MSG \
     "request line too long (max 512 bytes including the terminator)"
+#define AMIP_FSPUT_TIMEOUT_MSG \
+    "FSPUT payload never fully arrived within TIMEOUT"
 
 /* The currently-loaded manifest (MANIFEST command). One at a time --
  * loading a new one replaces the old, matching how a test session
@@ -503,6 +505,14 @@ static struct Gadget *ResolveTargetGadget(struct Window *window, const AmipArexx
  * so file-static is exactly as safe as per-message allocation, at zero
  * cost. Don't move these back into a function. */
 static char g_resultBuf[AMIP_RESULT_BUF_SIZE];
+
+/* FSPUT's own incoming payload, staged here by the wire-transport
+ * dispatch loops (serial/TCP, this file's own main loop) BEFORE
+ * HandleCommand() is ever called -- see HandleCommand's own doc
+ * comment on fsPutData. Sized to AMIP_AREXX_MAX_FSPUT
+ * (arexx_cmd.h), the same cap the parser already enforces on the
+ * declared byte-count, so a successful parse always fits here. */
+static UBYTE g_fsPutBuf[AMIP_AREXX_MAX_FSPUT];
 static char g_treeBuf[AMIP_TREE_BUF_SIZE];
 
 #define AMIP_TCP_PASSWORD_MAX 64
@@ -527,10 +537,20 @@ static char g_tcpPassword[AMIP_TCP_PASSWORD_MAX] = AMIP_TCP_DEFAULT_PASSWORD;
  * except FSGET leaves *resultLenOut at its initial 0, in which case
  * the caller falls back to strlen(result): safe even for a genuinely
  * empty FSGET result, since a buffer that starts with a NUL byte
- * strlen()s to 0 either way. */
+ * strlen()s to 0 either way.
+ *
+ * fsPutData is FSPUT's own already-received raw payload (cmd->fsPutLen
+ * bytes) -- NULL when none was received, which is always true for the
+ * ARexx-port call site (no such payload exists there at all) and for
+ * every OTHER verb regardless of caller (only FSPUT's own case reads
+ * it). The wire-transport dispatch loops (serial/TCP, this file's
+ * main loop) are what actually populate it, via
+ * AmipSerialReadExact()/AmipTcpReadExact(), before ever calling this
+ * function -- see server/WIRE.md's request-payload framing. */
 static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                          ULONG *resultLenOut, BOOL *runningOut,
-                         BOOL requiresAuth, BOOL *authenticated)
+                         BOOL requiresAuth, BOOL *authenticated,
+                         const void *fsPutData)
 {
     int rc = AMIP_AREXX_RC_OK;
     const char *result = NULL;
@@ -649,8 +669,8 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                      "AMIPILOT " XSTR(VERSION) "." XSTR(REVISION) " PROTOCOL 1\n"
                      "STABLE VERSION\n"
                      "EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH "
-                     "FSLIST FSSTAT FSMKDIR FSDELETE FSGET MENU MENUPICK DRAG "
-                     "WAITFOR SCREENS AUTH MUIREXX QUIT\n");
+                     "FSLIST FSSTAT FSMKDIR FSDELETE FSGET FSPUT MENU MENUPICK "
+                     "DRAG WAITFOR SCREENS AUTH MUIREXX QUIT\n");
             result = g_resultBuf;
             break;
 
@@ -861,6 +881,26 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
 
         case AMIP_AREXX_CMD_FSGET:
             rc = AmipFsGet(cmd->path, &result, resultLenOut);
+            break;
+
+        case AMIP_AREXX_CMD_FSPUT:
+            /* fsPutData is only ever non-NULL when a wire-transport
+             * dispatch loop (serial/TCP) has already received the
+             * declared byte-count off the wire and is handing it
+             * through -- the ARexx-port call site always passes NULL,
+             * since ARexx messages carry no such raw byte stream at
+             * all (see arexx_cmd.h's own doc comment on
+             * AMIP_AREXX_CMD_FSPUT). */
+            if (fsPutData == NULL) {
+                strncpy(g_resultBuf,
+                        "FSPUT requires a wire transport (serial or TCP) -- not available over ARexx",
+                        sizeof(g_resultBuf) - 1);
+                result = g_resultBuf;
+                rc = AMIP_AREXX_RC_ERROR;
+            } else {
+                rc = AmipFsPut(cmd->path, fsPutData, (ULONG)cmd->fsPutLen,
+                                &result, resultLenOut);
+            }
             break;
 
         case AMIP_AREXX_CMD_MENU: {
@@ -1366,7 +1406,7 @@ static int RealMain(void)
                                            * local machine, same implicit
                                            * trust boundary as always. */
                 int rc = HandleCommand(&cmd, &result, &resultLen, &running,
-                                        FALSE, &authIgnored);
+                                        FALSE, &authIgnored, NULL);
 
                 AmipArexxReply(handle, rc, result);
             }
@@ -1405,8 +1445,35 @@ static int RealMain(void)
                     payloadLen = (ULONG)strlen(result);
                 } else {
                     AmipArexxParse(lineIn, &cmd);
-                    rc = HandleCommand(&cmd, &result, &payloadLen, &running,
-                                        FALSE, &authIgnored);
+                    /* FSPUT's declared byte-count of raw data follows
+                     * the request line on the wire -- received in
+                     * full HERE, before HandleCommand() ever runs,
+                     * since that function is shared with the ARexx
+                     * port and has no transport of its own to read
+                     * from. A failed/timed-out read means the payload
+                     * never fully arrived (or the cable/link genuinely
+                     * failed); HandleCommand() is skipped entirely in
+                     * that case -- there is nothing complete to act
+                     * on, and the stream may already be desynced
+                     * (an honest, documented limitation of a
+                     * deliberately-malformed or connection-dropping
+                     * sender, see AmipSerialReadExact's own doc
+                     * comment). */
+                    if (cmd.type == AMIP_AREXX_CMD_FSPUT) {
+                        if (AmipSerialReadExact(serial, g_fsPutBuf,
+                                                 (ULONG)cmd.fsPutLen,
+                                                 cmd.expectTimeout)) {
+                            rc = HandleCommand(&cmd, &result, &payloadLen, &running,
+                                                FALSE, &authIgnored, g_fsPutBuf);
+                        } else {
+                            rc = AMIP_AREXX_RC_TIMEOUT;
+                            result = AMIP_FSPUT_TIMEOUT_MSG;
+                            payloadLen = (ULONG)strlen(result);
+                        }
+                    } else {
+                        rc = HandleCommand(&cmd, &result, &payloadLen, &running,
+                                            FALSE, &authIgnored, NULL);
+                    }
                 }
 
                 snprintf(header, sizeof(header), "RC %d %lu\n",
@@ -1444,9 +1511,31 @@ static int RealMain(void)
                     payloadLen = (ULONG)strlen(result);
                 } else {
                     AmipArexxParse(lineIn, &cmd);
-                    rc = HandleCommand(&cmd, &result, &payloadLen, &running,
-                                        TRUE, &authState);
-                    AmipTcpSetAuthenticated(tcp, authState);
+                    /* Same shape as the serial dispatch loop above --
+                     * see its own comment for the full rationale.
+                     * Read unconditionally (even before the AUTH
+                     * gate below would otherwise reject the command)
+                     * since the client has already sent these bytes
+                     * regardless of whether the request will succeed;
+                     * not draining them would desync the connection
+                     * for whatever request comes next. */
+                    if (cmd.type == AMIP_AREXX_CMD_FSPUT) {
+                        if (AmipTcpReadExact(tcp, g_fsPutBuf,
+                                              (ULONG)cmd.fsPutLen,
+                                              cmd.expectTimeout)) {
+                            rc = HandleCommand(&cmd, &result, &payloadLen, &running,
+                                                TRUE, &authState, g_fsPutBuf);
+                            AmipTcpSetAuthenticated(tcp, authState);
+                        } else {
+                            rc = AMIP_AREXX_RC_TIMEOUT;
+                            result = AMIP_FSPUT_TIMEOUT_MSG;
+                            payloadLen = (ULONG)strlen(result);
+                        }
+                    } else {
+                        rc = HandleCommand(&cmd, &result, &payloadLen, &running,
+                                            TRUE, &authState, NULL);
+                        AmipTcpSetAuthenticated(tcp, authState);
+                    }
                 }
 
                 snprintf(header, sizeof(header), "RC %d %lu\n",

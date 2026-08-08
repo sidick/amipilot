@@ -38,6 +38,11 @@ typedef enum {
     AMIP_AREXX_CMD_FSMKDIR,  /* FSMKDIR <path> */
     AMIP_AREXX_CMD_FSDELETE, /* FSDELETE <path> */
     AMIP_AREXX_CMD_FSGET,    /* FSGET <path> */
+    AMIP_AREXX_CMD_FSPUT,    /* FSPUT <path> <byte-count> [TIMEOUT=<n>] --
+                              * wire-only (serial/TCP), NOT answerable over
+                              * ARexx -- see AmipArexxParse's own doc
+                              * comment and server/WIRE.md's request-payload
+                              * framing for why. */
     AMIP_AREXX_CMD_MENU,     /* MENU <window-pattern> */
     AMIP_AREXX_CMD_MENUPICK, /* MENUPICK <window-pattern> <menu-num> <item-num> [<sub-num>] */
     AMIP_AREXX_CMD_DRAG,     /* DRAG <window-pattern> (<gadget-id> | ROLE=<r> [LABEL=<l>] [INDEX=<n>]) <dx> <dy> |
@@ -81,6 +86,14 @@ enum {
 #define AMIP_AREXX_MAX_NAME   32   /* manifest logical names ("@name") */
 #define AMIP_AREXX_MAX_PATH   256  /* MANIFEST file path */
 #define AMIP_AREXX_MAX_COMMAND 256 /* LAUNCH command line */
+#define AMIP_AREXX_MAX_FSPUT  16384 /* FSPUT's declared byte-count cap --
+                                    * duplicated from fs.c's own
+                                    * AMIP_FS_BUF_SIZE (this file stays
+                                    * portable/host-testable, no fs.h
+                                    * dependency, same reasoning as every
+                                    * other per-file duplicated constant
+                                    * here) -- keep both in sync if either
+                                    * changes. */
 #define AMIP_AREXX_MAX_ROLE   32   /* "ROLE=<name>" -- longest real name is
                                     * "radio_button"/"listbrowser", both well
                                     * under this */
@@ -137,6 +150,15 @@ typedef struct {
     char command[AMIP_AREXX_MAX_COMMAND];       /* LAUNCH */
     long stackSize;                             /* LAUNCH; 0 = use CreateNewProc's
                                                   * own default (4000 bytes) */
+    long fsPutLen;                              /* FSPUT's declared byte-count
+                                                  * -- how many raw bytes follow
+                                                  * the request line on the
+                                                  * wire, capped at
+                                                  * AMIP_AREXX_MAX_FSPUT. Reuses
+                                                  * `path` above for the target
+                                                  * path and `expectTimeout`
+                                                  * below for its own optional
+                                                  * TIMEOUT=. */
     long menuNum, itemNum;                      /* MENUPICK */
     long subNum;                                /* MENUPICK; -1 = a top-level
                                                   * item, not a submenu entry */
@@ -236,10 +258,16 @@ typedef struct {
                                                   * server's own default (10s,
                                                   * amipilotserver/main.c).
                                                   * Also reused for MUIREXX's
-                                                  * own TIMEOUT= -- same
-                                                  * "single-token bucket"
-                                                  * reuse convention path/
-                                                  * command above already
+                                                  * and FSPUT's own TIMEOUT=
+                                                  * (FSPUT's default is 30s,
+                                                  * not 10s -- see
+                                                  * amipilotserver/main.c --
+                                                  * a real 16KB payload over
+                                                  * a slow serial link
+                                                  * genuinely needs longer)
+                                                  * -- same "single-token
+                                                  * bucket" reuse convention
+                                                  * path/command above already
                                                   * use, not worth a
                                                   * dedicated field for one
                                                   * more "seconds to poll"
@@ -450,6 +478,24 @@ typedef struct {
  * universal command set plus whatever the target app chose to add;
  * nothing generic enough to build a CLICK/TYPE-shaped verb on top of
  * exists).
+ *
+ * FSPUT takes <path> (parsed exactly like FSLIST's own), then a
+ * required <byte-count> token (decimal, capped at
+ * AMIP_AREXX_MAX_FSPUT -- a larger declared count is rejected here,
+ * at parse time, the same "reject outright, don't guess" policy every
+ * other oversized argument on this wire already gets), then an
+ * optional trailing "TIMEOUT=<n>". Parsing FSPUT stops at byte-count
+ * and TIMEOUT= -- it does NOT read the <byte-count> raw bytes that
+ * follow on the wire; this parser has no transport to read from (it's
+ * shared with the portable ARexx-message path, which carries no such
+ * raw byte stream at all). The wire-transport dispatch loops
+ * (server/src/amipilotserver/main.c) are what actually receive the
+ * payload, immediately after calling this parser and before calling
+ * HandleCommand() -- see server/WIRE.md's request-payload framing.
+ * FSPUT parses successfully over ARexx too (one grammar, per this
+ * project's own design principle, same as AUTH above), but
+ * HandleCommand() rejects it there with a clear "requires a wire
+ * transport" error, since there is genuinely no payload to receive.
  *
  * Returns 0 on success, -1 on an unknown command or a missing required
  * argument (map to AMIP_AREXX_RC_ERROR) -- out->type is

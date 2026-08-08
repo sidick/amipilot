@@ -234,17 +234,49 @@ Lands in phase 0.2 onward -- see
   length-prefixed framing carries them intact) and is capped at the
   server's own internal buffer (`AMIP_FS_BUF_SIZE`, 16KB) -- this is a
   test-staging channel for small fixtures/config/log files, not a file
-  manager, and `RC 20` on anything larger. **`FSPUT` (host-to-Amiga
-  writes) is deliberately not built here** -- the wire's request
-  grammar is strictly single LF-terminated text lines today, and a
-  binary request body needs its own protocol addition; a real, separate
-  follow-up, not silently dropped scope.
+  manager, and `RC 20` on anything larger.
+
+  **`FSPUT <path> <byte-count> [TIMEOUT=<n>]` (phase 1.0, host-to-Amiga
+  writes) is real and wire-only.** It is the wire protocol's first
+  request that carries a raw binary body -- see `WIRE.md`'s "Request
+  payloads" section for the `<byte-count>`-then-raw-bytes framing this
+  introduces, symmetric to how a *response* already carries one.
+  **Not answerable over ARexx**: `RexxMsg`/`ARG0()` only ever carries
+  string arguments, so there is genuinely no channel to receive a raw
+  payload on that transport -- `FSPUT` issued via the ARexx port
+  returns `RC 10` outright, an explicit, permanent asymmetry (stronger
+  than `AUTH`'s own weaker one, which parses everywhere but only
+  *gates* on TCP). `path`'s parent directory is containment-checked the
+  same lock-identity way `FSMKDIR` checks its target (the file itself
+  may not exist yet); creates or overwrites identically
+  (`Open(path, MODE_NEWFILE)`), same `AMIP_FS_BUF_SIZE` (16KB) cap as
+  `FSGET`, checked against the declared byte-count at parse time,
+  before any attempt to read the payload. Once a valid (in-cap)
+  byte-count has been parsed, the server unconditionally drains exactly
+  that many raw bytes off the wire before replying -- even when the
+  request will ultimately be rejected for another reason (`FSROOT`
+  disabled, path outside the allowlist) -- because the client has
+  already sent those bytes and not consuming them would desync the
+  connection for the next request. `TIMEOUT=<n>` (seconds, default 30
+  -- longer than most other waits here, since a real multi-KB payload
+  over a slow serial link genuinely needs it) bounds how long the
+  server waits for the declared payload to fully arrive; `RC 15`
+  (`AMIP_AREXX_RC_TIMEOUT`) if it doesn't, distinct from `RC 20` on a
+  write that fails after a complete payload arrived (disk full).
+  Implemented per-transport (`AmipSerialReadExact()`/
+  `AmipTcpReadExact()`, `src/serial.c`/`src/tcp.c`) since
+  `AmipArexxParse()` itself has no read primitive of its own -- serial
+  polls the existing async-read-plus-drain mechanism, TCP briefly makes
+  the client socket non-blocking (`IoctlSocket(FIONBIO)`) and polls
+  `recv()`; both at the same ~100ms tick `WAITFOR`'s own polling uses.
+
   Verified end-to-end by `make test-target`'s file API check
   (`tests/copperline/fs-test.py`): seeds a granted `RAM:` directory
   with a file via `S:User-Startup` before the server starts (`FSROOT`
   is a startup-time `Lock()`, so the root must already exist), then
   over the wire lists it, stats and reads the seeded file back byte-
-  for-byte, creates and deletes a subdirectory, and confirms `FSLIST
+  for-byte, creates and deletes a subdirectory, writes a new file via
+  `FSPUT` and reads it back byte-for-byte, and confirms `FSLIST
   SYS:` -- outside the granted root -- is rejected rather than served.
 
 - **Menus (phase 0.4, shipped in v0.4):** `MENU <window-pattern>` walks a

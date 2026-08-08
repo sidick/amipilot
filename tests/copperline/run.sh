@@ -1012,15 +1012,18 @@ EOF
 	fi
 }
 
-# --- file API check (phase 0.4, allowlist-scoped FSLIST/FSSTAT/FSMKDIR/
-# FSDELETE/FSGET) ------------------------------------------------------
+# --- file API check (phase 0.4-1.0, allowlist-scoped FSLIST/FSSTAT/
+# FSMKDIR/FSDELETE/FSGET/FSPUT) -----------------------------------------
 # smoke.script stages a granted root (RAM:amipilot-fs-test, created and
 # seeded with a small file BEFORE AmiPilotServer starts -- FSROOT is a
 # Lock() at startup, so the directory must already exist) and starts
 # the server with FSROOT=RAM:amipilot-fs-test. tests/copperline/
 # fs-test.py then exercises the happy path (list/stat/get the seeded
-# file, mkdir/stat/delete a subdirectory) and the containment check
-# (FSLIST SYS: must be rejected, not served) over the wire.
+# file, mkdir/stat/delete a subdirectory, FSPUT a new file and read it
+# back byte-for-byte -- over this check's own serial.device transport,
+# exercising AmipSerialReadExact()'s read-the-declared-payload path)
+# and the containment check (FSLIST/FSPUT against SYS: must be
+# rejected, not served) over the wire.
 run_fs_check() {
 	echo "run.sh: file API"
 
@@ -1082,6 +1085,8 @@ EOF
 		"FSGET RESULT='seed data" \
 		'FSMKDIR PASS' \
 		'FSDELETE PASS' \
+		'FSPUT PASS' \
+		'FSPUT-CONTAINMENT PASS SYS: rejected' \
 		'CONTAINMENT PASS SYS: rejected'; do
 		if ! grep -qF "$pattern" "$BUILD/fs-result.txt" 2>/dev/null; then
 			echo "run.sh: FAIL (fs): expected line not found: $pattern"
