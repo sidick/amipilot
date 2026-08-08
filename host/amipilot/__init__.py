@@ -14,6 +14,7 @@ from .fs import FsEntry, FsParseError
 from .menu import Menu, MenuItem, MenuParseError, MenuStrip
 from .model import Gadget, TreeParseError, Window
 from .screen import Screen, ScreenParseError
+from .screenshot import Screenshot, ScreenshotParseError
 from .wire import ProtocolMismatch, Reply, ServerInfo, WireClient, WireError
 
 __all__ = [
@@ -33,6 +34,8 @@ __all__ = [
     "Reply",
     "Screen",
     "ScreenParseError",
+    "Screenshot",
+    "ScreenshotParseError",
     "ServerInfo",
     "Timeout",
     "TreeParseError",

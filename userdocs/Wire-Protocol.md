@@ -275,6 +275,101 @@ Unlike `FSPUT`, `WBLAUNCH` carries no binary wire payload, so — unlike
 that verb — it's fully answerable over ARexx too; there's no wire-only
 asymmetry here.
 
+## SCREENSHOT
+
+From 1.0, a connected session can capture a screen's raw pixels for
+human viewing/debugging/documentation — [GitHub issue
+#41](https://github.com/sidick/amipilot/issues/41). This is
+inspector tooling, **not** a locator mechanism: `click()`/`type()`/
+`get_text()` stay structural/semantic, this doesn't change that.
+
+```python
+from amipilot import Amipilot, NotFound
+
+with Amipilot.connect("127.0.0.1", 1234) as client:
+    shot = client.screenshot()                     # frontmost screen
+    ilbm_path, png_path = shot.save("/tmp/capture")  # writes both
+
+    window_shot = client.screenshot(window="GadTools")
+    print(window_shot.crop)  # (x, y, w, h) within its owning screen
+
+    try:
+        client.screenshot(screen="NoSuchScreen")
+    except NotFound:
+        pass
+```
+
+Same "wire stays simple, host does the rendering" split this project
+already uses for `TREE`/`amipilot dump` (no JSON on the wire, ever):
+the Amiga side sends raw, **uncompressed** bitplane bytes plus a small
+header — width, height, depth, the `CAMG` view-mode bits (`HAM`/
+`EHB`/`LACE`/`HIRES`), a palette, and (for a `WINDOW=` capture) a
+crop rectangle — see `server/include/screenshot.h`'s own header
+comment for the exact byte layout. **All image-format work happens
+host-side**, `amipilot.screenshot`, stdlib only (`zlib`, no Pillow):
+
+- `shot.to_ilbm()` — a real IFF `FORM ILBM` (`BMHD`/`CMAP`/`CAMG`/
+  `BODY`), a near-direct copy of the already-planar capture since
+  that's ILBM's own native shape. Viewable with Multiview or any
+  Amiga paint program, and preserves the exact view mode the capture
+  came from.
+- `shot.to_png()` — de-planed to chunky, palette-indexed pixels
+  first (`shot.to_chunky()`), then a straightforward indexed-color
+  PNG. Easier for modern tooling (browsers, CI artifact viewers,
+  image diffing) to work with than ILBM, at the cost of real
+  per-pixel unpacking work host-side — cheap there, which is the
+  whole point of doing it host-side rather than on the 68000.
+- `shot.save(path)` writes both `<path>.iff` and `<path>.png` in one
+  call.
+
+**Planar screens only by intent — with a real, currently unguarded gap
+for RTG.** A Picasso96/CGX screen's `BitMap` still has `Planes[]`/
+`BytesPerRow`/`Depth` fields, but they're not real chip-mem bitplanes
+on an RTG screen; walking them risks reading garbage pointers, the
+same risk class as the `WBPattern`/`GTYP_CUSTOMGADGET` hang found and
+fixed in issue #36. An earlier attempt to guard against this
+(`BitMap->Flags & BMF_STANDARD`) turned out to be simply wrong, not
+just imperfect — live testing against a real, completely ordinary
+Copperline Workbench screen showed that flag is never set on
+Intuition's own screen bitmaps regardless of whether they're planar,
+so it rejected the normal case it was meant to allow. It was removed
+rather than replaced with another guess. **There is currently no
+detection of a genuine RTG/P96 screen at all** — targeting one is a
+real, unverified risk. Real detection is tracked separately as
+[issue #44](https://github.com/sidick/amipilot/issues/44).
+
+With both `screen`/`window` omitted, `screenshot()` captures the
+frontmost/default public screen; `screen` alone selects one by
+`DefaultTitle` substring; `window` (optionally narrowed by `screen`,
+resolved exactly like `click()`'s own window pattern) captures that
+window's OWNING SCREEN in full, with the window's rectangle on
+`shot.crop` — there is no separate per-window pixel buffer to grab on
+classic Intuition (overlapping windows share one screen bitmap), so
+that's what a "window screenshot" actually is on any windowing system.
+
+Palette precision is 4-bit-per-gun (12-bit RGB, expanded to 8-bit-per-
+channel for the wire/PNG/ILBM) — the real, V33-era-safe way to read a
+`ColorMap` (`GetRGB4()`, not `ColorMap->ColorTable` directly, which is
+an opaque `APTR` in the real struct, not the plain array it might look
+like). A real AGA 8-bit-per-gun capture would need `GetRGB32()` (V39+,
+above this project's V37 floor) — not attempted here.
+
+**Serial transfer time, no compression on the wire (8N1, byte rate ≈
+baud/10):**
+
+| Capture (typical example)                       | Size    | 9600 baud | 19200 baud (default) | 38400 baud | 57600 baud |
+|---------------------------------------------------|---------|-----------|-----------------------|------------|------------|
+| 320x256, 16 colours (4 planes)                     | ~41 KB  | ~43 s     | ~21 s                 | ~11 s      | ~7 s       |
+| 320x256, 32 colours (5 planes)                     | ~50 KB  | ~53 s     | ~27 s                 | ~13 s      | ~9 s       |
+| 640x512 interlaced, 256 colours (8 planes, AGA)    | ~320 KB | ~5.7 min  | ~2.9 min              | ~1.4 min   | ~57 s      |
+| Server's own size cap (`AMIP_SCREENSHOT_MAX_BYTES`) | 512 KB  | ~9.1 min  | ~4.6 min              | ~2.3 min   | ~1.5 min   |
+
+Serial is genuinely slow for anything beyond a small/low-colour
+screen — **prefer TCP** for `SCREENSHOT`, which isn't baud-limited at
+all. These numbers exist so a serial-only setup (real hardware without
+a network card, or a Copperline config without `--serial tcp`) knows
+what to expect rather than guessing why a capture appears to hang.
+
 ## File API
 
 From 0.4, a connected session can list/stat/create/delete files and

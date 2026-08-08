@@ -41,6 +41,20 @@ def client_with(*replies: bytes) -> Amipilot:
     return Amipilot(WireClient(FakeTransport(list(replies))))
 
 
+def _fake_screenshot_capture() -> bytes:
+    """A minimal, valid SCREENSHOT payload (server/include/screenshot.h's
+    wire layout) -- 8x1 pixels, depth 1, no crop. Only used to exercise
+    Amipilot.screenshot()'s own wire construction/RC mapping here;
+    amipilot.screenshot's own parsing/encoding logic has its own
+    dedicated tests in test_screenshot.py."""
+    import struct
+
+    header = struct.pack(">HHBBHHHHHHH", 8, 1, 1, 0, 1, 0, 2, 0, 0, 0, 0)
+    palette = bytes([0, 0, 0, 255, 255, 255])
+    plane = bytes([0b10100000])
+    return header + palette + plane
+
+
 class Quoting(unittest.TestCase):
     def test_plain_pattern_unquoted(self):
         c = client_with(b"RC 0 0\n")
@@ -602,6 +616,31 @@ class Verbs(unittest.TestCase):
         self.assertEqual(c._wire._t.sent[0], b"SCREENS\n")
         self.assertEqual(len(screens), 2)
         self.assertTrue(screens[0].frontmost)
+
+    def test_screenshot_bare_sends_no_args(self):
+        payload = _fake_screenshot_capture()
+        c = client_with(b"RC 0 %d\n%s" % (len(payload), payload))
+        shot = c.screenshot()
+        self.assertEqual(c._wire._t.sent[0], b"SCREENSHOT\n")
+        self.assertEqual((shot.width, shot.height, shot.depth), (8, 1, 1))
+
+    def test_screenshot_with_screen_and_window(self):
+        payload = _fake_screenshot_capture()
+        c = client_with(b"RC 0 %d\n%s" % (len(payload), payload))
+        c.screenshot(screen="Second", window="GadTools")
+        self.assertEqual(c._wire._t.sent[0], b"SCREENSHOT SCREEN=Second WINDOW=GadTools\n")
+
+    def test_screenshot_no_match_raises_not_found(self):
+        payload = b"no screen matched"
+        c = client_with(b"RC 5 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(NotFound):
+            c.screenshot(screen="NoSuchScreen")
+
+    def test_screenshot_rtg_raises_command_error(self):
+        payload = b"screen is not a plain planar bitmap (RTG/P96 not supported -- issue #44)"
+        c = client_with(b"RC 10 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(CommandError):
+            c.screenshot()
 
 
 class FakeClock:

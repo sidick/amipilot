@@ -28,6 +28,7 @@ from .golden import assert_golden
 from .menu import MenuStrip, parse_menu_strip
 from .model import Window, parse_tree
 from .screen import Screen, parse_screens
+from .screenshot import Screenshot
 from .wire import RC_ERROR, RC_FAIL, RC_OK, RC_TIMEOUT, RC_WARN, Reply, ServerInfo, WireClient
 
 
@@ -788,6 +789,36 @@ class Amipilot:
         itself use (server/include/action_engine.h has the full
         rationale)."""
         return parse_screens(self._run("SCREENS").text)
+
+    def screenshot(self, *, screen: str | None = None, window: str | None = None) -> Screenshot:
+        """SCREENSHOT [SCREEN=<substring>] [WINDOW=<pattern>] -- raw
+        planar bitmap capture (phase 1.0, `amipilot.screenshot`'s own
+        module docstring has the full format/PNG/ILBM story). With
+        both omitted, captures the frontmost/default public screen;
+        `screen` alone selects a screen by `DefaultTitle` substring
+        and captures it whole; `window`, resolved exactly like
+        click()'s own window-pattern (optionally narrowed by
+        `screen`), captures that window's OWNING SCREEN in full, with
+        the window's own rectangle recorded on the returned
+        `Screenshot.crop` for cropping -- there's no separate per-
+        window pixel buffer on classic Intuition (overlapping windows
+        share one screen bitmap), so that's what a "window screenshot"
+        actually is.
+
+        Raises NotFound if `screen`/`window` doesn't match anything,
+        CommandError for a non-planar (RTG/Picasso96) screen -- not
+        supported, see screenshot.h's own header comment -- or a
+        capture too large for the server's own size cap. Call
+        `.save(path)` on the result to write both a `.iff` (IFF ILBM)
+        and a `.png`, or use `.to_ilbm()`/`.to_png()`/`.to_chunky()`
+        directly."""
+        parts = ["SCREENSHOT"]
+        if screen is not None:
+            parts.append(f"SCREEN={_quote(screen)}")
+        if window is not None:
+            parts.append(f"WINDOW={_quote(window)}")
+        reply = self._run(" ".join(parts))
+        return Screenshot.parse(reply.payload)
 
     def wait_for_window(
         self,
