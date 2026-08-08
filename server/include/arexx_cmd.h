@@ -33,6 +33,9 @@ typedef enum {
     AMIP_AREXX_CMD_VERSION,  /* VERSION -- the wire handshake (server/WIRE.md),
                               * also answerable over ARexx for feature tests */
     AMIP_AREXX_CMD_LAUNCH,   /* LAUNCH [STACK=n] <command-line...> */
+    AMIP_AREXX_CMD_WBLAUNCH, /* WBLAUNCH <icon-path> [TOOLTYPE=<key>=<value> ...] [ARG=<path> ...] --
+                              * real Workbench-style launch (phase 1.0);
+                              * see server/include/wblaunch.h */
     AMIP_AREXX_CMD_FSLIST,   /* FSLIST <path> */
     AMIP_AREXX_CMD_FSSTAT,   /* FSSTAT <path> */
     AMIP_AREXX_CMD_FSMKDIR,  /* FSMKDIR <path> */
@@ -97,6 +100,18 @@ enum {
 #define AMIP_AREXX_MAX_ROLE   32   /* "ROLE=<name>" -- longest real name is
                                     * "radio_button"/"listbrowser", both well
                                     * under this */
+#define AMIP_AREXX_MAX_WB_TOOLTYPES 8   /* WBLAUNCH's repeatable TOOLTYPE=
+                                        * cap -- matches wblaunch.h's
+                                        * AMIP_WB_MAX_TOOLTYPES (duplicated,
+                                        * same per-file-portable reasoning
+                                        * as every other cap here) */
+#define AMIP_AREXX_MAX_WB_ARGS      8   /* WBLAUNCH's repeatable ARG= cap --
+                                        * matches wblaunch.h's
+                                        * AMIP_WB_MAX_ARGS */
+#define AMIP_AREXX_MAX_WB_TT_KEY   32   /* matches wblaunch.h's
+                                        * AMIP_WB_TT_KEY_LEN */
+#define AMIP_AREXX_MAX_WB_TT_VALUE 192  /* matches wblaunch.h's
+                                        * AMIP_WB_TT_VALUE_LEN */
 
 typedef struct {
     AmipArexxCmdType type;
@@ -150,6 +165,13 @@ typedef struct {
     char command[AMIP_AREXX_MAX_COMMAND];       /* LAUNCH */
     long stackSize;                             /* LAUNCH; 0 = use CreateNewProc's
                                                   * own default (4000 bytes) */
+    char wbToolTypeKeys[AMIP_AREXX_MAX_WB_TOOLTYPES][AMIP_AREXX_MAX_WB_TT_KEY];
+    char wbToolTypeValues[AMIP_AREXX_MAX_WB_TOOLTYPES][AMIP_AREXX_MAX_WB_TT_VALUE];
+    int wbNumToolTypes;                         /* WBLAUNCH's repeatable
+                                                  * "TOOLTYPE=<key>=<value>" */
+    char wbArgs[AMIP_AREXX_MAX_WB_ARGS][AMIP_AREXX_MAX_PATH];
+    int wbNumArgs;                              /* WBLAUNCH's repeatable
+                                                  * "ARG=<path>" */
     long fsPutLen;                              /* FSPUT's declared byte-count
                                                   * -- how many raw bytes follow
                                                   * the request line on the
@@ -354,6 +376,23 @@ typedef struct {
  * fixtures/GTApp" and "LAUNCH STACK=8192 SRC:build/fixtures/GTApp"
  * are both valid; stackSize is 0 (caller's own default) when STACK
  * isn't given.
+ *
+ * WBLAUNCH takes a single <icon-path> (parsed exactly like MANIFEST's,
+ * into the same `path` field -- WITHOUT the ".info" suffix, icon.
+ * library's own convention), followed by any mix, in any order, of
+ * repeatable "TOOLTYPE=<key>=<value>" (up to AMIP_AREXX_MAX_WB_
+ * TOOLTYPES) and "ARG=<path>" (up to AMIP_AREXX_MAX_WB_ARGS) tokens.
+ * A TOOLTYPE='s <key> is everything up to the FIRST '=' after it;
+ * <value> is everything after that (so a value may itself contain
+ * '=', matching real tooltype values like "CLI=NEWCLI \"NIL:\""). See
+ * server/include/wblaunch.h for what this verb actually does (a real,
+ * hand-built Workbench-style launch, not SystemTagList()'s Shell-style
+ * one LAUNCH above uses) and why tooltype overrides need a scratch
+ * disk write. Unlike FSPUT, this carries no binary wire payload, so
+ * (like LAUNCH) it's fully answerable over ARexx too -- one grammar,
+ * three surfaces, no asymmetry here. No "@name" form, though (manifest
+ * locators name GADGETS within an already-loaded app's window, not
+ * icon files to launch -- a different kind of identifier).
  *
  * MENU takes a single <window-pattern>, same as TREE (no "@name"
  * form -- menus aren't part of the manifest contract). MENUPICK takes

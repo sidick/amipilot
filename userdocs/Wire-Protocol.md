@@ -210,6 +210,71 @@ capture yet to see that failure. Always assert on the expected effect
 `proc-wait` verb for real exit-code retrieval is planned but not built
 yet — see `server/README.md`.
 
+## WBLAUNCH
+
+From 1.0, a connected session can also start a target the way a user
+actually would — double-clicking its icon — instead of `launch()`'s
+Shell-style start:
+
+```python
+from amipilot import Amipilot, CommandError
+
+with Amipilot.connect("127.0.0.1", 1234) as client:
+    client.wb_launch("SRC:build/fixtures/WBApp")
+
+    client.wb_launch(
+        "SRC:build/fixtures/WBApp",
+        tooltypes={"PORT": "7777"},
+        args=["Work:data/one.txt"],
+    )
+
+    try:
+        client.wb_launch("SRC:build/fixtures/NoSuchApp")
+    except CommandError:
+        pass  # RC 10, bad icon path
+```
+
+This is a genuinely different mechanism from `launch()`, not a
+cosmetic variant: it hand-builds a real `WBStartup`/`WBArg` message and
+sends it to a real non-CLI `CreateNewProc()` process, the exact
+handshake a Workbench-aware program's own startup code (libnix's
+`_WBenchMsg`, or any compiler's equivalent) waits for — so tooltype
+parsing and `WBStartup` argument handling are code paths the launched
+program actually exercises, which `launch()`'s Shell start never
+touches at all.
+
+`icon_path` is the tool or project icon's path **without** the
+".info" suffix (icon.library's own convention) — `wb_launch()` reads
+the real icon, and for a project icon resolves its own default tool
+automatically (the project itself becomes a second argument, matching
+what double-clicking a project icon actually does).
+
+`tooltypes`, if given, overrides (or adds, if not already present)
+just the named tooltypes for this one launch — everything else on the
+real icon is left alone. This needs a real, if surprising, mechanism:
+there is no in-memory channel to hand a tooltype override to an
+off-the-shelf binary, since the launched program discovers its own
+tooltypes by reading its own icon file back off disk. `wb_launch()`
+instead writes a **scratch** copy of the icon (merged tooltypes) to
+`T:` — never touching the app's real `.info` — and points the launch
+at that instead; it's cleaned up automatically once the launched
+process exits.
+
+`args`, if given, are additional fully-qualified paths passed as
+further project-file arguments (the "multiple files selected, one is a
+tool" case double-clicking with extended-select icons produces).
+
+Same async honesty as `launch()`: this raises `CommandError` as soon
+as the icon/path itself is rejected (bad icon, unsupported icon type,
+an unlockable `ARG=`/`TOOLTYPE=`-scratch path), `ActionFailed` if
+`CreateNewProc()` itself fails (out of memory, no process slot) — but
+neither confirms the launched program actually finished starting;
+assert on its expected effect, same as `launch()`.
+
+Unlike `FSPUT`, `WBLAUNCH` carries no binary wire payload, so — unlike
+that verb — it's fully answerable over ARexx too; there's no wire-only
+asymmetry here.
+
 ## File API
 
 From 0.4, a connected session can list/stat/create/delete files and

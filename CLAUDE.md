@@ -119,7 +119,32 @@ portable command parser (`AmipArexxParse()`) has no read primitive of
 its own — see `server/README.md`'s File API section for the full
 contract, including the drain-even-on-rejection connection-desync
 guard. The other identified 1.0-blocking gap, real Workbench launch
-with tooltype/project-argument support, remains unstarted.
+with tooltype/project-argument support, is real too now: `WBLAUNCH
+<icon-path> [TOOLTYPE=<key>=<value> ...] [ARG=<path> ...]`
+(`server/src/wblaunch.c`) hand-builds a genuine `WBStartup`/`WBArg`
+message and sends it to a real non-CLI `CreateNewProc()` process --
+the same technique real launcher utilities (AmigaOS 45's own `WBLoad`;
+the classic `WBRun`) use, not `workbench.library`'s V44+
+`OpenWorkbenchObjectA()`, whose own autodoc BUGS section says
+launching (not just opening drawers) was unsafe up to and including
+V45.38 -- disqualifying against this project's V37 floor. One real
+deviation from this feature's own original plan sketch, found doing
+the research: tooltype overrides can't be merged "in memory... no
+disk writes" as originally assumed -- a Workbench-started program
+discovers its own tooltypes by reading its own icon file back off
+disk, so there's no in-memory channel to hand it an override at all.
+The real mechanism (what every real "tooltype override" launcher
+actually does): merge into a scratch copy of the icon written to
+`T:`, never the app's own real `.info`, and point the launch at that
+instead -- cleaned up once the launched process exits and replies its
+`WBStartup` message. Verified end to end against a real, Workbench-
+startable fixture (`fixtures/wbapp`, its own icon stamped once by a
+small helper reading the system's own default `WBTOOL` icon --
+`fixtures/wbapp/src/makeicon.c`) via `tests/copperline/run.sh`'s
+`run_wblaunch_check`: a bare launch, a `TOOLTYPE=` override that
+changes one key while leaving another untouched (the real merge, not
+a full replace), an `ARG=` project-file argument, and a bad-icon
+rejection.
 `manifest/` carries the manifest contract (`manifest/SPEC.md`, parsed
 by `server/src/manifest.c` — no screen-awareness yet, `SCREEN=` only
 applies to the classic locator form). `host/` is a real, installable
