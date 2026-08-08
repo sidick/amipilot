@@ -602,7 +602,7 @@ BOOL AmipDragGadgetToGadget(struct Window *window, struct Gadget *srcGadget, str
  * already has to resolve correctly for every other gadget kind, and
  * skipping that resolution was the actual bug, not the border math
  * itself. */
-static struct Gadget *FindSystemGadget(struct Window *window, UWORD sysType)
+struct Gadget *AmipFindSystemGadget(struct Window *window, UWORD sysType)
 {
     struct Gadget *g;
 
@@ -626,7 +626,7 @@ BOOL AmipWindowMoveBy(struct Window *window, WORD dx, WORD dy)
 
     BringWindowForward(window);
 
-    dragGadget = FindSystemGadget(window, GTYP_WDRAGGING);
+    dragGadget = AmipFindSystemGadget(window, GTYP_WDRAGGING);
     if (dragGadget == NULL || !AmipGadgetCenter(window, dragGadget, &anchorX, &anchorY)) {
         /* Honest fallback if the real system gadget somehow isn't in
          * the chain despite WFLG_DRAGBAR being set (shouldn't happen)
@@ -650,7 +650,7 @@ BOOL AmipWindowResizeTo(struct Window *window, WORD targetWidth, WORD targetHeig
 
     BringWindowForward(window);
 
-    sizeGadget = FindSystemGadget(window, GTYP_SIZING);
+    sizeGadget = AmipFindSystemGadget(window, GTYP_SIZING);
     if (sizeGadget == NULL || !AmipGadgetCenter(window, sizeGadget, &anchorX, &anchorY)) {
         /* Honest fallback, same reasoning as AmipWindowMoveBy() above. */
         anchorX = window->LeftEdge + window->Width - 1 - window->BorderRight / 2;

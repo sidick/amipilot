@@ -39,6 +39,20 @@ typedef enum {
 typedef struct AmipGadgetModel {
     struct AmipGadgetModel *next;
     ULONG   gadgetId;      /* GA_ID, 0 if unset */
+    /* 0 for an ordinary application gadget; otherwise the live
+     * GadgetType & GTYP_SYSTYPEMASK value (GTYP_SIZING, GTYP_WDRAGGING,
+     * GTYP_WDEPTH, GTYP_CLOSE, ...) for a genuine Intuition system
+     * gadget -- close/depth/drag-bar/size all report GA_ID 0, so
+     * gadgetId alone can't tell two of them apart; this can. A caller
+     * re-resolving this specific gadget back to a live struct Gadget*
+     * (e.g. to act on it) MUST branch on this field first -- re-
+     * resolving purely by gadgetId==0 finds Intuition's own first
+     * GA_ID-0 gadget in the window's chain, not necessarily the one
+     * this model node actually describes (confirmed live: this is
+     * exactly what made CLICK's own ROLE=/INDEX= locator silently
+     * click the wrong system gadget -- see
+     * server/src/amipilotserver/main.c's ResolveTargetGadget()). */
+    UWORD   sysGadgetType;
     AmipRole role;
     STRPTR  label;         /* copied out, caller-owned; NULL if none */
     STRPTR  className;     /* e.g. "button.gadget", NULL for plain GadTools */

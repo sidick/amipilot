@@ -196,6 +196,9 @@ static AmipGadgetModel *WalkGadgetList(struct Gadget *gadget, struct Window *win
         }
 
         node->gadgetId = gadget->GadgetID;
+        node->sysGadgetType = (gadget->GadgetType & GTYP_SYSGADGET)
+                                  ? (UWORD)(gadget->GadgetType & GTYP_SYSTYPEMASK)
+                                  : 0;
 
         /* GTYP_CUSTOMGADGET (0x0005) is a VALUE inside the 3-bit
          * GTYP_GTYPEMASK field (0x0007), not a standalone flag bit --

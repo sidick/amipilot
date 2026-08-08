@@ -92,23 +92,34 @@ def main() -> int:
         client.close()
         return 1
 
-    # Quits via the fixture's own real "_Quit" button (GA_ID=2), not
-    # the window's system close gadget -- see fixtures/wbgui-app's own
-    # header comment for why: clicking a GadTools-context window's
-    # system close gadget via the tier-2 ROLE=custom locator was found
-    # live NOT to work (a genuine, separate limitation, not yet root-
-    # caused). A numeric GA_ID click is the mechanism proven reliable
-    # everywhere else in this project, and a real Quit button is a
-    # completely legitimate "affordance" of its own.
-    client.click(window.title, 2)
+    # Quits via the window's own real system close gadget, addressed
+    # by the tier-2 ROLE=custom locator -- the same close gadget as
+    # every window's own WFLG_CLOSEGADGET, not fixtures/wbgui-app's
+    # separate "_Quit" button (GA_ID=2, kept on the fixture too as a
+    # second, equally legitimate affordance). This exercises the fix
+    # for issue #60: ResolveTargetGadget() used to re-resolve a
+    # ROLE=/INDEX=-matched system gadget by its (always-0, ambiguous)
+    # GA_ID, silently landing on whichever system gadget happened to
+    # be first in Intuition's own chain (the depth gadget) regardless
+    # of which index was requested -- now dispatches through
+    # AmipFindSystemGadget() (matching by GTYP_SYSTYPEMASK sub-type)
+    # instead, which is unambiguous. Close is index 1 among this
+    # window's own role=custom gadgets (0=depth, 1=close, 2=drag bar --
+    # confirmed via a live TREE dump, not assumed).
+    custom_gadgets = [g for g in window.gadgets if g.role == "custom"]
+    close_index = next(
+        i for i, g in enumerate(custom_gadgets)
+        if g.class_name == "buttongclass" and g.left < window.width // 2
+    )
+    client.click_by_role(window.title, role="custom", index=close_index)
 
     try:
         client.tree(window.title)
-        print("CLOSE FAIL window still open after clicking Quit")
+        print("CLOSE FAIL window still open after clicking its close gadget")
         client.close()
         return 1
     except Exception:
-        print("CLOSE PASS window gone after its own Quit button (no kill)")
+        print("CLOSE PASS window gone after its own close gadget (no kill)")
 
     result_bytes = client.fs_get(RESULT_PATH)
     result_text = result_bytes.decode("latin-1")
