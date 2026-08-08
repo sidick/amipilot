@@ -566,6 +566,94 @@ EOF
 	fi
 }
 
+# --- TCP transport over Copperline 0.15's real hostsocket net="host"
+# backend (phase 1.0, GitHub issue #55) --------------------------------
+# Unlike run_wire_check above (which carries the wire over a serial-to-
+# TCP bridge -- AmiPilotServer SERIAL, guest-side serial.device), this
+# drives AmiPilotServer's OWN TCP transport (bsdsocket.library, real
+# listen()/accept()) via Copperline's `--hostsocket-net host` --
+# delegates straight to a real host OS socket, so the host Python
+# client below connects directly to the port AmiPilotServer itself
+# bound inside the guest. No bridge, no /dev/bpf, no root, no static
+# interface/address/gateway config at all -- unlike the `bridge`
+# backend's own real setup cost (see this project's own Copperline-
+# hostsocket notes). Confirmed independently of run_wire_check's own
+# serial-bridge path so a regression in either transport is caught on
+# its own.
+run_tcp_host_check() {
+	echo "run.sh: TCP transport (hostsocket net=host)"
+
+	rm -f "$BUILD/tcp-host-result.txt" "$BUILD/marker-tcphost-ready.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+Run >NIL: SRC:build/fixtures/GTApp
+Wait 5
+Run >NIL: SRC:build/AmiPilotServer TCP TCPPORT=1236
+Wait 5
+Echo "READY" >SRC:build/marker-tcphost-ready.txt
+EOF
+
+	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
+	rm -f "$info"
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
+		--fast 8M --noaudio --hostsocket-net host --control :0 --control-info "$info" \
+		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
+	COPPERLINE_PID=$!
+
+	tries=0
+	while [ ! -f "$info" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 100 ]; then
+			echo "run.sh: FAIL (tcp-host): copperline never wrote $info"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			return
+		fi
+		sleep 0.1
+	done
+
+	"$COPPERLINE_CTL" --info "$info" run_until '{"seconds": 600}' > /dev/null 2>&1 &
+
+	tries=0
+	while [ ! -f "$BUILD/marker-tcphost-ready.txt" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 120 ]; then
+			echo "run.sh: FAIL (tcp-host): guest never became ready -- crash or hang"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			rm -f "$info"
+			return
+		fi
+		sleep 0.5
+	done
+
+	python3 "$REPO_ROOT/tests/copperline/tcp-host-test.py" 127.0.0.1:1236 \
+		> "$BUILD/tcp-host-result.txt" 2>&1 || true
+
+	kill "$COPPERLINE_PID" 2>/dev/null || true
+	COPPERLINE_PID=""
+	rm -f "$info"
+
+	ok=1
+	for pattern in \
+		'TREE PASS' \
+		'CLICK PASS'; do
+		if ! grep -qF "$pattern" "$BUILD/tcp-host-result.txt" 2>/dev/null; then
+			echo "run.sh: FAIL (tcp-host): expected line not found: $pattern"
+			ok=0
+		fi
+	done
+
+	if [ "$ok" -eq 1 ]; then
+		echo "run.sh: PASS (TCP transport / hostsocket net=host)"
+	else
+		echo "run.sh:   --- actual output ---"
+		sed 's/^/run.sh:   /' "$BUILD/tcp-host-result.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+	fi
+}
+
 # --- LAUNCH verb check (phase 0.4) -----------------------------------------
 # Unlike every check above, this one's smoke.script stages ONLY
 # AmiPilotServer -- no fixture pre-launched via User-Startup. Proves
@@ -1509,6 +1597,7 @@ run_type_check
 run_arexx_check
 run_manifest_check
 run_wire_check
+run_tcp_host_check
 run_launch_check
 run_wblaunch_check
 run_screenshot_check
