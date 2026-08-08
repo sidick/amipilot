@@ -96,6 +96,22 @@ BOOL AmipTcpWrite(AmipTcp *tcp, const void *data, ULONG len);
  * (phase 1.0) is this function's only caller today. */
 BOOL AmipTcpReadExact(AmipTcp *tcp, UBYTE *buf, ULONG len, long timeoutSeconds);
 
+/* Same wait/timeout contract as AmipTcpReadExact() (same shared,
+ * whole-call timeout budget -- NOT per-chunk), but DISCARDS the `len`
+ * bytes instead of storing them (internally, in small fixed-size
+ * chunks -- no caller-provided buffer needed for any size). Added to
+ * fix a real bug found in code review: FSPUT's own dispatch loop used
+ * to call AmipTcpReadExact() into the fixed-size g_fsPutBuf for ANY
+ * accepted byte-count, which only ever covers up to AMIP_AREXX_MAX_
+ * FSPUT (arexx_cmd.h); a declared count between that cap and AMIP_
+ * AREXX_MAX_FSPUT_DRAIN is real data the client already sent that
+ * must still be consumed off the wire before replying with the "too
+ * large" error, or the next request line would desync -- this drains
+ * it safely without needing a buffer anywhere near that size. Returns
+ * FALSE on timeout or if the connection closes mid-drain, same as
+ * AmipTcpReadExact(). */
+BOOL AmipTcpDrainExact(AmipTcp *tcp, ULONG len, long timeoutSeconds);
+
 /* Grants one TCPALLOW entry -- "a.b.c.d" (an exact address) or
  * "a.b.c.d/nn" (a CIDR range, nn 0-32) -- parsed by hand
  * (ParseDottedQuad(), tcp.c), NOT via inet_aton(): that call turned

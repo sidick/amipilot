@@ -112,6 +112,37 @@ def main():
     except CommandError:
         print("BAD-ICON PASS rejected")
 
+    # Regression check for a real bug found in code review: a
+    # TOOLTYPE= override writes a scratch icon to T: BEFORE the rest
+    # of the launch is attempted; every failure after that point
+    # (ARG=/LoadSeg()/allocation/CreateNewProc() all failing) used to
+    # return without ever deleting it, orphaning a
+    # T:amipilot-wb-<n>.info file permanently. Force one of those
+    # failures (a TOOLTYPE= override plus a nonexistent ARG= path) and
+    # confirm T: has no leftover amipilot-wb-*.info files afterward.
+    # Note: FillArg() only locks an ARG='s own PARENT DIRECTORY (real
+    # WBArg semantics -- the file itself is never opened/verified at
+    # registration time), so a nonexistent FILE in a real directory
+    # does NOT fail -- it takes a nonexistent DIRECTORY to make
+    # FillArg()'s own Lock() fail.
+    before = {e.name for e in client.fs_list("T:") if e.name.startswith("amipilot-wb-")}
+    try:
+        client.wb_launch(
+            "SRC:build/fixtures/WBApp",
+            tooltypes={"PORT": "9999"},
+            args=["SRC:build/fixtures/no-such-dir-at-all/somefile"],
+        )
+        print("SCRATCH-ICON-LEAK FAIL launch with a bad ARG= was accepted")
+        return 1
+    except CommandError:
+        pass
+    after = {e.name for e in client.fs_list("T:") if e.name.startswith("amipilot-wb-")}
+    leaked = after - before
+    if leaked:
+        print(f"SCRATCH-ICON-LEAK FAIL orphaned={sorted(leaked)}")
+        return 1
+    print("SCRATCH-ICON-LEAK PASS no orphaned scratch icon")
+
     client.quit()
     client.close()
     return 0

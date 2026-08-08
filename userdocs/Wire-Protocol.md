@@ -108,10 +108,10 @@ A quick manual session over the Copperline bridge:
 ```
 $ nc 127.0.0.1 1234
 VERSION
-RC 0 161
-AMIPILOT 0.3 PROTOCOL 1
+RC 0 208
+AMIPILOT 0.5 PROTOCOL 1
 STABLE VERSION
-EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH FSLIST FSSTAT FSMKDIR FSDELETE FSGET MENU MENUPICK SCREENS AUTH QUIT
+EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH FSLIST FSSTAT FSMKDIR FSDELETE FSGET FSPUT WBLAUNCH MENU MENUPICK DRAG WAITFOR SCREENS SCREENSHOT AUTH MUIREXX QUIT
 GETTEXT GadTools 2
 RC 0 10
 aminet.net
@@ -555,13 +555,53 @@ alone.
 
 `wait_for_window()`/`wait_for_screen()` poll `tree()`/`screens()`
 until the target appears or `timeout` elapses (`TimeoutError` on
-expiry) — the same host-side poll loop `launch()`'s own docs already
-recommend by hand ("assert on the expected effect instead, e.g.
-polling `TREE`"), promoted into reusable methods. There's
-deliberately no server-side blocking wait verb: `AmiPilotServer`
-services one command at a time, so a verb that blocks server-side for
-a timeout would stall the whole server — including `QUIT` — for that
-whole duration.
+expiry) — a host-side poll loop, useful when there's no accompanying
+action to anchor a wait to (e.g. waiting for an externally-launched
+process's window). For anything tied to an action you just took, see
+`WAITFOR` below and `click()`'s own `expect=` parameter instead —
+these poll **server-side**, in one wire round trip, not from the host.
+
+## WAITFOR
+
+From 0.5, a connected session can wait for a condition to become true
+without a host-side poll loop at all: `WAITFOR [SCREEN=<substring>]
+<condition> [TIMEOUT=<n>]` blocks entirely server-side (one wire round
+trip) until `condition` becomes true or `TIMEOUT=` (default 10s)
+elapses.
+
+```python
+from amipilot import Amipilot, Timeout
+
+with Amipilot.connect("127.0.0.1", 1234) as client:
+    client.wait_for("window:Settings")       # a matching window appears
+    client.wait_for("nowindow:Settings")     # no window matches (fresh re-search each poll)
+
+    try:
+        client.wait_for("window:NeverOpens", timeout=2.0)
+    except Timeout:
+        pass  # RC 15
+```
+
+`click()` also takes its own `expect=` parameter (`"window:<pattern>"`
+or `"nowindow"`, plus `timeout=`) to compose an action atomically with
+a wait for its effect — `expect="nowindow"` there is checked by
+POINTER IDENTITY against the exact window `click()` itself just acted
+on, not a fresh pattern re-search, which is the more precise "did the
+window I just clicked actually close" guarantee a standalone
+`wait_for("nowindow:...")` can't give (a different, same-titled window
+could satisfy a pattern re-search without the original ever closing).
+`wait_for_text()`/`wait_for_text_by_role()`/`wait_for_text_by_name()`
+cover waiting on a GADGET's text/state instead of a window — a
+different condition shape (needs a gadget locator) `wait_for()`'s
+plain `condition` string doesn't carry.
+
+This IS a genuine server-side blocking wait, not a host-side
+workaround: `AmiPilotServer`'s dispatch is single-threaded, so while
+one `WAITFOR`/`CLICK ... EXPECT=` call is polling server-side, no
+other request on that connection is serviced until it resolves — by
+design, since TCP already only serves one active client connection at
+a time (`server/README.md`'s own TCP section). Keep `TIMEOUT=` values
+reasonable for this reason.
 
 ## Securing TCP
 

@@ -100,6 +100,40 @@ enum {
                                     * other per-file duplicated constant
                                     * here) -- keep both in sync if either
                                     * changes. */
+#define AMIP_AREXX_MAX_FSPUT_DRAIN (AMIP_AREXX_MAX_FSPUT * 10) /* FSPUT's
+                                    * declared-byte-count DRAIN ceiling --
+                                    * a real, verified bug found in code
+                                    * review: a count between
+                                    * AMIP_AREXX_MAX_FSPUT and this ceiling
+                                    * is rejected (RC_ERROR, "too large")
+                                    * but the wire transport still drains
+                                    * exactly that many bytes off the wire
+                                    * (discarding, not into g_fsPutBuf,
+                                    * which stays sized to the real cap --
+                                    * see AmipSerialDrainExact()/
+                                    * AmipTcpDrainExact()) before replying,
+                                    * so the connection never desyncs for
+                                    * this case -- an ordinary "tried to
+                                    * FSPUT a file bigger than the cap"
+                                    * mistake, not malicious input. A
+                                    * count above THIS ceiling, or
+                                    * negative, is rejected outright with
+                                    * NO drain attempt (out->type forced to
+                                    * AMIP_AREXX_CMD_UNKNOWN in
+                                    * AmipArexxParse()) -- genuinely
+                                    * unrecoverable/not worth the wait, an
+                                    * accepted, documented desync risk for
+                                    * that specific malformed-or-abusive
+                                    * edge case only. Both drain functions
+                                    * share ONE timeout budget across the
+                                    * whole call (same accounting as
+                                    * AmipSerialReadExact()/
+                                    * AmipTcpReadExact() -- see their own
+                                    * doc comments), so raising this
+                                    * ceiling does not raise worst-case
+                                    * wait time, only how much a
+                                    * legitimately-oversized request can
+                                    * have discarded within that time. */
 #define AMIP_AREXX_MAX_ROLE   32   /* "ROLE=<name>" -- longest real name is
                                     * "radio_button"/"listbrowser", both well
                                     * under this */
@@ -178,12 +212,38 @@ typedef struct {
     long fsPutLen;                              /* FSPUT's declared byte-count
                                                   * -- how many raw bytes follow
                                                   * the request line on the
-                                                  * wire, capped at
-                                                  * AMIP_AREXX_MAX_FSPUT. Reuses
-                                                  * `path` above for the target
-                                                  * path and `expectTimeout`
-                                                  * below for its own optional
-                                                  * TIMEOUT=. */
+                                                  * wire, allowed up to
+                                                  * AMIP_AREXX_MAX_FSPUT_DRAIN
+                                                  * (see fsPutTooLarge below
+                                                  * for anything over the
+                                                  * real AMIP_AREXX_MAX_FSPUT
+                                                  * cap). Reuses `path` above
+                                                  * for the target path and
+                                                  * `expectTimeout` below for
+                                                  * its own optional TIMEOUT=. */
+    int fsPutTooLarge;                          /* FSPUT only: 1 if
+                                                  * fsPutLen exceeds the real
+                                                  * AMIP_AREXX_MAX_FSPUT cap
+                                                  * (but not the drain
+                                                  * ceiling, AMIP_AREXX_MAX_
+                                                  * FSPUT_DRAIN -- a count
+                                                  * beyond THAT is rejected
+                                                  * at parse time instead,
+                                                  * type forced to
+                                                  * AMIP_AREXX_CMD_UNKNOWN).
+                                                  * The wire dispatch loops
+                                                  * (amipilotserver/main.c)
+                                                  * still drain exactly
+                                                  * fsPutLen bytes off the
+                                                  * wire when this is set --
+                                                  * discarding them, never
+                                                  * into g_fsPutBuf -- before
+                                                  * replying AMIP_AREXX_RC_
+                                                  * ERROR, so the connection
+                                                  * stays in sync for this
+                                                  * ordinary "tried to write
+                                                  * a file bigger than the
+                                                  * cap" case. */
     long menuNum, itemNum;                      /* MENUPICK */
     long subNum;                                /* MENUPICK; -1 = a top-level
                                                   * item, not a submenu entry */
@@ -537,12 +597,21 @@ typedef struct {
  * exists).
  *
  * FSPUT takes <path> (parsed exactly like FSLIST's own), then a
- * required <byte-count> token (decimal, capped at
- * AMIP_AREXX_MAX_FSPUT -- a larger declared count is rejected here,
- * at parse time, the same "reject outright, don't guess" policy every
- * other oversized argument on this wire already gets), then an
- * optional trailing "TIMEOUT=<n>". Parsing FSPUT stops at byte-count
- * and TIMEOUT= -- it does NOT read the <byte-count> raw bytes that
+ * required <byte-count> token (decimal). A negative count, or one
+ * beyond AMIP_AREXX_MAX_FSPUT_DRAIN, is rejected outright here at
+ * parse time (out->type forced to AMIP_AREXX_CMD_UNKNOWN) -- neither
+ * is worth attempting to drain (a negative count has no recoverable
+ * byte length at all; a huge one isn't worth the wait), an accepted,
+ * documented wire-desync risk for that specific malformed/abusive
+ * edge case, same "reject outright, don't guess" policy every other
+ * oversized argument on this wire already gets. A count between the
+ * REAL cap (AMIP_AREXX_MAX_FSPUT) and the drain ceiling sets
+ * fsPutTooLarge instead -- an ordinary "tried to FSPUT something
+ * bigger than the cap" mistake, not malformed input, so the wire
+ * dispatch loops still drain (and discard) exactly that many bytes
+ * before replying with the real error, keeping the connection in
+ * sync. Then an optional trailing "TIMEOUT=<n>". Parsing FSPUT stops
+ * at byte-count and TIMEOUT= -- it does NOT read the <byte-count> raw bytes that
  * follow on the wire; this parser has no transport to read from (it's
  * shared with the portable ARexx-message path, which carries no such
  * raw byte stream at all). The wire-transport dispatch loops

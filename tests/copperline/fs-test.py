@@ -86,6 +86,29 @@ def main() -> int:
     except CommandError:
         print("FSPUT-CONTAINMENT PASS SYS: rejected")
 
+    # Regression check for a real bug found in code review: an FSPUT
+    # whose declared byte-count is a well-formed number but exceeds
+    # the server's own cap (AMIP_AREXX_MAX_FSPUT, server/include/
+    # arexx_cmd.h, duplicated here as the same well-known constant --
+    # keep in sync if it changes) used to desync the wire connection
+    # entirely, since the client's own payload bytes were never
+    # drained before the server replied. This sends a real,
+    # legitimately-oversized payload (the client always sends exactly
+    # what it declares) and then proves the connection is STILL usable
+    # afterward -- if it were desynced, this fs_list() call would raise
+    # WireError (a malformed response header) rather than returning
+    # cleanly.
+    oversized = b"x" * (16384 + 100)
+    try:
+        client.fs_put(f"{ROOT}/toolarge.dat", oversized)
+        print("FSPUT-TOOLARGE FAIL accepted")
+        return 1
+    except CommandError:
+        print("FSPUT-TOOLARGE PASS rejected")
+
+    client.fs_list(ROOT)  # would raise WireError here if desynced
+    print("FSPUT-TOOLARGE-NO-DESYNC PASS connection still usable")
+
     try:
         client.fs_list("SYS:")
         print("CONTAINMENT FAIL SYS: was served")

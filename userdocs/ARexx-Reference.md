@@ -254,6 +254,7 @@ ports:
 | `0` | Success. |
 | `5` | Warning — the window or gadget wasn't found. The command was well-formed; there was just nothing to act on. |
 | `10` | Error — unknown command, or a required argument was missing. |
+| `15` | Timeout — `WAITFOR`/`CLICK ... EXPECT=`'s own awaited condition (or `FSPUT`'s payload) never arrived within `TIMEOUT`. Distinct from `5` (nothing matched at all) and `20` (the action itself failed) — the command was accepted and, for `CLICK`, the action DID happen; the expected effect just didn't show up in time. |
 | `20` | Failure — the action itself didn't deliver (the underlying `input.device` event injection failed). |
 
 ## What it needs open

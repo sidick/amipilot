@@ -80,4 +80,20 @@ BOOL AmipSerialWrite(AmipSerial *serial, const void *data, ULONG len);
 BOOL AmipSerialReadExact(AmipSerial *serial, UBYTE *buf, ULONG len,
                           long timeoutSeconds);
 
+/* Same wait/timeout contract as AmipSerialReadExact() (same shared,
+ * whole-call timeout budget -- NOT per-chunk, see that function's own
+ * doc comment), but DISCARDS the `len` bytes instead of storing them
+ * -- no destination buffer needed at all. Added to fix a real bug
+ * found in code review: FSPUT's own dispatch loop used to call
+ * AmipSerialReadExact() into the fixed-size g_fsPutBuf for ANY
+ * accepted byte-count, which only ever covers up to AMIP_AREXX_MAX_
+ * FSPUT (arexx_cmd.h); a declared count between that cap and AMIP_
+ * AREXX_MAX_FSPUT_DRAIN is real data the client already sent that
+ * must still be consumed off the wire before replying with the "too
+ * large" error, or the next request line would desync -- this drains
+ * it safely, in ~256-byte chunks internally, without needing a buffer
+ * anywhere near that size. Returns FALSE on timeout or a device
+ * error, same as AmipSerialReadExact(). */
+BOOL AmipSerialDrainExact(AmipSerial *serial, ULONG len, long timeoutSeconds);
+
 #endif /* AMIPILOT_SERIAL_H */
