@@ -144,7 +144,33 @@ small helper reading the system's own default `WBTOOL` icon --
 `run_wblaunch_check`: a bare launch, a `TOOLTYPE=` override that
 changes one key while leaving another untouched (the real merge, not
 a full replace), an `ARG=` project-file argument, and a bad-icon
-rejection.
+rejection. `SCREENSHOT [SCREEN=<substring>] [WINDOW=<pattern>]`
+(GitHub issue #41, `server/src/screenshot.c`) is real too: raw,
+uncompressed planar bitmap capture, inspector tooling only (not a
+`CLICK`/`TYPE`/`GETTEXT`-style locator mechanism) -- the wire carries
+raw bitplane bytes plus a small header, and ALL image-format work
+(IFF ILBM, PNG) happens host-side (`host/amipilot/screenshot.py`,
+stdlib-only, no Pillow), the same "wire stays simple, host does the
+rendering" split TREE/`amipilot dump` already use. Planar screens
+only by intent, but with a real, currently unguarded gap: a
+Picasso96/CGX (RTG) screen's `BitMap` looks the same shape but its
+`Planes[]` aren't real chip-mem bitplanes -- an earlier version tried
+to guard this via `BitMap->Flags & BMF_STANDARD`, but live testing
+against a real, completely ordinary Copperline Workbench screen (this
+feature's own on-target check) proved that flag is never set on
+Intuition's own screen bitmaps at all, planar or not, so the check
+rejected the normal case it was meant to allow -- removed rather than
+replaced with another guess (real, verified functions over guessed
+heuristics is this project's own standing rule). There is currently
+no detection of a genuine RTG/P96 screen; real detection is tracked
+separately as issue #44, since it would need a whole separate
+third-party SDK, Picasso96API.library, this project's NDK doesn't
+carry. Verified end to end against a real running
+`fixtures/gadtools-app` window via `tests/copperline/run.sh`'s
+`run_screenshot_check`; the parsing/encoding logic itself (exact byte
+layout, IFF chunk shape, PNG chunk CRCs) has its own dedicated
+host-side unit tests (`host/tests/test_screenshot.py`) against a
+synthetic capture.
 `manifest/` carries the manifest contract (`manifest/SPEC.md`, parsed
 by `server/src/manifest.c` — no screen-awareness yet, `SCREEN=` only
 applies to the classic locator form). `host/` is a real, installable

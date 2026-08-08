@@ -257,6 +257,86 @@ Lands in phase 0.2 onward -- see
   `WBArg` the target actually sees; and a bad icon path is rejected
   (`RC 10`), not silently accepted.
 
+- **`SCREENSHOT [SCREEN=<substring>] [WINDOW=<pattern>]` (phase 1.0,
+  GitHub issue [#41](https://github.com/sidick/amipilot/issues/41)):**
+  raw, uncompressed planar bitmap capture -- inspector tooling for
+  human viewing/debugging/documentation, explicitly **not** a locator
+  mechanism (`CLICK`/`TYPE`/`GETTEXT` stay structural/semantic, this
+  doesn't change that). Same "wire stays simple, host does the
+  rendering" split this project already uses for `TREE`/`amipilot
+  dump`: the wire carries raw bitplane bytes plus a small header
+  (width/height/depth/`CAMG` view-mode bits/palette/an optional
+  window-crop rectangle) -- see `server/include/screenshot.h`'s own
+  header comment for the exact byte layout -- and ALL format work
+  (IFF ILBM, PNG) happens host-side (`host/amipilot/screenshot.py`),
+  stdlib-only (`zlib`, no Pillow). With both `SCREEN=`/`WINDOW=`
+  omitted, captures the frontmost/default public screen; `WINDOW=`
+  captures that window's OWNING SCREEN in full plus its rectangle in
+  the response header, since classic Intuition has no separate per-
+  window pixel buffer to grab (overlapping windows all share one
+  screen bitmap) -- "capturing a window" is always "capture the
+  screen, then crop," the same thing any windowing system's real
+  screenshot tool does. **Planar screens only by intent, with a real,
+  unresolved gap:** a Picasso96/CGX (RTG) screen's `BitMap` still has
+  `Planes[]`/`BytesPerRow`/`Depth` fields, but they're not real
+  chip-mem bitplanes -- P96 uses its own opaque, driver-private
+  representation there, and walking `Planes[]` on one risks reading
+  garbage pointers (the same risk class as the `WBPattern`/
+  `GTYP_CUSTOMGADGET` hang found and fixed in issue #36). An earlier
+  version guarded this via `BitMap->Flags & BMF_STANDARD`; live
+  testing against a real, completely ordinary Copperline Workbench
+  screen proved that check WRONG, not just imperfect -- that flag is
+  only ever set on a bitmap explicitly allocated requesting it,
+  Intuition's own screen bitmaps never set it regardless of whether
+  they're planar, so the check rejected the ordinary case it was
+  meant to allow. It was removed rather than replaced with another
+  guess (real, verified functions over guessed heuristics is this
+  project's own standing rule) -- **there is currently no guard
+  against a genuine RTG/P96 screen at all**, a real risk, not a
+  falsely-reassuring "checked and rejected" one. Real detection (most
+  likely via cybergraphics.library's own `IsCyberModeID()`/
+  `GetCyberMapAttr()`, a whole separate third-party SDK this project's
+  NDK doesn't carry) is tracked separately as issue
+  [#44](https://github.com/sidick/amipilot/issues/44). Palette precision is 4-bit-per-gun
+  (`GetRGB4()`, V33+ -- not `ColorMap->ColorTable` directly, an opaque
+  `APTR` in the real struct, and not `GetRGB32()`, V39+, above this
+  project's V37 floor), expanded to 8-bit-per-channel for the wire/
+  PNG/ILBM. Capped at `AMIP_SCREENSHOT_MAX_BYTES` (512KB, generous for
+  this project's floor without permanently reserving that much memory
+  -- the capture buffer is allocated on first use and only ever grown)
+  -- a capture whose real size would exceed this is rejected outright,
+  not silently truncated.
+
+  **Serial transfer time, no compression on the wire (8N1, byte rate ≈
+  baud/10):**
+
+  | Capture (typical example)                    | Size     | 9600 baud | 19200 baud (default) | 38400 baud | 57600 baud |
+  |------------------------------------------------|----------|-----------|-----------------------|------------|------------|
+  | 320x256, 16 colours (4 planes)                  | ~41 KB   | ~43 s     | ~21 s                 | ~11 s      | ~7 s       |
+  | 320x256, 32 colours (5 planes)                  | ~50 KB   | ~53 s     | ~27 s                 | ~13 s      | ~9 s       |
+  | 640x512 interlaced, 256 colours (8 planes, AGA) | ~320 KB  | ~5.7 min  | ~2.9 min              | ~1.4 min   | ~57 s      |
+  | `AMIP_SCREENSHOT_MAX_BYTES` cap                 | 512 KB   | ~9.1 min  | ~4.6 min              | ~2.3 min   | ~1.5 min   |
+
+  Serial is genuinely slow for anything beyond a small/low-colour
+  screen -- **prefer TCP** (`server/README.md`'s own TCP section) for
+  `SCREENSHOT`, which isn't baud-limited at all; these numbers exist so
+  a serial-only setup (real hardware without a network card, or a
+  Copperline config without `--serial tcp`) knows what to expect rather
+  than guessing why a capture appears to hang.
+
+  Verified end-to-end by `make test-target`'s SCREENSHOT check
+  (`tests/copperline/screenshot-test.py`, against a real running
+  `fixtures/gadtools-app` window, not a synthetic payload): a bare
+  (default-screen) capture has sane non-zero dimensions and a
+  palette/plane-size shape matching its own declared depth; a
+  `WINDOW=` capture reports a non-empty crop rectangle; both
+  `to_ilbm()`/`to_png()` produce real, correctly-signed files on the
+  host filesystem; and a bad `SCREEN=` substring is rejected. The
+  parsing/encoding logic itself (exact byte layout, IFF chunk shape,
+  PNG chunk CRCs, IDAT round-trip) has its own dedicated host-side
+  unit tests (`host/tests/test_screenshot.py`) against a synthetic
+  capture, independent of the emulator.
+
 - **File API (phase 0.4, shipped in v0.4):** `FSLIST`/`FSSTAT`/`FSMKDIR`/
   `FSDELETE`/`FSGET`, each taking a single `<path>` argument (quoted
   the same way a window pattern is if it contains a space) --

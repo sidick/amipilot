@@ -93,7 +93,8 @@ SETMOUSE_BIN    := $(BUILD)/AmiSetMouse
 AREXX_SRC       := $(ACTION_SRCDIR)/arexx.c $(ACTION_SRCDIR)/arexx_cmd.c \
                    $(ACTION_SRCDIR)/manifest.c $(ACTION_SRCDIR)/serial.c \
                    $(ACTION_SRCDIR)/tcp.c $(ACTION_SRCDIR)/fs.c \
-                   $(ACTION_SRCDIR)/muirexx.c $(ACTION_SRCDIR)/wblaunch.c
+                   $(ACTION_SRCDIR)/muirexx.c $(ACTION_SRCDIR)/wblaunch.c \
+                   $(ACTION_SRCDIR)/screenshot.c
 AMIPILOTD_SRCDIR := server/src/amipilotserver
 AMIPILOTD_BIN    := $(BUILD)/AmiPilotServer
 

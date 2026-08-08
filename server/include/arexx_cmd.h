@@ -58,6 +58,9 @@ typedef enum {
                               * WAITFOR [SCREEN=<s>] NOWINDOW=<pattern> [TIMEOUT=<n>] |
                               * WAITFOR [SCREEN=<s>] <window-pattern> (<gadget-id> | ROLE=<r> [LABEL=<l>] [INDEX=<n>]) TEXT=<value> [TIMEOUT=<n>] |
                               * WAITFOR @<name> TEXT=<value> [TIMEOUT=<n>] */
+    AMIP_AREXX_CMD_SCREENSHOT, /* SCREENSHOT [SCREEN=<substring>] [WINDOW=<pattern>] --
+                              * raw planar bitmap capture (phase 1.0);
+                              * see server/include/screenshot.h */
     AMIP_AREXX_CMD_MUIREXX,  /* MUIREXX <app-base> [TIMEOUT=<n>] <command...> --
                               * the MUI-ARexx bridge tier (phase 0.5); see
                               * server/include/muirexx.h */
@@ -501,6 +504,21 @@ typedef struct {
  * whether it succeeded; on ARexx/serial.device it's accepted and
  * compared but has no side effect, since neither of those transports
  * ever enforces the auth flag HandleCommand() tracks.
+ *
+ * SCREENSHOT takes an optional "SCREEN=<substring>" (parsed exactly
+ * like TREE/CLICK's own leading one, into the same `screenPattern`
+ * field) and an optional "WINDOW=<pattern>" (into the same
+ * `windowPattern` field TREE/CLICK's classic form uses -- empty means
+ * "not given", since a real window pattern can't legitimately be
+ * empty), in either order. Neither is required: with both omitted,
+ * captures the frontmost/default public screen; SCREEN= alone selects
+ * a screen by substring and captures it whole; WINDOW= (with or
+ * without SCREEN= narrowing which screen to search) captures the
+ * OWNING SCREEN'S full bitmap plus that window's rectangle in the
+ * response header -- there is no separate per-window pixel buffer to
+ * grab on classic Intuition (overlapping windows share one screen
+ * bitmap), so "capturing a window" is always "capture the screen,
+ * then the client crops" (see server/include/screenshot.h).
  *
  * MUIREXX takes <app-base> (a single token, the target MUI
  * application's ARexx port base name -- MUI's own naming rule caps it

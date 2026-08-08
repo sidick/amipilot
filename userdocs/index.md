@@ -25,6 +25,8 @@ documented limits stated up front rather than silent gaps — see
 
 ## Where to start
 
+- **Wondering what this is actually good for?** See
+  [Use Cases](Use-Cases.md).
 - **New user?** Read [Installation](Installation.md), then
   [Getting Started](Getting-Started.md) for a first inspection.
 - **Using `AmiInspect` day to day?** See the
@@ -36,6 +38,7 @@ documented limits stated up front rather than silent gaps — see
 
 | Page | What it covers |
 |------|-----------------|
+| [Use Cases](Use-Cases.md) | Real, grounded uses — testing, CI, screenshots, and more |
 | [Installation](Installation.md) | Requirements, copying `AmiInspect` into place |
 | [Getting Started](Getting-Started.md) | Your first `AmiInspect` dump |
 | [AmiInspect Reference](AmiInspect-Reference.md) | Command-line template, output format, exit codes |

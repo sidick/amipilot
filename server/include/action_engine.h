@@ -164,6 +164,14 @@ BOOL AmipTypeString(CONST_STRPTR text);
  * before this parameter existed. NULL if no window matches. */
 struct Window *AmipFindWindow(CONST_STRPTR screenSubstring, CONST_STRPTR titleSubstring);
 
+/* First screen whose DefaultTitle contains screenSubstring, or the
+ * frontmost/default screen (IntuitionBase->FirstScreen) if
+ * screenSubstring is NULL or "" -- same substring-match and NULL-means-
+ * "no filter" convention as AmipFindWindow's own screenSubstring.
+ * NULL only if screenSubstring was given and nothing matched, or no
+ * screen is open at all. */
+struct Screen *AmipFindScreen(CONST_STRPTR screenSubstring);
+
 /* First gadget in window's own list (window->FirstGadget) with a
  * matching GadgetID. NULL if none matches -- note this walks the classic
  * chain, so a BOOPSI window.class window only exposes its single

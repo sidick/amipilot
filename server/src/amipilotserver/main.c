@@ -32,11 +32,13 @@
 #include <exec/memory.h>
 #include <exec/tasks.h>
 #include <intuition/intuition.h>
+#include <graphics/gfxbase.h>
 #include <dos/dos.h>
 #include <dos/dostags.h>
 #include <proto/exec.h>
 #include <proto/dos.h>
 #include <proto/intuition.h>
+#include <proto/graphics.h>
 #include <proto/rexxsyslib.h>
 #include <proto/bsdsocket.h>
 #include <stdio.h>
@@ -48,6 +50,7 @@
 #include "intuition_model.h"
 #include "manifest.h"
 #include "muirexx.h"
+#include "screenshot.h"
 #include "serial.h"
 #include "tcp.h"
 #include "wblaunch.h"
@@ -79,6 +82,11 @@ struct Library *GadToolsBase = NULL;
 /* Consumed by AmipTypeString() (MapANSI). Optional -- TYPE just fails
  * (AMIP_AREXX_RC_FAIL) if it's absent; TREE/CLICK/GETTEXT don't need it. */
 struct Library *KeymapBase = NULL;
+/* Consumed by AmipScreenshotCapture()'s GetRGB4() palette reads
+ * (screenshot.c) -- optional, same graceful degradation as
+ * GadToolsBase/KeymapBase above: SCREENSHOT just fails
+ * (AMIP_AREXX_RC_ERROR) if it's absent, nothing else needs it. */
+struct GfxBase *GfxBase = NULL;
 /* Consumed by tcp.c's socket calls -- proto/bsdsocket.h's own extern
  * declaration expects exactly this name. Only opened when TCP is
  * requested (see RealMain); always initialized regardless, per this
@@ -671,7 +679,8 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                      "STABLE VERSION\n"
                      "EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH "
                      "FSLIST FSSTAT FSMKDIR FSDELETE FSGET FSPUT WBLAUNCH MENU "
-                     "MENUPICK DRAG WAITFOR SCREENS AUTH MUIREXX QUIT\n");
+                     "MENUPICK DRAG WAITFOR SCREENS SCREENSHOT AUTH MUIREXX "
+                     "QUIT\n");
             result = g_resultBuf;
             break;
 
@@ -1054,6 +1063,11 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
             break;
         }
 
+        case AMIP_AREXX_CMD_SCREENSHOT:
+            rc = AmipScreenshotCapture(cmd->screenPattern, cmd->windowPattern,
+                                        &result, resultLenOut);
+            break;
+
         case AMIP_AREXX_CMD_MUIREXX: {
             long appRC = 0;
             AmipMuiRexxResult outcome = AmipMuiRexxSend(
@@ -1202,6 +1216,7 @@ static int RealMain(void)
     }
     GadToolsBase = OpenLibrary((CONST_STRPTR)"gadtools.library", 37);
     KeymapBase = OpenLibrary((CONST_STRPTR)"keymap.library", 37);
+    GfxBase = (struct GfxBase *)OpenLibrary((CONST_STRPTR)"graphics.library", 37);
     RexxSysBase = (struct RxsLib *)OpenLibrary((CONST_STRPTR)"rexxsyslib.library", 0);
 
     if (RexxSysBase == NULL) {
@@ -1599,6 +1614,9 @@ cleanup:
     }
     if (GadToolsBase != NULL) {
         CloseLibrary(GadToolsBase);
+    }
+    if (GfxBase != NULL) {
+        CloseLibrary((struct Library *)GfxBase);
     }
     CloseLibrary((struct Library *)IntuitionBase);
     return RETURN_OK;

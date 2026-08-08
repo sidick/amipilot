@@ -648,6 +648,97 @@ EOF
 	fi
 }
 
+# --- SCREENSHOT check (phase 1.0, GitHub issue #41: "SCREENSHOT verb:
+# raw pixel capture, host-side PNG encoding") ----------------------------
+# Only GTApp needs staging -- SCREENSHOT captures whatever's already on
+# screen, no dedicated fixture of its own. tests/copperline/
+# screenshot-test.py exercises a bare (default-screen) capture, a
+# WINDOW= capture (non-empty crop rect), writes both a real .iff (IFF
+# ILBM) and .png to the HOST filesystem via Screenshot.save() and
+# checks their magic bytes, and confirms a bad SCREEN= substring is
+# rejected. amipilot.screenshot's own parsing/encoding correctness
+# (exact byte layout, chunk CRCs, IDAT round-trip) has its own
+# dedicated host-side unit tests (host/tests/test_screenshot.py) -- this
+# check is about a REAL capture from a REAL running screen, not the
+# format logic itself.
+run_screenshot_check() {
+	echo "run.sh: SCREENSHOT verb"
+
+	rm -f "$BUILD/screenshot-result.txt" "$BUILD/marker-screenshot-ready.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+Run >NIL: SRC:build/fixtures/GTApp
+Wait 5
+Run >NIL: SRC:build/AmiPilotServer SERIAL
+Wait 5
+Echo "READY" >SRC:build/marker-screenshot-ready.txt
+EOF
+
+	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
+	rm -f "$info"
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
+		--fast 8M --noaudio --serial tcp --control :0 --control-info "$info" \
+		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
+	COPPERLINE_PID=$!
+
+	tries=0
+	while [ ! -f "$info" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 100 ]; then
+			echo "run.sh: FAIL (screenshot): copperline never wrote $info"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			return
+		fi
+		sleep 0.1
+	done
+
+	"$COPPERLINE_CTL" --info "$info" run_until '{"seconds": 600}' > /dev/null 2>&1 &
+
+	tries=0
+	while [ ! -f "$BUILD/marker-screenshot-ready.txt" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 120 ]; then
+			echo "run.sh: FAIL (screenshot): guest never became ready -- crash or hang"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			rm -f "$info"
+			return
+		fi
+		sleep 0.5
+	done
+
+	python3 "$REPO_ROOT/tests/copperline/screenshot-test.py" 127.0.0.1:1234 \
+		> "$BUILD/screenshot-result.txt" 2>&1 || true
+
+	kill "$COPPERLINE_PID" 2>/dev/null || true
+	COPPERLINE_PID=""
+	rm -f "$info"
+
+	ok=1
+	for pattern in \
+		'BARE-CAPTURE PASS' \
+		'WINDOW-CROP PASS' \
+		'WINDOW-CROP-DEFAULT PASS' \
+		'ILBM-FILE PASS' \
+		'PNG-FILE PASS' \
+		'BAD-SCREEN PASS rejected'; do
+		if ! grep -qF "$pattern" "$BUILD/screenshot-result.txt" 2>/dev/null; then
+			echo "run.sh: FAIL (screenshot): expected line not found: $pattern"
+			ok=0
+		fi
+	done
+
+	if [ "$ok" -eq 1 ]; then
+		echo "run.sh: PASS (SCREENSHOT verb)"
+	else
+		echo "run.sh:   --- actual output ---"
+		sed 's/^/run.sh:   /' "$BUILD/screenshot-result.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+	fi
+}
+
 # --- WBLAUNCH check (phase 1.0, docs/implementation-plan.md's "Program
 # launch": "Workbench launch, done properly... The launched program
 # experiences a real Workbench start") -----------------------------------
@@ -1329,6 +1420,7 @@ run_manifest_check
 run_wire_check
 run_launch_check
 run_wblaunch_check
+run_screenshot_check
 run_stock_app_check
 run_mui_check
 run_fs_check

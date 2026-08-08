@@ -615,6 +615,26 @@ struct Window *AmipFindWindow(CONST_STRPTR screenSubstring, CONST_STRPTR titleSu
     return NULL;
 }
 
+struct Screen *AmipFindScreen(CONST_STRPTR screenSubstring)
+{
+    struct Screen *screen;
+    BOOL wantFilter = (screenSubstring != NULL && screenSubstring[0] != '\0');
+
+    if (IntuitionBase == NULL) {
+        return NULL;
+    }
+    if (!wantFilter) {
+        return IntuitionBase->FirstScreen;
+    }
+    for (screen = IntuitionBase->FirstScreen; screen != NULL; screen = screen->NextScreen) {
+        if (screen->DefaultTitle != NULL
+            && strstr((const char *)screen->DefaultTitle, (const char *)screenSubstring) != NULL) {
+            return screen;
+        }
+    }
+    return NULL;
+}
+
 struct Gadget *AmipFindGadgetById(struct Window *window, ULONG id)
 {
     struct Gadget *gadget;
