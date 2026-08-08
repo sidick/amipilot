@@ -457,11 +457,26 @@ static BOOL WaitForGadgetText(struct Window *window, ULONG gadgetId,
  * cmd->roleName is set, via AmipRoleFromName()) and by label
  * (case-sensitive substring, same convention as window/screen pattern
  * matching -- see arexx_cmd.h), takes the cmd->locatorIndex'th match,
- * then resolves that match's gadgetId back to a live struct Gadget*
- * via the existing AmipFindGadgetById -- the walk model itself is
- * always freed before returning, so no live Intuition pointer is ever
- * handed out from it (this project's own "never hand out live
- * pointers from a walk" rule, docs/implementation-plan.md).
+ * then re-resolves THAT SPECIFIC match back to a live struct Gadget*
+ * -- the walk model itself is always freed before returning, so no
+ * live Intuition pointer is ever handed out from it (this project's
+ * own "never hand out live pointers from a walk" rule,
+ * docs/implementation-plan.md).
+ *
+ * The re-resolve step branches on AmipGadgetModel's own sysGadgetType
+ * field: a genuine Intuition system gadget (close/depth/drag-bar/
+ * size) always reports GA_ID 0, so re-resolving those purely by
+ * AmipFindGadgetById(window, 0) is ambiguous -- it returns whichever
+ * system gadget happens to be first in Intuition's own chain,
+ * regardless of which one the walk above actually matched. Confirmed
+ * live: this silently made CLICK's own ROLE=custom INDEX=<n> locator
+ * act on the wrong system gadget (e.g. depth instead of close) no
+ * matter which INDEX was requested -- filed as issue #60, fixed here
+ * by dispatching those through AmipFindSystemGadget() (matching by
+ * GTYP_SYSTYPEMASK sub-type, unambiguous) instead of
+ * AmipFindGadgetById() (matching by GA_ID, ambiguous for these).
+ * Ordinary application gadgets are unaffected -- they have real,
+ * caller-assigned GA_IDs the old path already resolved correctly.
  *
  * *rcOut is set to AMIP_AREXX_RC_WARN (never touched on success) when
  * the window has since closed or nothing matches -- same RC class an
@@ -475,6 +490,7 @@ static struct Gadget *ResolveTargetGadget(struct Window *window, const AmipArexx
     AmipRole wantRole;
     long matchIndex = 0;
     ULONG matchedId = 0;
+    UWORD matchedSysType = 0;
     BOOL matched = FALSE;
 
     if (!cmd->gadgetLocatorMode) {
@@ -502,6 +518,7 @@ static struct Gadget *ResolveTargetGadget(struct Window *window, const AmipArexx
         }
         if (matchIndex == cmd->locatorIndex) {
             matchedId = gadget->gadgetId;
+            matchedSysType = gadget->sysGadgetType;
             matched = TRUE;
             break;
         }
@@ -512,6 +529,9 @@ static struct Gadget *ResolveTargetGadget(struct Window *window, const AmipArexx
     if (!matched) {
         *rcOut = AMIP_AREXX_RC_WARN;
         return NULL;
+    }
+    if (matchedSysType != 0) {
+        return AmipFindSystemGadget(window, matchedSysType);
     }
     return AmipFindGadgetById(window, matchedId);
 }

@@ -27,20 +27,29 @@
  * -- the same self-lookup idiom WBApp already uses (CurrentDir() to
  * the icon lock WBLAUNCH handed us, GetDiskObject(), FindToolType())
  * -- so a host test can GETTEXT it to confirm the tooltype override
- * genuinely reached the GUI, not just the T: report file. Also carries
- * a real "_Quit" button (GA_ID=2), which the lifecycle check actually
- * quits through -- a numeric GA_ID click, the real "quit via its own
- * affordances" the success criterion calls for, no kill. The window
- * still carries a genuine system close gadget too (WFLG_CLOSEGADGET,
- * IDCMP_CLOSEWINDOW -- a real user could close it that way by hand),
- * but the automated check doesn't rely on it: clicking a GadTools-
- * context window's system close gadget via the tier-2 ROLE=custom
- * locator was found live NOT to work (the click reports success --
- * WINDOWMOVE's own drag-bar click on the very same window works fine
- * -- but the close gadget specifically never responds), a genuine,
- * newly-found limitation not yet root-caused. The Quit button
- * sidesteps it with a mechanism already proven reliable everywhere
- * else in this project.
+ * genuinely reached the GUI, not just the T: report file. The
+ * lifecycle check quits through the window's own real system close
+ * gadget (WFLG_CLOSEGADGET, IDCMP_CLOSEWINDOW, addressed via the
+ * tier-2 ROLE=custom locator) -- the real "quit via its own
+ * affordances" the success criterion calls for, no kill. This window
+ * is also what caught a real, previously-unknown bug getting this
+ * check working (GitHub issue #60): clicking a GadTools-context
+ * window's system close gadget via ROLE=custom INDEX=<n> reported
+ * success but silently acted on the wrong gadget (depth instead of
+ * close) -- root-caused to AmipGadgetModel's gadgetId being 0 for
+ * EVERY system gadget, so main.c's ResolveTargetGadget() re-resolving
+ * "by ID 0" after a correct role/index match just grabbed whichever
+ * system gadget Intuition's own chain happened to list first,
+ * discarding the real match. Fixed by carrying each system gadget's
+ * real GTYP_SYSTYPEMASK sub-type through the walk model and
+ * re-resolving through AmipFindSystemGadget() (unambiguous) instead
+ * of AmipFindGadgetById() (ambiguous for these) -- see that function
+ * and intuition_model.h's own sysGadgetType field for the fix.
+ * Also carries a real "_Quit" button (GA_ID=2, a numeric-GA_ID click,
+ * the mechanism already proven reliable everywhere else in this
+ * project) as a second, equally legitimate affordance -- not what the
+ * automated check relies on, but there for anyone poking at this
+ * fixture by hand.
  *
  * On a Shell start (no _WBenchMsg -- useful for poking at this
  * fixture by hand): prints the same report to stdout, no GUI, and

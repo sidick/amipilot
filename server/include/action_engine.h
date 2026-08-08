@@ -213,6 +213,22 @@ struct Screen *AmipFindScreen(CONST_STRPTR screenSubstring);
  * (see CLAUDE.md's "Confirmed limit"). */
 struct Gadget *AmipFindGadgetById(struct Window *window, ULONG id);
 
+/* Finds `window`'s own system gadget (close/depth/drag-bar/size) of
+ * the given GTYP_SYSTYPEMASK sub-type (GTYP_CLOSE, GTYP_WDEPTH,
+ * GTYP_WDRAGGING, GTYP_SIZING -- intuition/intuition.h), by walking
+ * window->FirstGadget for a GTYP_SYSGADGET entry whose masked type
+ * matches. NULL if that window has no such system gadget. The ONLY
+ * correct way to re-resolve a specific system gadget back to a live
+ * struct Gadget* -- every system gadget reports GA_ID 0, so
+ * AmipFindGadgetById(window, 0) is ambiguous between them and simply
+ * returns whichever one is first in Intuition's own chain, not
+ * necessarily the one a caller actually means (confirmed live: this
+ * is exactly what made CLICK's own ROLE=/INDEX= locator silently act
+ * on the wrong system gadget -- server/src/amipilotserver/main.c's
+ * ResolveTargetGadget(), and AmipGadgetModel's own sysGadgetType
+ * field, both fixed alongside this). */
+struct Gadget *AmipFindSystemGadget(struct Window *window, UWORD sysType);
+
 /* Re-walks the live screen/window list under a brief LockIBase() hold,
  * checking pointer identity against target -- for the gap between
  * locating a window and acting on it (the window could have closed in
