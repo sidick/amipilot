@@ -693,8 +693,8 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                      "STABLE VERSION\n"
                      "EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH "
                      "FSLIST FSSTAT FSMKDIR FSDELETE FSGET FSPUT WBLAUNCH MENU "
-                     "MENUPICK DRAG WAITFOR SCREENS SCREENSHOT AUTH MUIREXX "
-                     "QUIT\n");
+                     "MENUPICK DRAG WINDOWMOVE WINDOWSIZE WAITFOR SCREENS "
+                     "SCREENSHOT AUTH MUIREXX QUIT\n");
             result = g_resultBuf;
             break;
 
@@ -823,6 +823,36 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                 if (!AmipDragGadgetToGadget(w, src, dest)) {
                     rc = AMIP_AREXX_RC_FAIL;
                 }
+            }
+            break;
+        }
+
+        case AMIP_AREXX_CMD_WINDOWMOVE: {
+            struct Window *w = AmipFindWindow((CONST_STRPTR)cmd->screenPattern, (CONST_STRPTR)cmd->windowPattern);
+
+            if (w == NULL) {
+                rc = AMIP_AREXX_RC_WARN;
+                break;
+            }
+            if (!AmipWindowMoveBy(w, (WORD)cmd->dragDx, (WORD)cmd->dragDy)) {
+                rc = AMIP_AREXX_RC_FAIL;
+                strncpy(g_resultBuf, "window has no drag bar", sizeof(g_resultBuf) - 1);
+                result = g_resultBuf;
+            }
+            break;
+        }
+
+        case AMIP_AREXX_CMD_WINDOWSIZE: {
+            struct Window *w = AmipFindWindow((CONST_STRPTR)cmd->screenPattern, (CONST_STRPTR)cmd->windowPattern);
+
+            if (w == NULL) {
+                rc = AMIP_AREXX_RC_WARN;
+                break;
+            }
+            if (!AmipWindowResizeTo(w, (WORD)cmd->windowTargetWidth, (WORD)cmd->windowTargetHeight)) {
+                rc = AMIP_AREXX_RC_FAIL;
+                strncpy(g_resultBuf, "window has no sizing gadget", sizeof(g_resultBuf) - 1);
+                result = g_resultBuf;
             }
             break;
         }

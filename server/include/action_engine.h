@@ -120,6 +120,40 @@ BOOL AmipDragGadgetBy(struct Window *window, struct Gadget *gadget, WORD dx, WOR
  * AmipClickGadget. */
 BOOL AmipDragGadgetToGadget(struct Window *window, struct Gadget *srcGadget, struct Gadget *destGadget);
 
+/* Moves a WHOLE WINDOW by a pixel offset (dx, dy) -- a real drag of
+ * its own title bar (WFLG_DRAGBAR), built on the exact same AmipDragAt()
+ * primitive the gadget-drag functions above use, not a new mechanism.
+ * The anchor point is the horizontal CENTER of the title bar, vertically
+ * centered in the window's own BorderTop strip -- deliberately not an
+ * attempt to locate the close/depth/zoom system gadgets' exact pixel
+ * extents and dodge them precisely; for any window wider than roughly
+ * 120px (effectively all real windows) the center point falls well
+ * clear of them, an honest, documented heuristic, not a guessed one
+ * masquerading as precise. Returns FALSE if `window` has no drag bar
+ * at all (WFLG_DRAGBAR unset) without attempting anything. Brings the
+ * window/screen forward first, same as AmipClickGadget. Query a
+ * window's CURRENT position via TREE (its own `[left,top WxH]` header
+ * line, `Window.left`/`Window.top` host-side) -- no separate "get
+ * position" verb exists since TREE already carries it. */
+BOOL AmipWindowMoveBy(struct Window *window, WORD dx, WORD dy);
+
+/* Resizes a WHOLE WINDOW to an ABSOLUTE target (targetWidth,
+ * targetHeight) -- a real drag of its own sizing gadget
+ * (WFLG_SIZEGADGET) from its current bottom-right corner to wherever
+ * that corner needs to land to reach the target size, built on the
+ * same AmipDragAt() primitive. Returns FALSE if `window` has no
+ * sizing gadget at all (WFLG_SIZEGADGET unset) without attempting
+ * anything. Does NOT pre-check the target against the window's own
+ * MinWidth/MinHeight/MaxWidth/MaxHeight (real, live fields on `struct
+ * Window` -- readable directly if a caller wants to check first):
+ * Intuition's own sizing logic clamps the drag exactly as it would a
+ * genuine user drag, so the honest way to confirm the actual
+ * resulting size is a follow-up TREE call, same "verify the real
+ * outcome, don't assume the request was granted exactly" precedent
+ * DRAG's own gadget forms already set. Brings the window/screen
+ * forward first, same as AmipClickGadget. */
+BOOL AmipWindowResizeTo(struct Window *window, WORD targetWidth, WORD targetHeight);
+
 /* Types text as genuine IECLASS_RAWKEY press/release events into
  * whatever currently has keyboard focus (click/activate the target
  * first). Each printable character is inverted into its rawkey +

@@ -584,6 +584,84 @@ BOOL AmipDragGadgetToGadget(struct Window *window, struct Gadget *srcGadget, str
     return AmipDragAt(window->WScreen, srcX, srcY, destX, destY);
 }
 
+/* Window system gadgets (drag bar, sizing gadget, close/depth/zoom) are
+ * REAL struct Gadget entries Intuition links into the window's own
+ * FirstGadget chain at OpenWindow() time, flagged GTYP_SYSGADGET with a
+ * GTYP_SYSTYPEMASK sub-type (GTYP_WDRAGGING, GTYP_SIZING, ...) --
+ * documented in intuition/intuition.h, not a private/undocumented
+ * struct. Finding the real gadget and reusing AmipGadgetCenter()'s
+ * already-correct REL-flag-aware geometry resolution is the honest way
+ * to get its exact clickable center -- confirmed necessary live: an
+ * earlier version of AmipWindowResizeTo() computed the sizing gadget's
+ * anchor by hand from Window->BorderRight/BorderBottom (inset by half
+ * the border thickness), which LOOKED right pixel-for-pixel against a
+ * live screenshot of fixtures/second-screen-app's own sizing gadget,
+ * yet the resize never actually happened -- Intuition's own real
+ * gadget rectangle for that gadget, once located this way, uses
+ * GFLG_RELRIGHT/GFLG_RELBOTTOM-relative dimensions AmipGadgetCenter()
+ * already has to resolve correctly for every other gadget kind, and
+ * skipping that resolution was the actual bug, not the border math
+ * itself. */
+static struct Gadget *FindSystemGadget(struct Window *window, UWORD sysType)
+{
+    struct Gadget *g;
+
+    for (g = window->FirstGadget; g != NULL; g = g->NextGadget) {
+        if ((g->GadgetType & GTYP_SYSGADGET) &&
+            (g->GadgetType & GTYP_SYSTYPEMASK) == sysType) {
+            return g;
+        }
+    }
+    return NULL;
+}
+
+BOOL AmipWindowMoveBy(struct Window *window, WORD dx, WORD dy)
+{
+    struct Gadget *dragGadget;
+    WORD anchorX, anchorY;
+
+    if (window == NULL || !(window->Flags & WFLG_DRAGBAR)) {
+        return FALSE;
+    }
+
+    BringWindowForward(window);
+
+    dragGadget = FindSystemGadget(window, GTYP_WDRAGGING);
+    if (dragGadget == NULL || !AmipGadgetCenter(window, dragGadget, &anchorX, &anchorY)) {
+        /* Honest fallback if the real system gadget somehow isn't in
+         * the chain despite WFLG_DRAGBAR being set (shouldn't happen)
+         * -- horizontal center of the title bar, vertically centered
+         * in the window's own top border strip. */
+        anchorX = window->LeftEdge + window->Width / 2;
+        anchorY = window->TopEdge + window->BorderTop / 2;
+    }
+    return AmipDragAt(window->WScreen, anchorX, anchorY,
+                       (WORD)(anchorX + dx), (WORD)(anchorY + dy));
+}
+
+BOOL AmipWindowResizeTo(struct Window *window, WORD targetWidth, WORD targetHeight)
+{
+    struct Gadget *sizeGadget;
+    WORD anchorX, anchorY, dx, dy;
+
+    if (window == NULL || !(window->Flags & WFLG_SIZEGADGET)) {
+        return FALSE;
+    }
+
+    BringWindowForward(window);
+
+    sizeGadget = FindSystemGadget(window, GTYP_SIZING);
+    if (sizeGadget == NULL || !AmipGadgetCenter(window, sizeGadget, &anchorX, &anchorY)) {
+        /* Honest fallback, same reasoning as AmipWindowMoveBy() above. */
+        anchorX = window->LeftEdge + window->Width - 1 - window->BorderRight / 2;
+        anchorY = window->TopEdge + window->Height - 1 - window->BorderBottom / 2;
+    }
+    dx = (WORD)(targetWidth - window->Width);
+    dy = (WORD)(targetHeight - window->Height);
+    return AmipDragAt(window->WScreen, anchorX, anchorY,
+                       (WORD)(anchorX + dx), (WORD)(anchorY + dy));
+}
+
 /* See action_engine.h's "locators" section for the design rationale --
  * moved here from server/src/clicktest/main.c once the ARexx commodity
  * needed the exact same lookups. */

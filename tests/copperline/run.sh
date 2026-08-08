@@ -1193,6 +1193,94 @@ EOF
 	fi
 }
 
+# --- WINDOWMOVE/WINDOWSIZE check (phase 1.0) -------------------------
+# Stages fixtures/gadtools-app (a drag-bar-only window, for the "no
+# sizing gadget" honest-failure case) and fixtures/second-screen-app
+# (the only fixture with a real WA_SizeGadget -- see its own header
+# comment for why neither golden-tree-tested fixture gets one).
+# tests/copperline/windowmoveresize-test.py drives a real title-bar
+# drag (WINDOWMOVE) and a real sizing-gadget drag (WINDOWSIZE) against
+# it, confirming the actual resulting position/size via TREE
+# afterward, plus the "no drag bar"/"no sizing gadget" and "no
+# matching window" rejection cases.
+run_windowmoveresize_check() {
+	echo "run.sh: WINDOWMOVE/WINDOWSIZE"
+
+	rm -f "$BUILD/windowmoveresize-result.txt" "$BUILD/marker-windowmoveresize-ready.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+Run >NIL: SRC:build/fixtures/GTApp
+Wait 5
+Run >NIL: SRC:build/fixtures/SecondScreenApp
+Wait 5
+Run >NIL: SRC:build/AmiPilotServer SERIAL
+Wait 5
+Echo "READY" >SRC:build/marker-windowmoveresize-ready.txt
+EOF
+
+	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
+	rm -f "$info"
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
+		--fast 8M --noaudio --serial tcp --control :0 --control-info "$info" \
+		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
+	COPPERLINE_PID=$!
+
+	tries=0
+	while [ ! -f "$info" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 100 ]; then
+			echo "run.sh: FAIL (windowmoveresize): copperline never wrote $info"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			return
+		fi
+		sleep 0.1
+	done
+
+	"$COPPERLINE_CTL" --info "$info" run_until '{"seconds": 600}' > /dev/null 2>&1 &
+
+	tries=0
+	while [ ! -f "$BUILD/marker-windowmoveresize-ready.txt" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 120 ]; then
+			echo "run.sh: FAIL (windowmoveresize): guest never became ready -- crash or hang"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			rm -f "$info"
+			return
+		fi
+		sleep 0.5
+	done
+
+	python3 "$REPO_ROOT/tests/copperline/windowmoveresize-test.py" 127.0.0.1:1234 \
+		> "$BUILD/windowmoveresize-result.txt" 2>&1 || true
+
+	kill "$COPPERLINE_PID" 2>/dev/null || true
+	COPPERLINE_PID=""
+	rm -f "$info"
+
+	ok=1
+	for pattern in \
+		'WINDOWMOVE PASS' \
+		'WINDOWSIZE PASS' \
+		'WINDOWSIZE-NO-SIZEGADGET PASS rejected' \
+		'WINDOWMOVE-NO-MATCH PASS rejected'; do
+		if ! grep -qF "$pattern" "$BUILD/windowmoveresize-result.txt" 2>/dev/null; then
+			echo "run.sh: FAIL (windowmoveresize): expected line not found: $pattern"
+			ok=0
+		fi
+	done
+
+	if [ "$ok" -eq 1 ]; then
+		echo "run.sh: PASS (WINDOWMOVE/WINDOWSIZE)"
+	else
+		echo "run.sh:   --- actual output ---"
+		sed 's/^/run.sh:   /' "$BUILD/windowmoveresize-result.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+	fi
+}
+
 # --- file API check (phase 0.4-1.0, allowlist-scoped FSLIST/FSSTAT/
 # FSMKDIR/FSDELETE/FSGET/FSPUT) -----------------------------------------
 # smoke.script stages a granted root (RAM:amipilot-fs-test, created and
@@ -1429,6 +1517,7 @@ run_mui_check
 run_fs_check
 run_menu_check
 run_screens_check
+run_windowmoveresize_check
 run_golden_check
 run_pytest_release_gate_check
 

@@ -603,6 +603,62 @@ design, since TCP already only serves one active client connection at
 a time (`server/README.md`'s own TCP section). Keep `TIMEOUT=` values
 reasonable for this reason.
 
+## Window move and resize
+
+From phase 1.0, a connected session can move or resize a whole window
+via genuine input-device drags — the same synthesized press/move/
+release primitive `drag()` already uses for gadgets, just anchored on
+the window's own title bar or sizing gadget instead of a gadget's:
+
+```python
+from amipilot import Amipilot, ActionFailed
+
+with Amipilot.connect("127.0.0.1", 1234) as client:
+    before = client.tree("GadTools")
+    print(before.left, before.top, before.width, before.height)
+
+    client.window_move("GadTools", 30, 20)      # relative offset
+    client.window_resize("GadTools", 400, 300)  # absolute target size
+
+    after = client.tree("GadTools")
+    print(after.left, after.top, after.width, after.height)
+
+    try:
+        client.window_resize("SomeFixedSizeWindow", 800, 600)
+    except ActionFailed:
+        pass  # RC 20 -- window has no sizing gadget (WFLG_SIZEGADGET unset)
+```
+
+`window_move(pattern, dx, dy)` sends `WINDOWMOVE [SCREEN=<s>] <pattern>
+<dx> <dy>`: a real drag of the window's title bar, anchored at its
+horizontal center vertically centered in the window's own `BorderTop`
+strip — a documented, honest heuristic (not an attempt to locate the
+close/depth/zoom system gadgets' exact pixel extents and dodge them
+precisely) that clears them for any window wider than roughly 120px.
+Raises `ActionFailed` if the window has no drag bar at all
+(`WFLG_DRAGBAR` unset).
+
+`window_resize(pattern, width, height)` sends `WINDOWSIZE
+[SCREEN=<s>] <pattern> <width> <height>`: a real drag of the window's
+sizing gadget from its current bottom-right corner to wherever that
+corner needs to land to reach the given ABSOLUTE target size. It does
+**not** pre-check `width`/`height` against the window's own
+`min_width`/`min_height`/`max_width`/`max_height` — Intuition clamps
+the drag exactly as it would a genuine user drag, so confirm the
+actual resulting size with a follow-up `tree()` call rather than
+assuming the exact target was reached, the same "verify the real
+outcome" precedent `drag()` already sets. Raises `ActionFailed` if the
+window has no sizing gadget at all (`WFLG_SIZEGADGET` unset).
+
+Both take an optional `screen=` keyword, same as `tree()`/`click()`,
+and both bring the window/screen forward first, same as every other
+action call. Neither has a manifest (`@name`) form — this acts on a
+whole window, the same scope `tree()`/`menu()` already have, neither
+of which takes one either. There's no separate "get window position/
+size" call: `tree()`'s own result already carries `left`/`top`/
+`width`/`height`, so query before or after a move/resize with a
+regular `tree()` call.
+
 ## Securing TCP
 
 **AmiPilot's TCP transport is meant for a trusted LAN or a direct

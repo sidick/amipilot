@@ -101,6 +101,41 @@ int main(void)
                              WA_CloseGadget, TRUE,
                              WA_DragBar, TRUE,
                              WA_DepthGadget, TRUE,
+                             /* WA_SizeGadget (+ the two default-placement
+                              * tags below): this fixture is the target
+                              * for AmiPilot's WINDOWMOVE/WINDOWSIZE
+                              * on-target check (tests/copperline/
+                              * windowsize-test.py) -- neither GTApp nor
+                              * CAApp gets this, deliberately: both have
+                              * their own checked-in golden-tree fixture
+                              * (GTApp.golden/CAApp.golden), and a size
+                              * gadget changes border thickness, a real
+                              * risk of silently invalidating either
+                              * golden file. This window isn't golden-
+                              * tested at all (only screens-test.py's own
+                              * title/position checks, neither sensitive
+                              * to border thickness). */
+                             WA_SizeGadget, TRUE,
+                             WA_SizeBRight, TRUE,
+                             WA_SizeBBottom, TRUE,
+                             /* Both MinWidth/MinHeight and MaxWidth/
+                              * MaxHeight left unset default to 0, which
+                              * the autodoc says means "clamp that limit
+                              * to the window's own OPENING dimension" --
+                              * i.e. a size gadget that's visually
+                              * present but can never actually move the
+                              * window, since it's already pinned at both
+                              * its own min and max. Confirmed the hard
+                              * way debugging AmipWindowResizeTo(): every
+                              * synthesized drag looked correct (right
+                              * gadget, right coordinates, confirmed via
+                              * a live screenshot) yet the window's size
+                              * never changed at all. Real, generous
+                              * limits here (not just "big enough for
+                              * this test") so this fixture behaves like
+                              * an ordinary resizable window. */
+                             WA_MinWidth, 80, WA_MinHeight, 40,
+                             WA_MaxWidth, 640, WA_MaxHeight, 400,
                              WA_Activate, TRUE,
                              WA_SimpleRefresh, TRUE,
                              WA_IDCMP, IDCMP_CLOSEWINDOW | IDCMP_GADGETUP | IDCMP_REFRESHWINDOW,

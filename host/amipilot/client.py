@@ -597,6 +597,49 @@ class Amipilot:
         HandleCommand())."""
         self._run(f"DRAG @{src_name} TO @{dest_name}")
 
+    def window_move(
+        self, window_pattern: str, dx: int, dy: int, *, screen: str | None = None
+    ) -> None:
+        """WINDOWMOVE <window-pattern> <dx> <dy> -- moves the WHOLE
+        window by a pixel offset, a genuine press/move/release drag of
+        its own title bar (built on the same primitive `drag()` uses,
+        not a new mechanism). `screen` narrows the window search the
+        same way `tree()`'s does; no manifest-locator ("@name") form --
+        this acts on a whole window, the same scope `tree()`/`menu()`
+        already have, neither of which takes one either.
+
+        Raises NotFound if no window matches, ActionFailed if the
+        window has no drag bar at all (`WFLG_DRAGBAR` unset -- rare,
+        but some windows are deliberately undraggable) or the event
+        injection didn't deliver. There's no separate "get window
+        position" call -- `tree()`'s own result already carries
+        `Window.left`/`Window.top`."""
+        self._run(
+            f"WINDOWMOVE {_screen_prefix(screen)}{_quote(window_pattern)} {dx} {dy}"
+        )
+
+    def window_resize(
+        self, window_pattern: str, width: int, height: int, *, screen: str | None = None
+    ) -> None:
+        """WINDOWSIZE <window-pattern> <width> <height> -- resizes the
+        WHOLE window to an ABSOLUTE target size, a genuine drag of its
+        own sizing gadget from its current bottom-right corner to
+        wherever that corner needs to land. `screen` narrows the
+        window search the same way `tree()`'s does; no manifest-
+        locator form, same reasoning as `window_move()`.
+
+        Raises NotFound if no window matches, ActionFailed if the
+        window has no sizing gadget at all (`WFLG_SIZEGADGET` unset)
+        or the event injection didn't deliver. Does NOT pre-check
+        `width`/`height` against the window's own min/max -- Intuition
+        clamps the drag exactly as it would a genuine user drag, so
+        confirm the actual resulting size with a follow-up `tree()`
+        call rather than assuming the exact target was reached, same
+        "verify the real outcome" precedent `drag()` already sets."""
+        self._run(
+            f"WINDOWSIZE {_screen_prefix(screen)}{_quote(window_pattern)} {width} {height}"
+        )
+
     def manifest(self, path: str) -> str:
         """MANIFEST <path> -- loads (replacing any previous) manifest
         on the server, enabling the @name locator forms. Returns the
