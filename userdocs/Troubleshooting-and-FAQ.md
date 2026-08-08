@@ -44,6 +44,94 @@ structurally identical. See
   substring search — omit `WINDOW=` to fall back to the active window
   instead.
 
+## `Amipilot.connect()`/`connect_with_retry()` raises `WireError` or times out
+
+- Check `AmiPilotServer` is actually running on the Amiga side and
+  listening on the transport you're connecting to (`Run AmiPilotServer`
+  for serial, `Run AmiPilotServer TCP` — see
+  [Wire Protocol](Wire-Protocol.md#starting-it) for the exact startup
+  arguments for each).
+- Over TCP, `connect_with_retry()` (unlike plain `connect()`) will keep
+  retrying until `deadline_seconds` — the right call in test setup code
+  when the server might not have finished booting yet, since a bare
+  `connect()` fails immediately on the first refused connection.
+- `ProtocolMismatch` (a `WireError` subclass) means the server's
+  `PROTOCOL` number doesn't match what this host package expects —
+  usually an old `AmiPilotServer` binary talking to a newer host
+  package or vice versa. Rebuild/reinstall one side to match.
+- If `TCPPASSWORD` was set on the server, connecting without the
+  matching `password=` argument leaves the connection stuck rejecting
+  every command except `VERSION`/`AUTH`/`QUIT` with `RC 10` — see
+  [Securing TCP](Wire-Protocol.md#securing-tcp).
+
+## A host client call raises `NotFound`, `CommandError`, `Timeout`, or `ActionFailed` — what's the difference?
+
+These map directly to the wire's own RC codes
+(`host/amipilot/client.py`):
+
+- **`NotFound`** (`RC 5`) — the command was well-formed, but nothing
+  matched (no window/gadget/screen fit the pattern you gave). Check
+  spelling and substring matching, same as `AmiInspect WINDOW=`'s own
+  rules above.
+- **`CommandError`** (`RC 10`) — bad syntax, an unknown verb, or a
+  locator the parser couldn't make sense of. Usually a typo or a verb
+  this server build doesn't have yet (check `client.handshake()` /
+  the `VERSION` command's stable/experimental verb lists).
+- **`Timeout`** (`RC 15`) — a `WAITFOR`/`click(expect=...)` condition
+  never became true within its timeout. For `click(expect=...)`
+  specifically, **the click itself already happened** — this means
+  only the expected follow-on effect (a window appearing/closing)
+  didn't show up in time, not that the click failed to deliver. Raise
+  `timeout=`, or check the effect you're waiting for is really what
+  that action triggers.
+- **`ActionFailed`** (`RC 20`) — the action itself didn't deliver:
+  input injection failed, or (for `window_move()`/`window_resize()`)
+  the target window never had a drag bar/sizing gadget at all.
+
+## `SCREENSHOT`/`client.screenshot()` fails, or a P96 capture looks wrong
+
+- `CommandError` from a capture usually means the target screen has no
+  bitmap at all, or (for a Picasso96/RTG screen) a pixel format this
+  project doesn't support — currently the SDK's own hardware-only YUV
+  formats. See [SCREENSHOT](Wire-Protocol.md#screenshot).
+- A capture that would exceed the server's own size cap
+  (`AMIP_SCREENSHOT_MAX_BYTES`, 512 KB) is rejected outright, not
+  silently truncated — expect this on a large/high-colour P96 desktop.
+- The genuine P96-active capture path (an RTG board actually being
+  detected and read) is honestly unverified against real hardware in
+  this project's own testing so far — Copperline has no RTG emulation
+  to test against. If a real P96 capture looks wrong, that's a real
+  gap worth filing as an issue, not assumed to already be solid.
+- Serial transfers are slow for anything beyond a small/low-colour
+  capture — see the transfer-time table in
+  [SCREENSHOT](Wire-Protocol.md#screenshot). Prefer TCP if `SCREENSHOT`
+  seems to hang.
+
+## `WBLAUNCH`'s `TOOLTYPE=`/`ARG=` don't seem to take effect
+
+- `WBLAUNCH`'s `RC 0` only means the process was created and the
+  `WBStartup` message queued — **not** that the launched program
+  finished starting or actually read the tooltype/argument. Assert on
+  the program's own observable effect (a window appearing with the
+  expected state) instead of trusting the return code alone. See
+  [WBLAUNCH](Wire-Protocol.md#wblaunch).
+- Tooltype overrides are merged into a scratch copy of the icon
+  written to `T:`, never the application's own real `.info` — if the
+  program re-reads its *own* icon path directly rather than trusting
+  the `WBArg` it was launched with, it'll see the original tooltypes,
+  not the override.
+
+## `MUIREXX` says a command isn't recognized, even though I copied it from MUI documentation
+
+MUI's own built-in ARexx support is a small, fixed set of seven
+commands (`quit`/`hide`/`show`/`activate`/`deactivate`/`info`/`help`)
+— it's not a generic "read or set any gadget's value" mechanism.
+`MUIREXX` is an honest passthrough to whatever the target application's
+own ARexx port actually implements; if the app adds its own custom
+commands beyond those seven, `MUIREXX` can send them too, but AmiPilot
+has no way to know what they are ahead of time. See
+[Driving MUI applications](ARexx-Reference.md#driving-mui-applications).
+
 ## Where do I report a bug or ask a question?
 
 [github.com/sidick/amipilot/issues](https://github.com/sidick/amipilot/issues).

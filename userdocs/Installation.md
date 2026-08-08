@@ -50,6 +50,26 @@ If you'd rather build it yourself than use the released binary, see
 [Building and Testing](Building-and-Testing.md) (`make dist` produces the
 same archive this release ships).
 
+## Installing the host Python package
+
+If you're driving AmiPilot from a host machine over the wire (serial or
+TCP) rather than only from on-Amiga ARexx scripts, you also need the
+`amipilot` Python package (the wire client, object API, `amipilot dump`,
+and the pytest plugin — see [Wire Protocol](Wire-Protocol.md)). It isn't
+in the `.lha` release archive above (that's on-Amiga binaries only) —
+install it from a clone of this repository:
+
+```
+git clone https://github.com/sidick/amipilot.git
+pip install -e 'amipilot/host/[test]'
+```
+
+Requires Python 3.9+. `[test]` pulls in `pytest` and the plugin's own
+test extras — drop it for a bare runtime-only install
+(`pip install -e amipilot/host/`) if you're not running the pytest
+plugin. There's no PyPI package yet; installing from a clone is the
+only path today.
+
 ## Checking which version you have
 
 Both binaries embed a standard AmigaDOS `$VER:` cookie — check it with
