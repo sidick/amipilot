@@ -291,3 +291,32 @@ BOOL AmipSerialReadExact(AmipSerial *serial, UBYTE *buf, ULONG len,
         }
     }
 }
+
+BOOL AmipSerialDrainExact(AmipSerial *serial, ULONG len, long timeoutSeconds)
+{
+    ULONG got = 0;
+    ULONG ticksTotal = (ULONG)(timeoutSeconds > 0 ? timeoutSeconds
+                                                   : AMIP_SER_READEXACT_DEFAULT_TIMEOUT) * 50;
+    ULONG ticksWaited = 0;
+
+    /* Identical loop shape to AmipSerialReadExact() above -- same
+     * shared, whole-call timeout budget -- except already-buffered
+     * bytes are discarded (rxHead advanced, nothing copied out) since
+     * there is no destination buffer here at all. */
+    for (;;) {
+        while (serial->rxHead < serial->rxCount && got < len) {
+            got++;
+            serial->rxHead++;
+        }
+        if (got >= len) {
+            return TRUE;
+        }
+        if (ticksWaited >= ticksTotal) {
+            return FALSE;
+        }
+        if (!Refill(serial)) {
+            Delay(AMIP_SER_READEXACT_POLL_TICKS);
+            ticksWaited += AMIP_SER_READEXACT_POLL_TICKS;
+        }
+    }
+}

@@ -812,7 +812,8 @@ EOF
 		'BARE-LAUNCH PASS' \
 		'TOOLTYPE-OVERRIDE PASS' \
 		'ARG-EXTRA PASS' \
-		'BAD-ICON PASS rejected'; do
+		'BAD-ICON PASS rejected' \
+		'SCRATCH-ICON-LEAK PASS no orphaned scratch icon'; do
 		if ! grep -qF "$pattern" "$BUILD/wblaunch-result.txt" 2>/dev/null; then
 			echo "run.sh: FAIL (wblaunch): expected line not found: $pattern"
 			ok=0
@@ -1267,6 +1268,8 @@ EOF
 		'FSDELETE PASS' \
 		'FSPUT PASS' \
 		'FSPUT-CONTAINMENT PASS SYS: rejected' \
+		'FSPUT-TOOLARGE PASS rejected' \
+		'FSPUT-TOOLARGE-NO-DESYNC PASS connection still usable' \
 		'CONTAINMENT PASS SYS: rejected'; do
 		if ! grep -qF "$pattern" "$BUILD/fs-result.txt" 2>/dev/null; then
 			echo "run.sh: FAIL (fs): expected line not found: $pattern"

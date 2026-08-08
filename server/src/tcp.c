@@ -437,6 +437,65 @@ BOOL AmipTcpReadExact(AmipTcp *tcp, UBYTE *buf, ULONG len, long timeoutSeconds)
     return ok;
 }
 
+#define AMIP_TCP_DRAINEXACT_CHUNK 256
+
+BOOL AmipTcpDrainExact(AmipTcp *tcp, ULONG len, long timeoutSeconds)
+{
+    UBYTE discard[AMIP_TCP_DRAINEXACT_CHUNK];
+    ULONG got = 0;
+    ULONG ticksTotal = (ULONG)(timeoutSeconds > 0 ? timeoutSeconds
+                                                   : AMIP_TCP_READEXACT_DEFAULT_TIMEOUT) * 50;
+    ULONG ticksWaited = 0;
+    LONG nbio;
+    BOOL ok = TRUE;
+
+    /* Identical structure to AmipTcpReadExact() above -- same shared,
+     * whole-call timeout budget -- except bytes are discarded (read
+     * into a small fixed chunk buffer, never accumulated) rather than
+     * stored, so this never needs a destination sized to `len`. */
+    while (tcp->rxHead < tcp->rxCount && got < len) {
+        got++;
+        tcp->rxHead++;
+    }
+    if (got >= len) {
+        return TRUE;
+    }
+    if (tcp->clientSock < 0) {
+        return FALSE;
+    }
+
+    nbio = 1;
+    IoctlSocket(tcp->clientSock, FIONBIO, &nbio);
+
+    while (got < len) {
+        ULONG chunk = (len - got) > AMIP_TCP_DRAINEXACT_CHUNK
+            ? AMIP_TCP_DRAINEXACT_CHUNK : (len - got);
+        LONG n = recv(tcp->clientSock, discard, (LONG)chunk, 0);
+        if (n > 0) {
+            got += (ULONG)n;
+            continue;
+        }
+        if (n == 0) {
+            CloseSocket(tcp->clientSock);
+            tcp->clientSock = -1;
+            ok = FALSE;
+            break;
+        }
+        if (ticksWaited >= ticksTotal) {
+            ok = FALSE;
+            break;
+        }
+        Delay(AMIP_TCP_READEXACT_POLL_TICKS);
+        ticksWaited += AMIP_TCP_READEXACT_POLL_TICKS;
+    }
+
+    if (tcp->clientSock >= 0) {
+        nbio = 0;
+        IoctlSocket(tcp->clientSock, FIONBIO, &nbio);
+    }
+    return ok;
+}
+
 /* Splits "a.b.c.d/nn" at the '/', if present, into a dotted-quad part
  * (copied into ipBuf, cap ipCap) and *prefixOut (0-32, defaulting to
  * 32 -- an exact-address match -- when there's no '/'). Returns FALSE

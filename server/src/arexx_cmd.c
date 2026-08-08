@@ -266,16 +266,29 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
         p = read_token(p, numbuf, sizeof(numbuf), &trunc);
         if (fail_if_trunc(trunc, out)) return -1;
         out->fsPutLen = strtol(numbuf, NULL, 10);
-        if (out->fsPutLen < 0 || out->fsPutLen > AMIP_AREXX_MAX_FSPUT) {
-            /* Rejected here, at parse time, before the wire dispatch
-             * loop ever attempts to read a single byte of the
-             * payload -- an out-of-range declared count is never safe
-             * to act on, whether that means "too large to buffer" or
-             * "negative", so this is the same "reject outright, don't
-             * guess" policy every other oversized argument gets. */
+        if (out->fsPutLen < 0 || out->fsPutLen > AMIP_AREXX_MAX_FSPUT_DRAIN) {
+            /* Genuinely unrecoverable -- rejected here, at parse time,
+             * before the wire dispatch loop ever attempts to read a
+             * single byte of the payload: a negative count has no
+             * byte length to drain at all, and one this far beyond
+             * the real cap isn't worth the wait even to discard. This
+             * is the one case that still accepts the documented wire-
+             * desync risk (arexx_cmd.h's own AMIP_AREXX_MAX_FSPUT_
+             * DRAIN comment has the full story) -- a real bug found
+             * in code review: this check used to fire at the REAL cap
+             * (AMIP_AREXX_MAX_FSPUT) too, silently desyncing the
+             * connection for the ordinary "tried to FSPUT something
+             * bigger than the cap" case, which is fixed below instead
+             * of accepting that risk for an easily-recoverable
+             * mistake. */
             out->type = AMIP_AREXX_CMD_UNKNOWN;
             return -1;
         }
+        /* Recoverable: still within the drain ceiling, so the wire
+         * dispatch loops (amipilotserver/main.c) can and do drain
+         * (discard) exactly fsPutLen bytes before replying with this
+         * error, keeping the connection in sync. */
+        out->fsPutTooLarge = (out->fsPutLen > AMIP_AREXX_MAX_FSPUT) ? 1 : 0;
 
         p = skip_ws(p);
         if (ci_streq_prefix(p, "TIMEOUT=")) {

@@ -194,6 +194,27 @@ static void UnwindArgs(struct WBArg *args, LONG count)
     }
 }
 
+/* Deletes slot's scratch icon (the TOOLTYPE= merge's T: write, if any
+ * was made -- scratchName is empty otherwise) and clears the field so
+ * a later successful launch reusing this slot doesn't see a stale
+ * name. A real bug found in code review: every failure path between
+ * writing the scratch icon (numToolTypes > 0 branch, above) and
+ * setting inUse = TRUE at the very end of AmipWbLaunch() used to
+ * return without calling this at all -- FreePending() (the only
+ * other place that deletes it) never runs for a slot that never
+ * became inUse, so the .info file was orphaned on T: permanently.
+ * Safe to call even when scratchName is already empty (a no-op). */
+static void CleanupScratchIcon(PendingLaunch *p)
+{
+    if (p->scratchName[0] != '\0') {
+        char infoPath[sizeof(p->scratchName) + 8];
+
+        snprintf(infoPath, sizeof(infoPath), "%s.info", p->scratchName);
+        DeleteFile((CONST_STRPTR)infoPath);
+        p->scratchName[0] = '\0';
+    }
+}
+
 /* Case-insensitive "does this do_ToolTypes entry's KEY match `key`"
  * (up to the first '=', or the whole string for a valueless tooltype
  * like "NOICONIFY") -- FindToolType()'s own matching convention. A
@@ -400,6 +421,7 @@ int AmipWbLaunch(const char *iconPath,
     for (i = 0; i < numArgPaths; i++) {
         if (!FillArg(&args[nArgs], argPaths[i], g_pending[slot].argNames[nArgs])) {
             UnwindArgs(args, nArgs);
+            CleanupScratchIcon(&g_pending[slot]);
             SetErr(resultOut, outLen, "could not lock an ARG= path (fully-qualified path required)");
             return AMIP_AREXX_RC_ERROR;
         }
@@ -409,6 +431,7 @@ int AmipWbLaunch(const char *iconPath,
     seglist = LoadSeg((CONST_STRPTR)toolPath);
     if (seglist == 0) {
         UnwindArgs(args, nArgs);
+        CleanupScratchIcon(&g_pending[slot]);
         SetErr(resultOut, outLen, "could not load the tool's executable");
         return AMIP_AREXX_RC_ERROR;
     }
@@ -425,6 +448,7 @@ int AmipWbLaunch(const char *iconPath,
         }
         UnLoadSeg(seglist);
         UnwindArgs(args, nArgs);
+        CleanupScratchIcon(&g_pending[slot]);
         SetErr(resultOut, outLen, "out of memory building the startup message");
         return AMIP_AREXX_RC_ERROR;
     }
@@ -457,6 +481,7 @@ int AmipWbLaunch(const char *iconPath,
         g_pending[slot].argList = NULL;
         UnLoadSeg(seglist);
         UnwindArgs(args, nArgs);
+        CleanupScratchIcon(&g_pending[slot]);
         SetErr(resultOut, outLen, "could not create process (out of memory or no process slot)");
         return AMIP_AREXX_RC_FAIL;
     }

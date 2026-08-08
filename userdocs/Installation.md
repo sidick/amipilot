@@ -57,11 +57,15 @@ the Shell's own `Version` command:
 
 ```
 > Version AmiInspect
-AmiInspect 0.2
+AmiInspect x.y
 
 > Version AmiPilotServer
-AmiPilotServer 0.2
+AmiPilotServer x.y
 ```
+
+(`x.y` will be the actual release version, e.g. `0.5` — shown
+genericized here so this example doesn't go stale every release; see
+the [Changelog](Changelog.md) for what's current.)
 
 ## Next steps
 

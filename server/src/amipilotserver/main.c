@@ -121,6 +121,8 @@ struct Library *SocketBase = NULL;
     "request line too long (max 512 bytes including the terminator)"
 #define AMIP_FSPUT_TIMEOUT_MSG \
     "FSPUT payload never fully arrived within TIMEOUT"
+#define AMIP_FSPUT_TOO_LARGE_MSG \
+    "FSPUT byte-count exceeds this server's cap"
 
 /* The currently-loaded manifest (MANIFEST command). One at a time --
  * loading a new one replaces the old, matching how a test session
@@ -1521,7 +1523,27 @@ static int RealMain(void)
                      * deliberately-malformed or connection-dropping
                      * sender, see AmipSerialReadExact's own doc
                      * comment). */
-                    if (cmd.type == AMIP_AREXX_CMD_FSPUT) {
+                    if (cmd.type == AMIP_AREXX_CMD_FSPUT && cmd.fsPutTooLarge) {
+                        /* Real, well-formed byte-count, just over
+                         * AMIP_AREXX_MAX_FSPUT -- the client already
+                         * sent this many bytes, so they're drained
+                         * (discarded, never into g_fsPutBuf) before
+                         * replying, keeping the connection in sync.
+                         * A bug found in code review: this case used
+                         * to fall through to AMIP_AREXX_CMD_UNKNOWN at
+                         * parse time with no drain at all, silently
+                         * desyncing every subsequent request on this
+                         * connection. */
+                        if (AmipSerialDrainExact(serial, (ULONG)cmd.fsPutLen,
+                                                  cmd.expectTimeout)) {
+                            rc = AMIP_AREXX_RC_ERROR;
+                            result = AMIP_FSPUT_TOO_LARGE_MSG;
+                        } else {
+                            rc = AMIP_AREXX_RC_TIMEOUT;
+                            result = AMIP_FSPUT_TIMEOUT_MSG;
+                        }
+                        payloadLen = (ULONG)strlen(result);
+                    } else if (cmd.type == AMIP_AREXX_CMD_FSPUT) {
                         if (AmipSerialReadExact(serial, g_fsPutBuf,
                                                  (ULONG)cmd.fsPutLen,
                                                  cmd.expectTimeout)) {
@@ -1581,7 +1603,23 @@ static int RealMain(void)
                      * regardless of whether the request will succeed;
                      * not draining them would desync the connection
                      * for whatever request comes next. */
-                    if (cmd.type == AMIP_AREXX_CMD_FSPUT) {
+                    if (cmd.type == AMIP_AREXX_CMD_FSPUT && cmd.fsPutTooLarge) {
+                        /* Same "real byte-count, just over the cap"
+                         * case the serial dispatch loop above handles
+                         * -- drain (discard) it before replying,
+                         * keeping the connection in sync, rather than
+                         * the desync a code-review-found bug used to
+                         * cause here. */
+                        if (AmipTcpDrainExact(tcp, (ULONG)cmd.fsPutLen,
+                                               cmd.expectTimeout)) {
+                            rc = AMIP_AREXX_RC_ERROR;
+                            result = AMIP_FSPUT_TOO_LARGE_MSG;
+                        } else {
+                            rc = AMIP_AREXX_RC_TIMEOUT;
+                            result = AMIP_FSPUT_TIMEOUT_MSG;
+                        }
+                        payloadLen = (ULONG)strlen(result);
+                    } else if (cmd.type == AMIP_AREXX_CMD_FSPUT) {
                         if (AmipTcpReadExact(tcp, g_fsPutBuf,
                                               (ULONG)cmd.fsPutLen,
                                               cmd.expectTimeout)) {
