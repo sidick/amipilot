@@ -116,9 +116,18 @@ def _render_condition(condition: str) -> str:
         return f"WINDOW={_quote(pattern)}"
     if kind == "nowindow":
         return f"NOWINDOW={_quote(pattern)}" if pattern else "NOWINDOW"
+    if kind == "requester":
+        # WAITFOR-only (wait_for() never reaches click()'s own expect=
+        # path with this) -- detection-only, no pattern: waits for ANY
+        # currently-open window to have a genuine Intuition Requester
+        # attached (window->FirstRequest != NULL), not a system-wide
+        # requester with no owning window (a disk-swap prompt, say) --
+        # a real, stated scope line, see wait_for()'s own docstring and
+        # GitHub issue #52.
+        return "REQUESTER"
     raise ValueError(
-        f'unrecognised condition {condition!r} -- expected "window:<pattern>" '
-        f'or "nowindow"[:<pattern>]'
+        f'unrecognised condition {condition!r} -- expected "window:<pattern>", '
+        f'"nowindow"[:<pattern>], or "requester"'
     )
 
 
@@ -946,13 +955,22 @@ class Amipilot:
         loop) until `condition` becomes true or `timeout` elapses.
 
         `condition` is "window:<pattern>" (a window matching <pattern>
-        appears) or "nowindow:<pattern>" (no window matches <pattern>
+        appears), "nowindow:<pattern>" (no window matches <pattern>
         -- always a fresh pattern re-search each poll, since a
         standalone WAITFOR has no prior action to anchor an exact
         window identity to; if you need "the window my last click()
         acted on has closed" specifically, use
         `click(..., expect="nowindow")` instead, which checks by
-        identity, not by pattern -- see `click()`'s own docstring).
+        identity, not by pattern -- see `click()`'s own docstring), or
+        "requester" (ANY currently-open window -- optionally narrowed
+        by `screen` -- gets a genuine Intuition Requester attached,
+        i.e. `Request()`/`EasyRequestArgs()` was called on it with a
+        real owning window). "requester" is detection only (GitHub
+        issue #52's own "cheap first step") -- there's no way yet to
+        address or click a Requester's own gadgets, and it only sees
+        WINDOW-attached Requesters, not a system-wide one with no
+        owning window (a disk-swap prompt, say) -- both real, stated
+        scope lines, not silent gaps.
 
         Raises `Timeout` (RC 15) once `timeout` elapses. This is the
         general-purpose wait primitive for anything not already tied

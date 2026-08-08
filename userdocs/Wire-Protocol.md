@@ -595,6 +595,21 @@ cover waiting on a GADGET's text/state instead of a window — a
 different condition shape (needs a gadget locator) `wait_for()`'s
 plain `condition` string doesn't carry.
 
+`wait_for("requester")` waits for a genuine Intuition Requester to
+appear (GitHub issue #52's detection-only "cheap first step" — no way
+yet to address or click a Requester's own gadgets). No pattern
+argument, and window-attached Requesters only — a system-wide one
+with no owning window (a disk-swap prompt, say) is a stated, harder
+problem left open. See `userdocs/ARexx-Reference.md`'s own WAITFOR
+section for the full detection story, including two genuine surprises
+found building it: neither `window->FirstRequest` nor the
+`GTYP_REQGADGET` bit `BuildSysRequest()`'s own 1990s autodoc documents
+turned out to be set by `AutoRequest()`/`BuildSysRequest()`/
+`EasyRequest()` on this project's target OS/ROM when given a real
+owning window — detection instead relies on the confirmed-live fact
+that these calls open a genuinely separate window sharing their
+owner's exact title text.
+
 This IS a genuine server-side blocking wait, not a host-side
 workaround: `AmiPilotServer`'s dispatch is single-threaded, so while
 one `WAITFOR`/`CLICK ... EXPECT=` call is polling server-side, no

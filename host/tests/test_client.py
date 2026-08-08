@@ -398,6 +398,24 @@ class WaitForVerb(unittest.TestCase):
         with self.assertRaises(Timeout):
             c.wait_for("window:Async Dialog")
 
+    def test_wait_for_requester(self):
+        c = client_with(b"RC 0 0\n")
+        c.wait_for("requester")
+        self.assertEqual(c._wire._t.sent[0], b"WAITFOR REQUESTER TIMEOUT=10\n")
+
+    def test_wait_for_requester_honours_screen_and_timeout(self):
+        c = client_with(b"RC 0 0\n")
+        c.wait_for("requester", screen="Workbench", timeout=5)
+        self.assertEqual(
+            c._wire._t.sent[0], b"WAITFOR SCREEN=Workbench REQUESTER TIMEOUT=5\n"
+        )
+
+    def test_wait_for_requester_timeout_raises(self):
+        payload = b"condition never became true"
+        c = client_with(b"RC 15 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(Timeout):
+            c.wait_for("requester")
+
     def test_wait_for_text(self):
         c = client_with(b"RC 0 0\n")
         c.wait_for_text("GadTools", 2, "hello wire")

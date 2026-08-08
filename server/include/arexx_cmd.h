@@ -347,7 +347,56 @@ typedef struct {
                                                   * gadget-locator parsing
                                                   * CLICK/TYPE/GETTEXT/DRAG
                                                   * already share, rather than
-                                                  * duplicating it. */
+                                                  * duplicating it; 4 =
+                                                  * REQUESTER -- WAITFOR only,
+                                                  * no argument (expectPattern/
+                                                  * expectText both unused):
+                                                  * wait for ANY currently-
+                                                  * open window (optionally
+                                                  * narrowed by this same
+                                                  * struct's screenPattern) to
+                                                  * have a genuine Intuition
+                                                  * Requester attached --
+                                                  * either a non-NULL
+                                                  * FirstRequest (the classic
+                                                  * Request()-based struct
+                                                  * Requester chain), OR
+                                                  * another currently-open
+                                                  * window on the same screen
+                                                  * sharing its EXACT title
+                                                  * text (what
+                                                  * AutoRequest()/
+                                                  * BuildSysRequest()/
+                                                  * EasyRequest() actually
+                                                  * produce when given a
+                                                  * real owning window --
+                                                  * confirmed live against
+                                                  * fixtures/gadtools-app's
+                                                  * own "Ask" button that
+                                                  * BOTH FirstRequest and
+                                                  * the GTYP_REQGADGET bit
+                                                  * BuildSysRequest()'s own
+                                                  * autodoc claims are
+                                                  * genuinely absent on this
+                                                  * project's target OS/ROM
+                                                  * -- see
+                                                  * WaitForRequesterPresent()'s
+                                                  * own comment in
+                                                  * amipilotserver/main.c for
+                                                  * the full story).
+                                                  * Detection only (GitHub
+                                                  * issue #52's "cheap first
+                                                  * step"): no way yet to
+                                                  * address or click a
+                                                  * Requester's own gadgets,
+                                                  * and this only sees
+                                                  * window-attached
+                                                  * Requesters, not a
+                                                  * system-wide one with no
+                                                  * owning window (a
+                                                  * disk-swap prompt, say) --
+                                                  * both real, stated scope
+                                                  * lines, not silent gaps. */
     char expectPattern[AMIP_AREXX_MAX_WINDOW];  /* WAITFOR's WINDOW=/NOWINDOW=
                                                   * pattern, and CLICK's
                                                   * EXPECT=WINDOW= pattern;

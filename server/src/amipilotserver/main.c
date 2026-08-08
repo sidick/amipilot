@@ -447,6 +447,97 @@ static BOOL WaitForGadgetText(struct Window *window, ULONG gadgetId,
     }
 }
 
+/* WAITFOR's REQUESTER form (GitHub issue #52's detection-only "cheap
+ * first step"): polls until a genuine Intuition Requester appears
+ * (optionally narrowed to screens matching screenPattern), or
+ * timeoutSeconds elapses. Same screen/window double-walk
+ * AmipFindWindow() itself already uses (action.c), and deliberately
+ * unlocked the same way that function already is: this project's
+ * intuition-model walker holds a brief LockIBase() for its own
+ * snapshot-and-copy model, but the action-engine "find" functions
+ * (AmipFindWindow/AmipFindScreen) already read the live screen/window
+ * chain directly with no lock, and this matches that established
+ * precedent rather than inventing a new one -- each poll tick re-walks
+ * the live chain fresh, so a window/screen opening or closing between
+ * ticks is simply reflected on the next pass.
+ *
+ * TWO GENUINE SURPRISES were found getting this right, both live
+ * against fixtures/gadtools-app's own "Ask" button (a real,
+ * AutoRequest()-triggered requester -- tests/copperline/
+ * requester-test.py), not assumed from docs alone. The plan's
+ * original design (and BuildSysRequest()'s own 1990s autodoc) both
+ * turned out to be wrong about how a requester bound to a real owning
+ * window actually shows up on this project's target OS/ROM:
+ *
+ * 1. window->FirstRequest -- the classic Request()-based struct
+ *    Requester chain -- stays NULL the whole time. AutoRequest()/
+ *    BuildSysRequest() never call Request() at all.
+ * 2. The Positive/Negative gadgets BuildSysRequest()'s own autodoc
+ *    says carry GTYP_REQGADGET ("The Positive and Negative Gadgets
+ *    created by this routine have the following features: ...
+ *    GTYP_REQGADGET") do NOT, on this OS/ROM's actual BOOPSI-based
+ *    reimplementation (rendered via a real "frbuttonclass" object,
+ *    confirmed via TREE/intuition-model's own OCLASS() classification
+ *    -- a modern requester.class internals swap the 1990s autodoc
+ *    never anticipated). Their GadgetType carries only
+ *    GTYP_CUSTOMGADGET.
+ *
+ * What DOES hold, confirmed live: BuildSysRequest()'s own autodoc is
+ * explicit that "a new window is opened in the same screen as the one
+ * containing your window" -- a real, separate struct Window, not a
+ * struct Requester attached to the original at all -- and that new
+ * window is given the SAME Title text as its owner. Two distinctly
+ * unusual things follow from a plain app window in the same screen
+ * sharing an *exact* title with another currently-open window: no
+ * ordinary, well-behaved app does this on its own (window titles are
+ * how a user/script tells windows apart at all), so treating an exact
+ * title collision between two open windows on the same screen as "a
+ * requester is up" is a real, if indirect, signal -- not a guess.
+ * window->FirstRequest is still checked first, both because it's
+ * free and because a future genuine Request()-based interaction path
+ * (issue #52's still-open second half) may rely on it directly. */
+static BOOL WaitForRequesterPresent(CONST_STRPTR screenPattern, long timeoutSeconds)
+{
+    ULONG ticksTotal = (ULONG)(timeoutSeconds > 0 ? timeoutSeconds : AMIP_EXPECT_DEFAULT_TIMEOUT) * 50;
+    ULONG ticksWaited = 0;
+    BOOL wantScreenFilter = (screenPattern != NULL && screenPattern[0] != '\0');
+
+    for (;;) {
+        struct Screen *screen;
+
+        for (screen = IntuitionBase->FirstScreen; screen != NULL; screen = screen->NextScreen) {
+            struct Window *outer;
+
+            if (wantScreenFilter
+                && (screen->DefaultTitle == NULL
+                    || strstr((const char *)screen->DefaultTitle, (const char *)screenPattern) == NULL)) {
+                continue;
+            }
+            for (outer = screen->FirstWindow; outer != NULL; outer = outer->NextWindow) {
+                struct Window *inner;
+
+                if (outer->FirstRequest != NULL) {
+                    return TRUE;
+                }
+                if (outer->Title == NULL || outer->Title[0] == '\0') {
+                    continue;
+                }
+                for (inner = outer->NextWindow; inner != NULL; inner = inner->NextWindow) {
+                    if (inner->Title != NULL
+                        && strcmp((const char *)outer->Title, (const char *)inner->Title) == 0) {
+                        return TRUE;
+                    }
+                }
+            }
+        }
+        if (ticksWaited >= ticksTotal) {
+            return FALSE;
+        }
+        Delay(AMIP_EXPECT_POLL_TICKS);
+        ticksWaited += AMIP_EXPECT_POLL_TICKS;
+    }
+}
+
 /* Resolves CLICK/TYPE/GETTEXT's (and DRAG's, 0.4) target gadget --
  * either the classic numeric cmd->gadgetId (today's original,
  * unchanged path: a plain AmipFindGadgetById lookup) or, when
@@ -1111,6 +1202,9 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                 if (cmd->expectMode == 1) {
                     ok = WaitForWindowPattern(screenPattern, (CONST_STRPTR)cmd->expectPattern,
                                               cmd->expectTimeout, TRUE);
+                } else if (cmd->expectMode == 4) {
+                    /* REQUESTER -- issue #52's detection-only slice. */
+                    ok = WaitForRequesterPresent(screenPattern, cmd->expectTimeout);
                 } else {
                     /* expectMode == 2 (NOWINDOW=<pattern>) is the only
                      * other value AmipArexxParse() ever sets here --
