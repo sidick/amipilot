@@ -49,7 +49,7 @@ def _fake_screenshot_capture() -> bytes:
     dedicated tests in test_screenshot.py."""
     import struct
 
-    header = struct.pack(">HHBBHHHHHHH", 8, 1, 1, 0, 1, 0, 2, 0, 0, 0, 0)
+    header = struct.pack(">HHBBHHHHHHHHH", 8, 1, 0, 1, 1, 0, 2, 0, 0, 0, 0, 0, 0)
     palette = bytes([0, 0, 0, 255, 255, 255])
     plane = bytes([0b10100000])
     return header + palette + plane

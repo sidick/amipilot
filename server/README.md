@@ -258,46 +258,72 @@ Lands in phase 0.2 onward -- see
   (`RC 10`), not silently accepted.
 
 - **`SCREENSHOT [SCREEN=<substring>] [WINDOW=<pattern>]` (phase 1.0,
-  GitHub issue [#41](https://github.com/sidick/amipilot/issues/41)):**
-  raw, uncompressed planar bitmap capture -- inspector tooling for
-  human viewing/debugging/documentation, explicitly **not** a locator
-  mechanism (`CLICK`/`TYPE`/`GETTEXT` stay structural/semantic, this
-  doesn't change that). Same "wire stays simple, host does the
-  rendering" split this project already uses for `TREE`/`amipilot
-  dump`: the wire carries raw bitplane bytes plus a small header
-  (width/height/depth/`CAMG` view-mode bits/palette/an optional
-  window-crop rectangle) -- see `server/include/screenshot.h`'s own
-  header comment for the exact byte layout -- and ALL format work
-  (IFF ILBM, PNG) happens host-side (`host/amipilot/screenshot.py`),
-  stdlib-only (`zlib`, no Pillow). With both `SCREEN=`/`WINDOW=`
-  omitted, captures the frontmost/default public screen; `WINDOW=`
-  captures that window's OWNING SCREEN in full plus its rectangle in
-  the response header, since classic Intuition has no separate per-
-  window pixel buffer to grab (overlapping windows all share one
-  screen bitmap) -- "capturing a window" is always "capture the
-  screen, then crop," the same thing any windowing system's real
-  screenshot tool does. **Planar screens only by intent, with a real,
-  unresolved gap:** a Picasso96/CGX (RTG) screen's `BitMap` still has
-  `Planes[]`/`BytesPerRow`/`Depth` fields, but they're not real
-  chip-mem bitplanes -- P96 uses its own opaque, driver-private
-  representation there, and walking `Planes[]` on one risks reading
-  garbage pointers (the same risk class as the `WBPattern`/
+  GitHub issues [#41](https://github.com/sidick/amipilot/issues/41)/
+  [#44](https://github.com/sidick/amipilot/issues/44)):** raw,
+  uncompressed bitmap capture (planar OR Picasso96/RTG) -- inspector
+  tooling for human viewing/debugging/documentation, explicitly
+  **not** a locator mechanism (`CLICK`/`TYPE`/`GETTEXT` stay
+  structural/semantic, this doesn't change that). Same "wire stays
+  simple, host does the rendering" split this project already uses
+  for `TREE`/`amipilot dump`: the wire carries raw pixel bytes plus a
+  small header -- see `server/include/screenshot.h`'s own header
+  comment for the exact byte layout -- and ALL format/colour-space
+  work (IFF ILBM, PNG, and P96 pixel-format decoding) happens
+  host-side (`host/amipilot/screenshot.py`), stdlib-only (`zlib`, no
+  Pillow). With both `SCREEN=`/`WINDOW=` omitted, captures the
+  frontmost/default public screen; `WINDOW=` captures that window's
+  OWNING SCREEN in full plus its rectangle in the response header,
+  since classic Intuition has no separate per-window pixel buffer to
+  grab (overlapping windows all share one screen bitmap) --
+  "capturing a window" is always "capture the screen, then crop," the
+  same thing any windowing system's real screenshot tool does; the
+  host client crops to just that window BY DEFAULT.
+
+  **Picasso96/RTG support (issue #44) is real, optional, and never
+  required.** A Picasso96/CGX screen's `BitMap` looks the same shape
+  as a classic one but its `Planes[]`/`BytesPerRow`/`Depth` fields
+  aren't real chip-mem bitplanes -- P96 uses its own opaque, driver-
+  private representation there, and walking `Planes[]` on one risks
+  reading garbage pointers (the same risk class as the `WBPattern`/
   `GTYP_CUSTOMGADGET` hang found and fixed in issue #36). An earlier
-  version guarded this via `BitMap->Flags & BMF_STANDARD`; live
-  testing against a real, completely ordinary Copperline Workbench
-  screen proved that check WRONG, not just imperfect -- that flag is
-  only ever set on a bitmap explicitly allocated requesting it,
-  Intuition's own screen bitmaps never set it regardless of whether
-  they're planar, so the check rejected the ordinary case it was
-  meant to allow. It was removed rather than replaced with another
-  guess (real, verified functions over guessed heuristics is this
-  project's own standing rule) -- **there is currently no guard
-  against a genuine RTG/P96 screen at all**, a real risk, not a
-  falsely-reassuring "checked and rejected" one. Real detection (most
-  likely via cybergraphics.library's own `IsCyberModeID()`/
-  `GetCyberMapAttr()`, a whole separate third-party SDK this project's
-  NDK doesn't carry) is tracked separately as issue
-  [#44](https://github.com/sidick/amipilot/issues/44). Palette precision is 4-bit-per-gun
+  version tried to guard against this via `BitMap->Flags &
+  BMF_STANDARD`; live testing against a real, completely ordinary
+  Copperline Workbench screen proved that check WRONG, not just
+  imperfect -- it rejected the ordinary planar case it was meant to
+  allow (see issue #44's own comment thread for the finding). The
+  REAL, verified mechanism (from Picasso96API.library's own published
+  SDK, https://wiki.icomp.de/w/images/6/62/P96Develop.lha, NOT
+  redistributed in this repo -- see `server/include/p96_compat.h`'s
+  own header comment for exactly what was independently reproduced
+  from its factual interface data, and why): `p96GetBitMapAttr(bm,
+  P96BMA_ISP96)`, documented safe to call on ANY `struct BitMap *`
+  without locking it first. `Picasso96API.library` is opened
+  OPTIONALLY at startup (same graceful-degradation pattern as
+  `GadToolsBase`/`KeymapBase`/`GfxBase`) -- absent, or the target
+  screen isn't genuinely P96-backed, and the classic planar path
+  (issue #41) runs completely unchanged, exactly as before #44. When a
+  genuine P96 bitmap IS the target, pixel memory is read via
+  `p96LockBitMap()`'s own `RenderInfo` buffer (the SDK's own required
+  protocol -- "Picasso96 could move the bitmap's image data away
+  while you are reading... you're likely to cause illegal memory
+  accesses" otherwise), held only for the raw memcpy, then
+  `p96UnlockBitMap()` immediately (the SDK's own docs: "never hold the
+  lock for longer than about one second"). Whatever native pixel
+  format P96 reports (CLUT/8-bit palette, or one of several truecolor/
+  hicolor RGB byte orders) is sent RAW over the wire, unconverted --
+  `host/amipilot/screenshot.py` decodes it host-side, including the
+  documented `PC`-suffix byte-swap pitfall (16-bit `PC` formats are
+  little-endian, non-`PC` ones big-endian; never assumed uniform).
+  YUV formats are NOT supported -- the SDK's own docs mark them
+  "hardware-window-only... bitmap operations may be implemented
+  incompletely," so excluding them honors the SDK's own stated limit,
+  not a scope cut. `to_ilbm()` (fundamentally planar) has no way to
+  represent a P96 truecolor/hicolor capture and raises a clear error
+  for one -- use `to_png()` (real true-colour PNG, no palette) or
+  `to_rgb888()` instead; a P96 CLUT capture re-plane into a standard
+  8-bitplane ILBM works fine, same as any 256-colour image.
+
+  Palette precision (planar or P96 CLUT) is 4-bit-per-gun
   (`GetRGB4()`, V33+ -- not `ColorMap->ColorTable` directly, an opaque
   `APTR` in the real struct, and not `GetRGB32()`, V39+, above this
   project's V37 floor), expanded to 8-bit-per-channel for the wire/
@@ -305,7 +331,8 @@ Lands in phase 0.2 onward -- see
   this project's floor without permanently reserving that much memory
   -- the capture buffer is allocated on first use and only ever grown)
   -- a capture whose real size would exceed this is rejected outright,
-  not silently truncated.
+  not silently truncated (a large P96 truecolor desktop can easily
+  exceed it).
 
   **Serial transfer time, no compression on the wire (8N1, byte rate ≈
   baud/10):**
@@ -331,11 +358,26 @@ Lands in phase 0.2 onward -- see
   palette/plane-size shape matching its own declared depth; a
   `WINDOW=` capture reports a non-empty crop rectangle; both
   `to_ilbm()`/`to_png()` produce real, correctly-signed files on the
-  host filesystem; and a bad `SCREEN=` substring is rejected. The
-  parsing/encoding logic itself (exact byte layout, IFF chunk shape,
-  PNG chunk CRCs, IDAT round-trip) has its own dedicated host-side
-  unit tests (`host/tests/test_screenshot.py`) against a synthetic
-  capture, independent of the emulator.
+  host filesystem; and a bad `SCREEN=` substring is rejected. This
+  also verifies the P96 code path's own graceful-degrade behavior
+  live: Copperline (this project's on-target test environment) has no
+  Picasso96/RTG emulation at all, so `Picasso96API.library` never
+  opens there and every one of these checks exercises the classic
+  planar path exactly as before issue #44 -- a real, live confirmation
+  that adding optional P96 support didn't disturb the common case.
+  **Honestly unverified:** the P96-ACTIVE capture path itself (a
+  genuine RTG bitmap actually being detected and read) has NOT been
+  exercised against a real P96/CGX board or emulator in this
+  project's own tooling -- Copperline has no RTG emulation to test
+  against, so that code path is built against the SDK's own real,
+  verified interface but not yet proven end-to-end the way this
+  project holds every other feature to. The parsing/encoding logic
+  itself (exact byte layout including the P96 pixel-format decode
+  table, IFF chunk shape, PNG chunk CRCs, IDAT round-trip) has its own
+  dedicated host-side unit tests (`host/tests/test_screenshot.py`)
+  against synthetic captures of both shapes, independent of the
+  emulator -- but a synthetic capture can't stand in for confirming
+  the SDK calls themselves behave as documented against a real board.
 
 - **File API (phase 0.4, shipped in v0.4):** `FSLIST`/`FSSTAT`/`FSMKDIR`/
   `FSDELETE`/`FSGET`, each taking a single `<path>` argument (quoted

@@ -792,26 +792,37 @@ class Amipilot:
 
     def screenshot(self, *, screen: str | None = None, window: str | None = None) -> Screenshot:
         """SCREENSHOT [SCREEN=<substring>] [WINDOW=<pattern>] -- raw
-        planar bitmap capture (phase 1.0, `amipilot.screenshot`'s own
-        module docstring has the full format/PNG/ILBM story). With
-        both omitted, captures the frontmost/default public screen;
-        `screen` alone selects a screen by `DefaultTitle` substring
-        and captures it whole; `window`, resolved exactly like
-        click()'s own window-pattern (optionally narrowed by
-        `screen`), captures that window's OWNING SCREEN in full, with
-        the window's own rectangle recorded on the returned
-        `Screenshot.crop` for cropping -- there's no separate per-
-        window pixel buffer on classic Intuition (overlapping windows
-        share one screen bitmap), so that's what a "window screenshot"
-        actually is.
+        bitmap capture, planar or Picasso96/RTG (phase 1.0,
+        `amipilot.screenshot`'s own module docstring has the full
+        format/PNG/ILBM story). With both omitted, captures the
+        frontmost/default public screen; `screen` alone selects a
+        screen by `DefaultTitle` substring and captures it whole;
+        `window`, resolved exactly like click()'s own window-pattern
+        (optionally narrowed by `screen`), captures that window's
+        OWNING SCREEN in full, with the window's own rectangle
+        recorded on the returned `Screenshot.crop` for cropping --
+        there's no separate per-window pixel buffer on classic
+        Intuition (overlapping windows share one screen bitmap), so
+        that's what a "window screenshot" actually is.
+
+        A genuine Picasso96/RTG screen is captured automatically, in
+        its own native pixel format, WHEN a real P96 board is present
+        AND that specific screen is P96-backed -- never assumed, never
+        required (`server/include/p96_compat.h`'s own header has the
+        detection story); on this project's own tested floor (no P96
+        installed) every capture is the classic planar path,
+        unchanged. Check `.pixel_format`/`.rgb_format` on the result
+        if it matters which path a given capture took.
 
         Raises NotFound if `screen`/`window` doesn't match anything,
-        CommandError for a non-planar (RTG/Picasso96) screen -- not
-        supported, see screenshot.h's own header comment -- or a
-        capture too large for the server's own size cap. Call
-        `.save(path)` on the result to write both a `.iff` (IFF ILBM)
-        and a `.png`, or use `.to_ilbm()`/`.to_png()`/`.to_chunky()`
-        directly."""
+        CommandError for a screen with no bitmap at all, a P96 YUV
+        pixel format (not supported -- see screenshot.h's own header
+        comment), or a capture too large for the server's own size
+        cap. Call `.save(path)` on the result to write both a `.iff`
+        (IFF ILBM) and a `.png` (`.save()`/`.to_ilbm()` raise
+        ScreenshotParseError for a P96 truecolor/hicolor capture, which
+        ILBM has no way to represent -- use `.to_png()`/`.to_rgb888()`
+        directly for those)."""
         parts = ["SCREENSHOT"]
         if screen is not None:
             parts.append(f"SCREEN={_quote(screen)}")

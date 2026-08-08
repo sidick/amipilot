@@ -87,6 +87,18 @@ struct Library *KeymapBase = NULL;
  * GadToolsBase/KeymapBase above: SCREENSHOT just fails
  * (AMIP_AREXX_RC_ERROR) if it's absent, nothing else needs it. */
 struct GfxBase *GfxBase = NULL;
+/* Consumed by AmipScreenshotCapture()'s optional Picasso96/RTG capture
+ * path (screenshot.c, issue #44) -- same graceful degradation as
+ * GadToolsBase/KeymapBase/GfxBase above: when this is NULL (the
+ * common case on this project's own tested floor -- no P96 installed
+ * at all), SCREENSHOT's existing classic planar capture (issue #41)
+ * runs completely unchanged. Never required. See p96_compat.h/
+ * screenshot.h for what's actually verified here and why this
+ * project doesn't redistribute Picasso96Develop's own header files.
+ * The base MUST be named exactly P96Base -- p96_compat.h's own
+ * inline call macros reference it by that literal name (the SDK's
+ * own convention, not this project's choice). */
+struct Library *P96Base = NULL;
 /* Consumed by tcp.c's socket calls -- proto/bsdsocket.h's own extern
  * declaration expects exactly this name. Only opened when TCP is
  * requested (see RealMain); always initialized regardless, per this
@@ -1217,6 +1229,12 @@ static int RealMain(void)
     GadToolsBase = OpenLibrary((CONST_STRPTR)"gadtools.library", 37);
     KeymapBase = OpenLibrary((CONST_STRPTR)"keymap.library", 37);
     GfxBase = (struct GfxBase *)OpenLibrary((CONST_STRPTR)"graphics.library", 37);
+    /* Version 2 (per the P96 SDK's own examples/docs -- covers
+     * p96GetRTGDataTagList/p96GetBoardDataTagList/p96EncodeColor,
+     * none of which this module calls, but this is the SDK's own
+     * documented minimum, not a guess). Absence is NEVER fatal --
+     * see the P96Base doc comment above. */
+    P96Base = OpenLibrary((CONST_STRPTR)"Picasso96API.library", 2);
     RexxSysBase = (struct RxsLib *)OpenLibrary((CONST_STRPTR)"rexxsyslib.library", 0);
 
     if (RexxSysBase == NULL) {
@@ -1617,6 +1635,9 @@ cleanup:
     }
     if (GfxBase != NULL) {
         CloseLibrary((struct Library *)GfxBase);
+    }
+    if (P96Base != NULL) {
+        CloseLibrary(P96Base);
     }
     CloseLibrary((struct Library *)IntuitionBase);
     return RETURN_OK;
