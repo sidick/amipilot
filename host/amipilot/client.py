@@ -358,8 +358,14 @@ class Amipilot:
         self.info = self._wire.handshake()
         return self.info
 
-    def _run(self, command: str, *, allow: tuple[int, ...] = (RC_OK,)) -> Reply:
-        reply = self._wire.command(command)
+    def _run(
+        self,
+        command: str,
+        *,
+        allow: tuple[int, ...] = (RC_OK,),
+        payload: bytes | None = None,
+    ) -> Reply:
+        reply = self._wire.command(command, payload)
         if reply.rc not in allow:
             raise _ERROR_CLASSES.get(reply.rc, AmipilotError)(
                 reply.rc, command, reply.text.strip() or "(no message)"
@@ -659,11 +665,36 @@ class Amipilot:
         terminated text payloads). The server caps this at its own
         internal buffer size (server/src/fs.c's AMIP_FS_BUF_SIZE, a
         test-staging channel, not a file manager) and raises
-        ActionFailed for anything larger. There is no fs_put() --
-        writing files host-to-Amiga needs a binary request-body
-        mechanism the wire doesn't have yet (deferred, see the plan's
-        "File system access" section)."""
+        ActionFailed for anything larger. See fs_put() for the
+        opposite direction."""
         return self._run(f"FSGET {_quote(path)}").payload
+
+    def fs_put(self, path: str, data: bytes, *, timeout: float = 30.0) -> None:
+        """FSPUT <path> <byte-count> [TIMEOUT=<n>] -- writes `data` to
+        `path`, creating it if it doesn't exist and overwriting it if
+        it does. Same allowlist rules as the other fs_*() methods
+        (raises CommandError if `path`'s parent isn't inside a granted
+        FSROOT), and the same AMIP_FS_BUF_SIZE cap as fs_get() (server
+        rejects an oversized declared byte-count outright, before ever
+        reading the payload off the wire).
+
+        Wire-only: there is genuinely no way to carry a raw binary
+        request body over ARexx (RexxMsg/ARG0() only ever carries
+        string arguments), so unlike every other verb here this one
+        cannot be issued from an ARexx script -- only from a client
+        connected over TCP or serial, which is what this method
+        always is.
+
+        `timeout` (seconds, default 30 -- longer than most other
+        waits here, since a real multi-KB payload over a slow serial
+        link genuinely needs it) bounds how long the server waits for
+        the payload to fully arrive after the request line; raises
+        Timeout (RC_TIMEOUT) if it doesn't, distinctly from the write
+        itself failing (ActionFailed, e.g. disk full)."""
+        self._run(
+            f"FSPUT {_quote(path)} {len(data)} TIMEOUT={int(timeout)}",
+            payload=data,
+        )
 
     def menu(self, window_pattern: str, *, screen: str | None = None) -> MenuStrip:
         """MENU <window-pattern> -- the matched window's full menu

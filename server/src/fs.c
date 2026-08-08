@@ -553,3 +553,68 @@ int AmipFsGet(const char *path, const char **resultOut, ULONG *outLen)
     *outLen = (ULONG)size;
     return AMIP_AREXX_RC_OK;
 }
+
+int AmipFsPut(const char *path, const void *data, ULONG len,
+              const char **resultOut, ULONG *outLen)
+{
+    const char *leaf;
+    int parentLen;
+    char parentBuf[256];
+    BPTR parentLock;
+    BPTR fh;
+    LONG n;
+
+    if (!AmipFsEnabled()) {
+        SetErr(resultOut, outLen, "file API not enabled -- no FSROOT granted at startup");
+        return AMIP_AREXX_RC_ERROR;
+    }
+
+    /* Same containment shape as AmipFsMkdir(): the target may not
+     * exist yet (a fresh file) or may already (an overwrite -- Open()
+     * with MODE_NEWFILE handles both identically), so it's the PARENT
+     * directory that must already exist and be checked, not the
+     * target itself. */
+    leaf = (const char *)FilePart((CONST_STRPTR)path);
+    parentLen = (int)(leaf - path);
+    if (parentLen <= 0) {
+        SetErr(resultOut, outLen,
+               "path must be fully qualified (e.g. RAM:name, not a bare name)");
+        return AMIP_AREXX_RC_ERROR;
+    }
+    if (parentLen >= (int)sizeof(parentBuf)) {
+        SetErr(resultOut, outLen, "path too long");
+        return AMIP_AREXX_RC_ERROR;
+    }
+    memcpy(parentBuf, path, (size_t)parentLen);
+    parentBuf[parentLen] = '\0';
+
+    parentLock = Lock((CONST_STRPTR)parentBuf, ACCESS_READ);
+    if (parentLock == 0) {
+        SetErr(resultOut, outLen, "parent directory does not exist");
+        return AMIP_AREXX_RC_WARN;
+    }
+    if (!IsUnderGrantedRoot(parentLock)) {
+        UnLock(parentLock);
+        DescribeRootsError(resultOut, outLen);
+        return AMIP_AREXX_RC_ERROR;
+    }
+    UnLock(parentLock);
+
+    /* Same TOCTOU gap every other verb here already documents: the
+     * parent lock verified above is released before Open() re-resolves
+     * `path` from scratch. */
+    fh = Open((CONST_STRPTR)path, MODE_NEWFILE);
+    if (fh == 0) {
+        SetErr(resultOut, outLen, "could not create file");
+        return AMIP_AREXX_RC_FAIL;
+    }
+    n = len > 0 ? Write(fh, (APTR)data, (LONG)len) : 0;
+    Close(fh);
+    if (n != (LONG)len) {
+        SetErr(resultOut, outLen, "short write (disk full?)");
+        return AMIP_AREXX_RC_FAIL;
+    }
+
+    SetErr(resultOut, outLen, "written");
+    return AMIP_AREXX_RC_OK;
+}

@@ -6,6 +6,7 @@
 #include <exec/ports.h>
 #include <exec/io.h>
 #include <devices/serial.h>
+#include <proto/dos.h>
 #include <proto/exec.h>
 #include <proto/alib.h>
 
@@ -260,4 +261,33 @@ BOOL AmipSerialWrite(AmipSerial *serial, const void *data, ULONG len)
     serial->writeIO->IOSer.io_Data = (APTR)data;
     serial->writeIO->IOSer.io_Length = len;
     return DoIO((struct IORequest *)serial->writeIO) == 0;
+}
+
+#define AMIP_SER_READEXACT_DEFAULT_TIMEOUT 30 /* seconds */
+#define AMIP_SER_READEXACT_POLL_TICKS 5        /* ~100ms, matching Refill()'s
+                                                 * own drain granularity */
+
+BOOL AmipSerialReadExact(AmipSerial *serial, UBYTE *buf, ULONG len,
+                          long timeoutSeconds)
+{
+    ULONG got = 0;
+    ULONG ticksTotal = (ULONG)(timeoutSeconds > 0 ? timeoutSeconds
+                                                   : AMIP_SER_READEXACT_DEFAULT_TIMEOUT) * 50;
+    ULONG ticksWaited = 0;
+
+    for (;;) {
+        while (serial->rxHead < serial->rxCount && got < len) {
+            buf[got++] = serial->rxBuf[serial->rxHead++];
+        }
+        if (got >= len) {
+            return TRUE;
+        }
+        if (ticksWaited >= ticksTotal) {
+            return FALSE;
+        }
+        if (!Refill(serial)) {
+            Delay(AMIP_SER_READEXACT_POLL_TICKS);
+            ticksWaited += AMIP_SER_READEXACT_POLL_TICKS;
+        }
+    }
 }

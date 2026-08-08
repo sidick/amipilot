@@ -90,8 +90,7 @@ public default password, no rate-limiting; LAN/trusted-network use
 only, see `server/README.md`'s TCP section. Phase 0.4 additions
 beyond TCP: `LAUNCH` (start a test subject over the wire), the
 allowlist-scoped file API (`FSLIST`/`FSSTAT`/`FSMKDIR`/`FSDELETE`/
-`FSGET`, `server/src/fs.c` — `FSPUT` deliberately deferred, needs a
-wire protocol addition), menu walking + shortcut-based selection
+`FSGET`, `server/src/fs.c`), menu walking + shortcut-based selection
 (`MENU`/`MENUPICK`, `intuition-model`'s `AmipWalkMenuStrip()` —
 pointer-based selection for shortcut-less items not yet built),
 multi-screen support (`SCREENS`/`SCREEN=`, keyed off
@@ -105,6 +104,22 @@ sliders/scrollers and a gadget-to-gadget form for drag-and-drop,
 built on a single press/absolute-jump/release, not synthesized
 continuous motion). See
 `server/README.md` for the full verb set and what's verified for each.
+Phase 1.0 has started on main, not yet tagged: `FSPUT <path>
+<byte-count> [TIMEOUT=<n>]` (host-to-Amiga file writes,
+`server/src/fs.c`'s `AmipFsPut()`) is real — the wire's first request
+to carry a raw binary body, via a new length-prefixed request-payload
+framing documented in `server/WIRE.md`'s "Request payloads" section
+(symmetric to the response side's own framing). Deliberately
+wire-only: there is no ARexx form at all, since `RexxMsg`/`ARG0()`
+only ever carries string arguments — a real, permanent asymmetry
+(stronger than `AUTH`'s own weaker one), not an oversight. Implemented
+per-transport (`AmipSerialReadExact()`/`AmipTcpReadExact()`,
+`server/src/serial.c`/`server/src/tcp.c`) since the shared, transport-
+portable command parser (`AmipArexxParse()`) has no read primitive of
+its own — see `server/README.md`'s File API section for the full
+contract, including the drain-even-on-rejection connection-desync
+guard. The other identified 1.0-blocking gap, real Workbench launch
+with tooltype/project-argument support, remains unstarted.
 `manifest/` carries the manifest contract (`manifest/SPEC.md`, parsed
 by `server/src/manifest.c` — no screen-awareness yet, `SCREEN=` only
 applies to the classic locator form). `host/` is a real, installable

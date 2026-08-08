@@ -210,6 +210,7 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
     else if (ci_streq(kw, "FSMKDIR"))  out->type = AMIP_AREXX_CMD_FSMKDIR;
     else if (ci_streq(kw, "FSDELETE")) out->type = AMIP_AREXX_CMD_FSDELETE;
     else if (ci_streq(kw, "FSGET"))    out->type = AMIP_AREXX_CMD_FSGET;
+    else if (ci_streq(kw, "FSPUT"))    out->type = AMIP_AREXX_CMD_FSPUT;
     else if (ci_streq(kw, "MENU"))     out->type = AMIP_AREXX_CMD_MENU;
     else if (ci_streq(kw, "MENUPICK")) out->type = AMIP_AREXX_CMD_MENUPICK;
     else if (ci_streq(kw, "DRAG"))     out->type = AMIP_AREXX_CMD_DRAG;
@@ -240,6 +241,47 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
         }
         read_token(p, out->path, sizeof(out->path), &trunc);
         if (fail_if_trunc(trunc, out)) return -1;
+        return 0;
+    }
+
+    if (out->type == AMIP_AREXX_CMD_FSPUT) {
+        char numbuf[16];
+        int trunc;
+
+        p = skip_ws(p);
+        if (*p == '\0') {
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+        p = read_token(p, out->path, sizeof(out->path), &trunc);
+        if (fail_if_trunc(trunc, out)) return -1;
+
+        p = skip_ws(p);
+        if (*p == '\0') {
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+        p = read_token(p, numbuf, sizeof(numbuf), &trunc);
+        if (fail_if_trunc(trunc, out)) return -1;
+        out->fsPutLen = strtol(numbuf, NULL, 10);
+        if (out->fsPutLen < 0 || out->fsPutLen > AMIP_AREXX_MAX_FSPUT) {
+            /* Rejected here, at parse time, before the wire dispatch
+             * loop ever attempts to read a single byte of the
+             * payload -- an out-of-range declared count is never safe
+             * to act on, whether that means "too large to buffer" or
+             * "negative", so this is the same "reject outright, don't
+             * guess" policy every other oversized argument gets. */
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+
+        p = skip_ws(p);
+        if (ci_streq_prefix(p, "TIMEOUT=")) {
+            p += 8; /* strlen("TIMEOUT=") */
+            p = read_token(p, numbuf, sizeof(numbuf), &trunc);
+            if (fail_if_trunc(trunc, out)) return -1;
+            out->expectTimeout = strtol(numbuf, NULL, 10);
+        }
         return 0;
     }
 

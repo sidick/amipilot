@@ -33,11 +33,13 @@
 #include <string.h>
 
 #include <exec/types.h>
+#include <proto/dos.h>
 #include <proto/exec.h>
 #include <proto/bsdsocket.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/filio.h>
 #include <netinet/in.h>
 /* arpa/inet.h (inet_aton()/inet_ntoa()) is deliberately never included
  * here at all -- not just to dodge a header landmine (an earlier
@@ -355,6 +357,84 @@ BOOL AmipTcpWrite(AmipTcp *tcp, const void *data, ULONG len)
         len -= (ULONG)n;
     }
     return TRUE;
+}
+
+#define AMIP_TCP_READEXACT_DEFAULT_TIMEOUT 30 /* seconds, matching
+                                                * AmipSerialReadExact()'s own
+                                                * default -- a real multi-KB
+                                                * payload genuinely needs
+                                                * longer than WAITFOR's 10s */
+#define AMIP_TCP_READEXACT_POLL_TICKS 5        /* ~100ms */
+
+BOOL AmipTcpReadExact(AmipTcp *tcp, UBYTE *buf, ULONG len, long timeoutSeconds)
+{
+    ULONG got = 0;
+    ULONG ticksTotal = (ULONG)(timeoutSeconds > 0 ? timeoutSeconds
+                                                   : AMIP_TCP_READEXACT_DEFAULT_TIMEOUT) * 50;
+    ULONG ticksWaited = 0;
+    LONG nbio;
+    BOOL ok = TRUE;
+
+    /* Drain whatever's already buffered from the request line read
+     * that preceded this call first -- the client typically sends the
+     * line and its payload back to back, so this is the common case,
+     * not an edge case. */
+    while (tcp->rxHead < tcp->rxCount && got < len) {
+        buf[got++] = tcp->rxBuf[tcp->rxHead++];
+    }
+    if (got >= len) {
+        return TRUE;
+    }
+    if (tcp->clientSock < 0) {
+        return FALSE;
+    }
+
+    /* Non-blocking for the duration of this call only, restored
+     * before returning either way -- recv()'s normal blocking
+     * behavior (used everywhere else in this file) would let a
+     * stalled or malicious sender wedge the whole server waiting for
+     * bytes that never arrive; there is no bounded-wait recv() this
+     * NDK snapshot actually defines a usable `struct __timeval` for
+     * (it's referenced by WaitSelect()'s own prototype but never
+     * given a real field layout anywhere in this toolchain's headers
+     * -- confirmed, not assumed), so FIONBIO + a Delay()-based poll
+     * loop is the verified-available alternative, matching this
+     * project's other Delay()-based timeouts (WAITFOR, MUIREXX,
+     * AmipSerialReadExact) in spirit if not mechanism. */
+    nbio = 1;
+    IoctlSocket(tcp->clientSock, FIONBIO, &nbio);
+
+    while (got < len) {
+        LONG n = recv(tcp->clientSock, buf + got, (LONG)(len - got), 0);
+        if (n > 0) {
+            got += (ULONG)n;
+            continue;
+        }
+        if (n == 0) {
+            /* Graceful close, same as ReadAvailable()'s own handling. */
+            CloseSocket(tcp->clientSock);
+            tcp->clientSock = -1;
+            ok = FALSE;
+            break;
+        }
+        /* n < 0: almost always "nothing available yet" (the expected,
+         * common case for a non-blocking socket) but could in
+         * principle be a genuine error too -- either way there is
+         * nothing more useful to do here than keep polling toward the
+         * deadline, so the two aren't distinguished. */
+        if (ticksWaited >= ticksTotal) {
+            ok = FALSE;
+            break;
+        }
+        Delay(AMIP_TCP_READEXACT_POLL_TICKS);
+        ticksWaited += AMIP_TCP_READEXACT_POLL_TICKS;
+    }
+
+    if (tcp->clientSock >= 0) {
+        nbio = 0;
+        IoctlSocket(tcp->clientSock, FIONBIO, &nbio);
+    }
+    return ok;
 }
 
 /* Splits "a.b.c.d/nn" at the '/', if present, into a dotted-quad part

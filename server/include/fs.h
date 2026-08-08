@@ -56,4 +56,15 @@ int AmipFsMkdir(const char *path, const char **resultOut, ULONG *outLen);
 int AmipFsDelete(const char *path, const char **resultOut, ULONG *outLen);
 int AmipFsGet(const char *path, const char **resultOut, ULONG *outLen);
 
+/* Writes `len` bytes from `data` to `path`, creating it if it doesn't
+ * exist and overwriting it if it does (MODE_NEWFILE handles both the
+ * same way) -- containment checked against `path`'s PARENT directory,
+ * same shape as AmipFsMkdir(), since the target itself may not exist
+ * yet. `data`/`len` are the raw payload a caller must have already
+ * received in full off the wire (phase 1.0's FSPUT; see server/
+ * WIRE.md's request-payload framing) -- this function has no
+ * transport awareness of its own. */
+int AmipFsPut(const char *path, const void *data, ULONG len,
+              const char **resultOut, ULONG *outLen);
+
 #endif /* AMIPILOT_FS_H */
