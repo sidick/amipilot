@@ -525,7 +525,28 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
             }
             return 0;
         }
-        /* Not WINDOW=/NOWINDOW= -- this is the TEXT= form instead: a
+        if (ci_streq_prefix(p, "REQUESTER")) {
+            /* Deliberately NOT folded into parse_expect_condition()
+             * (which CLICK's own EXPECT= also calls) -- REQUESTER is
+             * WAITFOR-only for this pass, same scope decision TEXT=
+             * already made (arexx_cmd.h's doc comment on expectMode).
+             * No pattern, no gadget locator -- just the optional
+             * trailing TIMEOUT=<n>. */
+            int trunc;
+            p += 9; /* strlen("REQUESTER") */
+            out->expectMode = 4;
+            p = skip_ws(p);
+            if (ci_streq_prefix(p, "TIMEOUT=")) {
+                char numbuf[16];
+                p += 8; /* strlen("TIMEOUT=") */
+                p = read_token(p, numbuf, sizeof(numbuf), &trunc);
+                if (fail_if_trunc(trunc, out)) return -1;
+                out->expectTimeout = strtol(numbuf, NULL, 10);
+                p = skip_ws(p);
+            }
+            return 0;
+        }
+        /* Not WINDOW=/NOWINDOW=/REQUESTER -- this is the TEXT= form instead: a
          * window-pattern-or-"@name" plus a gadget locator, exactly
          * like CLICK/TYPE/GETTEXT/DRAG's own (arexx_cmd.h's doc
          * comment on AmipArexxParse). Deliberately falls through into

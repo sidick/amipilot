@@ -696,10 +696,11 @@ Lands in phase 0.2 onward -- see
   intermediate, not-yet-final state (e.g. matching both "loading..."
   and "loaded"), a subtler footgun for a wait condition specifically.
 
-  **Scope for this pass:** `WINDOW=`/`NOWINDOW=`/`TEXT=` conditions,
-  and only `CLICK` composes with `EXPECT=` (`WINDOW=`/`NOWINDOW=`
-  only, not `TEXT=`) -- `TYPE`/`DRAG`/`MENUPICK` callers, and anyone
-  wanting a `TEXT=` wait, use a separate `WAITFOR` call instead.
+  **Scope for this pass:** `WINDOW=`/`NOWINDOW=`/`TEXT=`/`REQUESTER`
+  conditions, and only `CLICK` composes with `EXPECT=` (`WINDOW=`/
+  `NOWINDOW=` only, not `TEXT=`/`REQUESTER`) -- `TYPE`/`DRAG`/
+  `MENUPICK` callers, and anyone wanting a `TEXT=`/`REQUESTER` wait,
+  use a separate `WAITFOR` call instead.
   `CLICK`'s own `EXPECT=` doesn't get a `TEXT=` form: the gadget whose
   text changes as a result of a click is often a DIFFERENT gadget than
   the one clicked (e.g. a status label), which would need a second,
@@ -713,6 +714,36 @@ Lands in phase 0.2 onward -- see
   misses, that `EXPECT=`/`WAITFOR` reliably don't, and that a
   deliberately-too-short `TIMEOUT=` reliably reports as `RC 15`
   (confirmed live, not just theoretically distinguishable).
+
+  `WAITFOR` also takes a fourth condition form, `REQUESTER`: `WAITFOR
+  [SCREEN=<s>] REQUESTER [TIMEOUT=<n>]` polls until a genuine Intuition
+  Requester appears anywhere (optionally narrowed to a screen) -- GitHub
+  issue #52's detection-only "cheap first step", no way yet to address
+  or click a Requester's own gadgets. No pattern argument, since a
+  Requester generally has no title of its own.
+
+  Window-attached Requesters only, by design -- a system-wide Requester
+  with no owning window (a disk-swap prompt, a Guru) is a genuinely
+  harder detection problem `BuildSysRequest()`'s own autodoc leaves
+  open. Getting even this "cheap" slice right, confirmed live against
+  `fixtures/gadtools-app`'s own `Ask` button (a real `AutoRequest()`
+  call) and `tests/copperline/run.sh`'s `run_requester_check`, found
+  TWO genuine surprises the original design (and `BuildSysRequest()`'s
+  own 1990s autodoc) got wrong for this project's target OS/ROM:
+  neither a non-NULL `window->FirstRequest` (the classic
+  `Request()`-based struct `Requester` chain) NOR the `GTYP_REQGADGET`
+  bit the autodoc documents on the Positive/Negative gadgets is
+  actually set by `AutoRequest()`/`BuildSysRequest()`/`EasyRequest()`
+  when given a real owning window -- `BuildSysRequest()`'s own autodoc
+  is explicit elsewhere that "a new window is opened in the same
+  screen as the one containing your window", and that new window turns
+  out to be given its owner's EXACT title text, which no ordinary
+  well-behaved app window shares with another on its own. Detection
+  uses that title collision as the real signal (`FirstRequest` is
+  still checked first, both because it's free and for a possible
+  future genuine `Request()`-based interaction path). Full story in
+  `WaitForRequesterPresent()`'s own comment,
+  `server/src/amipilotserver/main.c`.
 
 - **MUI-ARexx bridge tier (phase 0.5, shipped in v0.5):** `MUIREXX <app-base> [TIMEOUT=<n>]
   <command...>` sends `<command>` verbatim to the ARexx port of the MUI

@@ -77,6 +77,7 @@ struct Library *GadToolsBase;
 #define GID_CANCEL   4
 #define GID_SLIDER   5
 #define GID_OPENREQ  6
+#define GID_ASK      7
 
 #define MENUNUM_PROJECT   0
 #define ITEMNUM_ABOUT     0
@@ -219,6 +220,20 @@ int main(void)
     ng.ng_Flags = PLACETEXT_IN;
     gad = CreateGadget(BUTTON_KIND, gad, &ng, GT_Underscore, '_', TAG_DONE);
 
+    /* AmiPilot's WAITFOR REQUESTER on-target check (issue #52's
+     * detection-only slice) needs a REAL genuine Intuition Requester
+     * to detect, not a second plain window (GID_OPENREQ above is
+     * exactly that, kept as-is for its own existing WAITFOR/EXPECT=
+     * race-condition check). AutoRequest() below is a real, blocking
+     * modal Requester attached to THIS window (window->FirstRequest
+     * becomes non-NULL for its whole duration) -- the actual thing
+     * WAITFOR REQUESTER is meant to detect. */
+    ng.ng_TopEdge += 24;
+    ng.ng_GadgetText = (UBYTE *)"_Ask";
+    ng.ng_GadgetID = GID_ASK;
+    ng.ng_Flags = PLACETEXT_IN;
+    gad = CreateGadget(BUTTON_KIND, gad, &ng, GT_Underscore, '_', TAG_DONE);
+
     if (gad == NULL) {
         rc = RETURN_FAIL;
         goto cleanup;
@@ -333,6 +348,28 @@ int main(void)
                                 WA_PubScreen, (ULONG)screen,
                                 TAG_DONE);
                         }
+                    } else if (((struct Gadget *)msg->IAddress)->GadgetID == GID_ASK) {
+                        /* A REAL, blocking modal Requester (RKRM/NDK
+                         * AutoRequest() -- window->FirstRequest is
+                         * genuinely non-NULL for its whole duration),
+                         * not a second window -- the actual thing
+                         * WAITFOR REQUESTER (issue #52's detection-only
+                         * slice) is meant to detect. AutoRequest()
+                         * itself runs its own internal message loop on
+                         * window->UserPort until answered; calling it
+                         * from inside an IDCMP_GADGETUP handler like
+                         * this is the RKRM's own documented usage
+                         * pattern, not a hack. PosFlags/NegFlags both 0
+                         * -- IDCMP_GADGETUP is always an implicit
+                         * dismiss condition, no extra flags needed for
+                         * a plain Yes/No. */
+                        struct IntuiText body = { 0, 1, JAM2, 4, 4, NULL,
+                                                   (UBYTE *)"Are you sure?", NULL };
+                        struct IntuiText posText = { 0, 1, JAM2, 4, 4, NULL,
+                                                      (UBYTE *)"Yes", NULL };
+                        struct IntuiText negText = { 0, 1, JAM2, 4, 4, NULL,
+                                                      (UBYTE *)"No", NULL };
+                        AutoRequest(window, &body, &posText, &negText, 0, 0, 220, 60);
                     }
                     break;
                 /* Diagnostic: IDCMP_MOUSEBUTTONS only arrives for clicks

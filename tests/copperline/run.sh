@@ -1585,6 +1585,89 @@ EOF
 	fi
 }
 
+# --- WAITFOR REQUESTER check (GitHub issue #52's detection-only slice) ----
+# fixtures/gadtools-app's "Ask" button (GID_ASK) calls a real, blocking
+# AutoRequest() -- a genuine window-attached struct Requester, not a
+# simulation. Confirms both directions: WAITFOR REQUESTER correctly times
+# out before the requester exists (no false positive against GTApp's own
+# ordinary window), and succeeds once the Ask button is clicked and the
+# requester is genuinely up.
+run_requester_check() {
+	echo "run.sh: WAITFOR REQUESTER (issue #52 detection-only slice)"
+
+	rm -f "$BUILD/requester-result.txt" "$BUILD/marker-requester-ready.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+Run >NIL: SRC:build/fixtures/GTApp
+Wait 5
+Run >NIL: SRC:build/AmiPilotServer SERIAL
+Wait 5
+Echo "READY" >SRC:build/marker-requester-ready.txt
+EOF
+
+	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
+	rm -f "$info"
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --serial tcp --control :0 --control-info "$info" \
+		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
+	COPPERLINE_PID=$!
+
+	tries=0
+	while [ ! -f "$info" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 100 ]; then
+			echo "run.sh: FAIL (requester): copperline never wrote $info"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			return
+		fi
+		sleep 0.1
+	done
+
+	"$COPPERLINE_CTL" --info "$info" run_until '{"seconds": 600}' > /dev/null 2>&1 &
+
+	tries=0
+	while [ ! -f "$BUILD/marker-requester-ready.txt" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 120 ]; then
+			echo "run.sh: FAIL (requester): guest never became ready -- crash or hang"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			rm -f "$info"
+			return
+		fi
+		sleep 0.5
+	done
+
+	python3 "$REPO_ROOT/tests/copperline/requester-test.py" 127.0.0.1:1234 \
+		> "$BUILD/requester-result.txt" 2>&1 || true
+
+	kill "$COPPERLINE_PID" 2>/dev/null || true
+	COPPERLINE_PID=""
+	rm -f "$info"
+
+	ok=1
+	for pattern in \
+		'WINDOW-FOUND OK' \
+		'NO-REQUESTER-YET PASS' \
+		'ASK-CLICKED OK' \
+		'REQUESTER-DETECTED PASS'; do
+		if ! grep -qF "$pattern" "$BUILD/requester-result.txt" 2>/dev/null; then
+			echo "run.sh: FAIL (requester): expected line not found: $pattern"
+			ok=0
+		fi
+	done
+
+	if [ "$ok" -eq 1 ]; then
+		echo "run.sh: PASS (WAITFOR REQUESTER)"
+	else
+		echo "run.sh:   --- actual output ---"
+		sed 's/^/run.sh:   /' "$BUILD/requester-result.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+	fi
+}
+
 # --- file API check (phase 0.4-1.0, allowlist-scoped FSLIST/FSSTAT/
 # FSMKDIR/FSDELETE/FSGET/FSPUT) -----------------------------------------
 # smoke.script stages a granted root (RAM:amipilot-fs-test, created and
@@ -1825,6 +1908,7 @@ run_fs_check
 run_menu_check
 run_screens_check
 run_windowmoveresize_check
+run_requester_check
 run_golden_check
 run_pytest_release_gate_check
 

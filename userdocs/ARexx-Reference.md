@@ -57,7 +57,7 @@ for disambiguating two same-titled windows on different screens; see
 | `DRAG` | `<window-pattern> <locator> <dx> <dy>` or `<window-pattern> <locator> TO (<dest-gadget-id> \| @<dest-name>)` | A genuine press/move/release drag. The offset form (`<dx> <dy>`) moves the gadget's current center by a pixel delta — the natural shape for a slider/scroller. The `TO` form drags onto a second gadget's center instead, both resolved live, for drag-and-drop/reorder — the destination must be in the same window as the source. `<locator>` is the same numeric `GA_ID`, `ROLE=`/`LABEL=`/`INDEX=`, or `@name` form CLICK/TYPE/GETTEXT accept. |
 | `WINDOWMOVE` | `[SCREEN=<s>] <window-pattern> <dx> <dy>` | Moves the WHOLE window by a pixel offset — a genuine title-bar drag (`WFLG_DRAGBAR`), built on the same primitive `DRAG`'s gadget forms use. Classic locator form only, no `@name` — a window-level action, same scope as `TREE`/`MENU`. `RC=20` ("window has no drag bar") if the window never had one. No separate "get position" verb — `TREE`'s own `[left,top WxH]` header already carries it. |
 | `WINDOWSIZE` | `[SCREEN=<s>] <window-pattern> <width> <height>` | Resizes the WHOLE window to an ABSOLUTE target size — a genuine sizing-gadget drag (`WFLG_SIZEGADGET`) from its current bottom-right corner. Doesn't pre-check against the window's own min/max — Intuition clamps the drag as it would a real one; confirm the actual result with a follow-up `TREE`. `RC=20` ("window has no sizing gadget") if the window never had one. Same classic-form-only scope as `WINDOWMOVE`. |
-| `WAITFOR` | `[SCREEN=<s>] WINDOW=<pattern> [TIMEOUT=<n>]` or `[SCREEN=<s>] NOWINDOW=<pattern> [TIMEOUT=<n>]` or `[SCREEN=<s>] <window-pattern> (<gadget-id> \| ROLE=<r> [LABEL=<l>] [INDEX=<n>]) TEXT=<value> [TIMEOUT=<n>]` or `@<name> TEXT=<value> [TIMEOUT=<n>]` | Polls (server-side, one round trip) until a window matching `<pattern>` appears, until none does, or until a gadget's text exactly equals `<value>`. `TIMEOUT` defaults to 10 seconds. `RC=15` if the condition never becomes true in time — a new RC distinct from "nothing matched" (`RC=5`) or "the action itself failed" (`RC=20`). See [Wait/expectation primitives](#waitexpectation-primitives). |
+| `WAITFOR` | `[SCREEN=<s>] WINDOW=<pattern> [TIMEOUT=<n>]` or `[SCREEN=<s>] NOWINDOW=<pattern> [TIMEOUT=<n>]` or `[SCREEN=<s>] <window-pattern> (<gadget-id> \| ROLE=<r> [LABEL=<l>] [INDEX=<n>]) TEXT=<value> [TIMEOUT=<n>]` or `@<name> TEXT=<value> [TIMEOUT=<n>]` or `[SCREEN=<s>] REQUESTER [TIMEOUT=<n>]` | Polls (server-side, one round trip) until a window matching `<pattern>` appears, until none does, until a gadget's text exactly equals `<value>`, or until a genuine Intuition Requester appears (window-attached only — issue #52's detection-only slice). `TIMEOUT` defaults to 10 seconds. `RC=15` if the condition never becomes true in time — a new RC distinct from "nothing matched" (`RC=5`) or "the action itself failed" (`RC=20`). See [Wait/expectation primitives](#waitexpectation-primitives). |
 | `AUTH` | `<password>` | Authenticates a TCP connection (no effect on ARexx or serial.device, which have their own implicit trust boundaries). Until it succeeds, the TCP transport refuses every command except `VERSION`/`AUTH`/`QUIT` with `RC=10`. See [Securing TCP](Wire-Protocol.md#securing-tcp). |
 | `MUIREXX` | `<app-base> [TIMEOUT=<n>] <command...>` | Sends `<command>` verbatim to a MUI application's own ARexx port. The MUI-ARexx bridge tier — see [Driving MUI applications](#driving-mui-applications). |
 | `QUIT` | (none) | Shuts the commodity down cleanly. |
@@ -172,10 +172,48 @@ This condition is `WAITFOR`-only, not available on `CLICK`'s
 `EXPECT=`, because the gadget whose text changes as a result of a
 click is often a *different* gadget than the one clicked.
 
-**Scope today:** `WINDOW=`/`NOWINDOW=`/`TEXT=` conditions are
-understood, and only `CLICK` composes with `EXPECT=` (`WINDOW=`/
-`NOWINDOW=` only, not `TEXT=`) — `TYPE`/`DRAG`/`MENUPICK` callers, and
-anyone wanting a `TEXT=` wait, use a separate `WAITFOR` call instead.
+`WAITFOR` also has a fourth condition, for detecting an Intuition
+Requester (GitHub issue #52's detection-only "cheap first step" —
+a way to know a modal requester appeared, without addressing its own
+gadgets):
+
+```rexx
+'CLICK GadTools 7'
+'WAITFOR REQUESTER TIMEOUT=10'
+```
+
+`WAITFOR [SCREEN=<s>] REQUESTER [TIMEOUT=<n>]` polls until ANY
+currently-open window (optionally narrowed by `SCREEN=`) shows a
+genuine Intuition Requester, or `TIMEOUT` (default 10s) elapses. No
+pattern argument — a requester generally has no title of its own to
+match against, so "any requester, anywhere" (or on a matching screen)
+is the right granularity for a detection-only primitive.
+
+**Window-attached Requesters only, by design:** a system-wide
+Requester with no owning window (a disk-swap prompt, a DOS error, a
+Guru) is a genuinely harder detection problem — `BuildSysRequest()`'s
+own autodoc says these *can* come back as a standalone window, but
+reliably telling that apart from an ordinary app window needs more
+research than this pass covers. Confirmed live against a real,
+`AutoRequest()`-triggered requester (`fixtures/gadtools-app`,
+`tests/copperline/run.sh`'s `run_requester_check`): detection does
+NOT rely on `window->FirstRequest` alone (checked, but `AutoRequest()`/
+`BuildSysRequest()`/`EasyRequest()` never populate it when given a
+real owning window on this project's target OS/ROM — they open a
+genuinely separate window instead, confirmed against
+`BuildSysRequest()`'s own autodoc text: "a new window is opened in the
+same screen as the one containing your window") — the actual signal
+is that separate window sharing its owning window's exact title text,
+which no ordinary well-behaved app window does on its own. Full
+technical story in `WaitForRequesterPresent()`'s own comment,
+`server/src/amipilotserver/main.c`. There's no way yet to address or
+click a Requester's own gadgets — issue #52 stays open for that half.
+
+**Scope today:** `WINDOW=`/`NOWINDOW=`/`TEXT=`/`REQUESTER` conditions
+are understood, and only `CLICK` composes with `EXPECT=` (`WINDOW=`/
+`NOWINDOW=` only, not `TEXT=`/`REQUESTER`) — `TYPE`/`DRAG`/`MENUPICK`
+callers, and anyone wanting a `TEXT=`/`REQUESTER` wait, use a separate
+`WAITFOR` call instead.
 
 ## Driving MUI applications
 
