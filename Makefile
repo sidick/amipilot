@@ -65,6 +65,14 @@ WBAPP_BIN       := $(BUILD)/fixtures/WBApp
 MAKEICON_SRC    := fixtures/wbapp/src/makeicon.c
 MAKEICON_BIN    := $(BUILD)/fixtures/MakeIcon
 
+# wbgui-app: a SEPARATE Workbench-startable fixture from wbapp/WBApp
+# above, with a real GUI window -- for the "bare machine" lifecycle
+# on-target check (fs-put-staged launch, GUI assertion, quit via its
+# own close gadget). See fixtures/wbgui-app/src/main.c's own header
+# for why this isn't just WBApp with a window added.
+WBGUIAPP_SRC    := fixtures/wbgui-app/src/main.c
+WBGUIAPP_BIN    := $(BUILD)/fixtures/WBGuiApp
+
 # p96-app: opens a real Picasso96/RTG CLUT screen for SCREENSHOT's P96
 # capture-path on-target check (issue #55) -- skips itself cleanly
 # (writes a SKIP status, no crash) when no P96 mode is actually
@@ -119,7 +127,7 @@ all: amiga
 
 amiga: $(INSPECT_BIN)
 
-fixtures: $(GADTOOLS_APP_BIN) $(CLASSACT_APP_BIN) $(SECONDSCREEN_APP_BIN) $(WBAPP_BIN) $(MAKEICON_BIN) $(P96APP_BIN)
+fixtures: $(GADTOOLS_APP_BIN) $(CLASSACT_APP_BIN) $(SECONDSCREEN_APP_BIN) $(WBAPP_BIN) $(MAKEICON_BIN) $(P96APP_BIN) $(WBGUIAPP_BIN)
 
 server: $(CLICKTEST_BIN) $(SETMOUSE_BIN) $(AMIPILOTD_BIN)
 
@@ -153,6 +161,10 @@ $(SECONDSCREEN_APP_BIN): $(SECONDSCREEN_APP_SRC)
 $(WBAPP_BIN): $(WBAPP_SRC)
 	@mkdir -p $(BUILD)/fixtures
 	$(CC) $(CFLAGS) -o $@ $(WBAPP_SRC)
+
+$(WBGUIAPP_BIN): $(WBGUIAPP_SRC)
+	@mkdir -p $(BUILD)/fixtures
+	$(CC) $(CFLAGS) -o $@ $(WBGUIAPP_SRC)
 
 $(P96APP_BIN): $(P96APP_SRC)
 	@mkdir -p $(BUILD)/fixtures

@@ -1036,6 +1036,103 @@ EOF
 	fi
 }
 
+# --- Bare-machine lifecycle check (phase 1.0, docs/implementation-plan.md's
+# own "Success criteria": a Workbench-launch with an overridden tooltype and
+# a project argument, driven and quit via its own affordances, "entirely
+# self-contained against a bare machine over TCP -- fixtures staged via
+# fs-put... no shared drive, mount, or emulator involved"). Unlike
+# run_wblaunch_check above (which stages WBApp's own icon and launches it
+# both via the SRC: hostfs mount), this check's OWN smoke.script does only
+# two things -- run MakeIcon once (still fundamentally needs a real Amiga
+# environment, since it reads the system's own live default WBTOOL icon;
+# not different in kind from fixtures/wbgui-app/src/main.c itself being a
+# pre-built cross-compiled artifact) to produce a reusable
+# fixtures/wbgui-app/WBGuiApp.info on the host disk, then start
+# `AmiPilotServer TCP FSROOT=T:` -- no fixture launch via SRC: at all.
+# Everything else (staging the binary/icon/project-arg file, launching,
+# driving, harvesting, cleanup) happens purely over the wire from
+# tests/copperline/bare-lifecycle-test.py; see that script's own header for
+# the full reasoning, including why fixtures/wbgui-app is a separate
+# fixture from wbapp/WBApp rather than a modification of it.
+run_bare_lifecycle_check() {
+	echo "run.sh: bare-machine lifecycle (WBLAUNCH+FSPUT+FSGET over TCP)"
+
+	rm -f "$BUILD/lifecycle-result.txt" "$BUILD/marker-lifecycle-ready.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+Run >NIL: SRC:build/fixtures/MakeIcon SRC:build/fixtures/WBGuiApp
+Wait 2
+Run >NIL: SRC:build/AmiPilotServer TCP TCPPORT=1237 FSROOT=T:
+Wait 5
+Echo "READY" >SRC:build/marker-lifecycle-ready.txt
+EOF
+
+	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
+	rm -f "$info"
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --hostsocket-net host --control :0 --control-info "$info" \
+		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
+	COPPERLINE_PID=$!
+
+	tries=0
+	while [ ! -f "$info" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 100 ]; then
+			echo "run.sh: FAIL (lifecycle): copperline never wrote $info"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			return
+		fi
+		sleep 0.1
+	done
+
+	"$COPPERLINE_CTL" --info "$info" run_until '{"seconds": 600}' > /dev/null 2>&1 &
+
+	tries=0
+	while [ ! -f "$BUILD/marker-lifecycle-ready.txt" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 120 ]; then
+			echo "run.sh: FAIL (lifecycle): guest never became ready -- crash or hang"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			rm -f "$info"
+			return
+		fi
+		sleep 0.5
+	done
+
+	python3 "$REPO_ROOT/tests/copperline/bare-lifecycle-test.py" 127.0.0.1:1237 \
+		> "$BUILD/lifecycle-result.txt" 2>&1 || true
+
+	kill "$COPPERLINE_PID" 2>/dev/null || true
+	COPPERLINE_PID=""
+	rm -f "$info"
+
+	ok=1
+	for pattern in \
+		'STAGE PASS' \
+		'LAUNCH PASS' \
+		'WINDOW PASS' \
+		'OVERRIDE PASS' \
+		'CLOSE PASS' \
+		'HARVEST PASS' \
+		'CLEANUP PASS'; do
+		if ! grep -qF "$pattern" "$BUILD/lifecycle-result.txt" 2>/dev/null; then
+			echo "run.sh: FAIL (lifecycle): expected line not found: $pattern"
+			ok=0
+		fi
+	done
+
+	if [ "$ok" -eq 1 ]; then
+		echo "run.sh: PASS (bare-machine lifecycle)"
+	else
+		echo "run.sh:   --- actual output ---"
+		sed 's/^/run.sh:   /' "$BUILD/lifecycle-result.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+	fi
+}
+
 # --- stock-app conformance check (phase 0.5, docs/implementation-plan.md's
 # "Testing strategy": "Foreign-app tier tested against a fixed set of stock
 # programs... with golden interaction scripts") -----------------------------
@@ -1719,6 +1816,7 @@ run_wire_check
 run_tcp_host_check
 run_launch_check
 run_wblaunch_check
+run_bare_lifecycle_check
 run_screenshot_check
 run_screenshot_p96_check
 run_stock_app_check
