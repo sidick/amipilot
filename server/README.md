@@ -55,16 +55,25 @@ Lands in phase 0.2 onward -- see
   involved at all, just `Run AmiPilotServer TCP TCPPORT=n` and connect
   to that port on the host directly), and the same round trip earlier
   against a real Copperline hostsocket bridge (bridged to a host
-  `feth` pair). The two implementations are architecturally unrelated
+  `feth` pair, before Copperline 0.15's own `net="host"` backend
+  existed). The two implementations are architecturally unrelated
   (Copperline's is a from-scratch smoltcp-based TCP/IP stack;
   Amiberry's is a thin syscall-forwarding shim), so agreement between
   them is real evidence the `WaitSelect()` design is correct, not an
-  artifact of one emulator's specific behaviour. Not yet wired into
-  `make test-target` as an automated check -- Amiberry isn't scripted
-  headlessly the way Copperline is (see "On-target testing" in the
-  top-level `CLAUDE.md`), and a Copperline-hostsocket version would
-  need the same `feth` bridge setup `tests/copperline/README.md`
-  documents, machine-specific like `copperline.local.toml`. Only
+  artifact of one emulator's specific behaviour. **Now wired into
+  `make test-target`** as a real, automated check
+  (`run_tcp_host_check`, `tests/copperline/tcp-host-test.py`) using
+  Copperline 0.15's `[hostsocket] net = "host"` backend
+  (`--hostsocket-net host`) -- confirmed to delegate straight to a
+  real host OS socket for `listen()`/`accept()`, so a host Python
+  client reaches `AmiPilotServer TCP`'s listener directly with **no
+  `feth` pair, no `/dev/bpf`, no root, and no static interface/
+  address/gateway config at all**, unlike the `bridge` backend's own
+  real setup cost (still documented in `tests/copperline/README.md`
+  for anyone who needs it, e.g. genuinely testing cross-machine
+  reachability rather than same-host loopback). Amiberry still isn't
+  scripted headlessly the way Copperline is (see "On-target testing"
+  in the top-level `CLAUDE.md`), so that half stays manual. Only
   listen-mode exists today (the server binds, the host connects in);
   a guest-initiated dial-out mode -- which would sidestep needing any
   bridge/NAT-forwarding setup at all, since the guest only needs
