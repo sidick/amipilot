@@ -18,13 +18,34 @@ Or, with a local `m68k-amigaos-gcc` on `PATH`:
 
 ```
 make amiga      # AmiInspect only
-make fixtures   # + the conformance fixtures (gadtools-app, classact-app)
+make fixtures   # + the conformance fixtures (gadtools-app, classact-app,
+                # second-screen-app, wbapp)
+make server     # + AmiPilotServer itself, and the internal
+                # AmiClickTest/AmiSetMouse test helpers
 ```
+
+## Building and testing the host Python package
+
+The wire client, host object API, and pytest plugin live under `host/`
+as a real, installable package:
+
+```
+pip install -e 'host/[test]'   # editable install, with test extras
+make test-host                 # = pip install -e 'host/[test]' + pytest host/tests
+```
+
+`test-host` runs entirely against a scripted transport (no emulator
+needed) — it's testing the wire framing, the `TREE`/`MENU`/`SCREENS`/
+file-API parsers, the object API's exception mapping, and the pytest
+plugin's own boot/skip logic. Installing editable first matters: it's
+what makes `amipilot.pytest_plugin` register via its real `pytest11`
+entry point, the same way a real consumer of the package sees it,
+rather than being force-loaded.
 
 ## On-target testing under Copperline
 
-AmiPilot's conformance check runs the actual compiled `AmiInspect` and its
-two fixture applications under the
+AmiPilot's conformance check runs the actual compiled binaries and
+fixture applications under the
 [Copperline](https://copperline.dev) Amiga emulator — not Amiberry;
 Copperline's headless, deterministic `--control` protocol is a much
 better fit for scripted, repeatable verification than driving an
@@ -34,13 +55,22 @@ interactive emulator's GUI by hand.
 make test-target
 ```
 
-This boots each fixture headlessly, runs `AmiInspect` against it, and
-asserts the exact classification output confirmed correct during
-development — it's proven to actually catch a regression, not just
-written to look like it does: a real crash bug (a gadget-type bitmask
-check that misidentified plain GadTools gadgets as BOOPSI objects) was
-deliberately reintroduced during 0.1 development, and this check caught
-it before being reverted.
+This is a whole suite (`tests/copperline/run.sh`), not just the
+original `AmiInspect` classification check: `AmiInspect` structural
+walking against both fixtures and a real stock Prefs editor
+(`WBPattern`), the action engine (`CLICK`/`TYPE`/`DRAG`), the ARexx
+port and manifest locators, the wire protocol over both serial and
+TCP, `LAUNCH`/`WBLAUNCH`, `SCREENSHOT`, the MUI-ARexx bridge, the file
+API, `MENU`/`MENUPICK`, `SCREENS`, `WINDOWMOVE`/`WINDOWSIZE`, the
+checked-in golden-tree fixture regression check, and (if the host
+package is installed) the phase 0.3 pytest release-gate scenario
+itself. It's proven to actually catch a regression, not just written
+to look like it does: a real crash bug (a gadget-type bitmask check
+that misidentified plain GadTools gadgets as BOOPSI objects) was
+deliberately reintroduced during 0.1 development, and this check
+caught it before being reverted — and a second, genuine deadlock bug
+(found live against AmigaOS 3.2's own `WBPattern`, GitHub issue #36)
+is now a permanent regression check (`run_wbpattern_check`) too.
 
 **Needs `tests/copperline/copperline.local.toml`** (gitignored — a
 machine-specific Kickstart ROM + Workbench install path; see
@@ -76,7 +106,7 @@ make guide     # -> build/amipilot.guide
 make dist   # -> build/dist/amipilot.lha, build/dist/amipilot.readme
 ```
 
-Builds `AmiInspect`, the guide, and packages them with `LICENSE` and
+Builds `AmiInspect`, `AmiPilotServer`, the guide, and packages them with `LICENSE` and
 `amipilot.readme` into the same `amipilot.lha` this project's releases
 ship — including building a real `lha` archiver from source first
 (Homebrew's and most Linux distros' `lha` is Lhasa, extract-only, useless

@@ -31,6 +31,18 @@ walked structurally rather than screenshotted pixel-for-pixel (see
 [Locator Tiers and Limits](Locator-Tiers-and-Limits.md) for what "walked
 structurally" can and can't see).
 
+## Layout and resize testing
+
+`WINDOWMOVE`/`WINDOWSIZE` (see
+[Wire Protocol](Wire-Protocol.md#window-move-and-resize)) drive a real
+title-bar drag or sizing-gadget drag, the same way a user would
+reposition or resize a window — useful for asserting an application's
+layout actually adapts correctly (a `GadTools`/ReAction layout
+re-flowing gadgets, a scrollable view updating its visible extent)
+instead of only ever being tested at its default opening size, or for
+moving a window out of the way of another one mid-test without
+guessing screen coordinates by hand.
+
 ## CI for Amiga software
 
 Because the whole stack is scriptable (Copperline's own `--control` JSON-RPC
