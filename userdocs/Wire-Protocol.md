@@ -348,13 +348,13 @@ truecolor/hicolor RGB byte orders — YUV formats aren't supported, the
 SDK's own docs mark them hardware-only) is sent raw over the wire and
 decoded host-side, including the documented `PC`-suffix byte-swap
 pitfall (16-bit `PC` formats are little-endian, non-`PC` big-endian —
-never assumed uniform). **Honestly unverified:** the P96-active
-capture path itself hasn't been exercised against a real P96/CGX board
-or emulator — Copperline (this project's on-target test environment)
-has no RTG emulation at all — so while it's built against the SDK's
-own real, documented interface, it hasn't been proven end-to-end the
-way this project holds every other feature to; see `server/README.md`'s
-own SCREENSHOT section for the fuller story.
+never assumed uniform). The P96-active capture path has been verified
+manually against real Picasso96 3.6 + `uaegfx` under Amiberry (both a
+CLUT and a truecolor screen, each decoding back correctly) — Copperline
+(this project's automated on-target test environment) still has no RTG
+emulation at all, so this is a hands-on confirmation, not a `make
+test-target` regression check yet; see `server/README.md`'s own
+SCREENSHOT section for the fuller story.
 
 With both `screen`/`window` omitted, `screenshot()` captures the
 frontmost/default public screen; `screen` alone selects one by

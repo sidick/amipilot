@@ -178,12 +178,21 @@ against a real running `fixtures/gadtools-app` window via
 `tests/copperline/run.sh`'s `run_screenshot_check` -- which, since
 Copperline has no RTG emulation at all, is really a live confirmation
 that the classic planar path (and P96Base's graceful absence) still
-works correctly, NOT a live confirmation of the P96-active capture
-path itself, which remains genuinely unverified against a real board
-or emulator (an honest, stated gap, not a silent one -- see
-`server/README.md`'s own SCREENSHOT section). The parsing/encoding
-logic itself (exact byte layout for both capture shapes, IFF chunk
-shape, PNG chunk CRCs, the P96 pixel-format decode table) has its own
+works correctly, NOT a confirmation of the P96-active capture path
+itself. That path is now verified too, manually against real
+Picasso96 3.6 + `uaegfx` under Amiberry (Copperline still has no RTG
+emulation, so this isn't a `make test-target` regression check, just
+a real, by-hand confirmation): a genuine P96 CLUT screen decoded back
+an exact match of a known painted pen pattern, and a genuine P96
+truecolor (`R5G6B5PC`) screen decoded back colour values matching the
+expected 5/6/5-bit quantization exactly -- real hardware-adjacent
+confirmation of both the SDK's own bitmap-locking contract and this
+module's `PC`-suffix byte-swap handling, not just the planar/absent
+path. See `server/README.md`'s own SCREENSHOT section for the full
+detail; wiring this into an automated Amiberry-based check remains
+real, tracked follow-up work, not done. The parsing/encoding logic
+itself (exact byte layout for both capture shapes, IFF chunk shape,
+PNG chunk CRCs, the P96 pixel-format decode table) has its own
 dedicated host-side unit tests (`host/tests/test_screenshot.py`)
 against synthetic captures. `WINDOWMOVE [SCREEN=<s>] <window-pattern>
 <dx> <dy>` / `WINDOWSIZE [SCREEN=<s>] <window-pattern> <width>
