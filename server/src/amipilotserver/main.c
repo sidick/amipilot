@@ -50,6 +50,7 @@
 #include "muirexx.h"
 #include "serial.h"
 #include "tcp.h"
+#include "wblaunch.h"
 
 #define STR(s)  #s
 #define XSTR(s) STR(s)
@@ -669,8 +670,8 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                      "AMIPILOT " XSTR(VERSION) "." XSTR(REVISION) " PROTOCOL 1\n"
                      "STABLE VERSION\n"
                      "EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH "
-                     "FSLIST FSSTAT FSMKDIR FSDELETE FSGET FSPUT MENU MENUPICK "
-                     "DRAG WAITFOR SCREENS AUTH MUIREXX QUIT\n");
+                     "FSLIST FSSTAT FSMKDIR FSDELETE FSGET FSPUT WBLAUNCH MENU "
+                     "MENUPICK DRAG WAITFOR SCREENS AUTH MUIREXX QUIT\n");
             result = g_resultBuf;
             break;
 
@@ -862,6 +863,13 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
             }
             break;
         }
+
+        case AMIP_AREXX_CMD_WBLAUNCH:
+            rc = AmipWbLaunch(cmd->path,
+                               cmd->wbToolTypeKeys, cmd->wbToolTypeValues, cmd->wbNumToolTypes,
+                               cmd->wbArgs, cmd->wbNumArgs,
+                               &result, resultLenOut);
+            break;
 
         case AMIP_AREXX_CMD_FSLIST:
             rc = AmipFsList(cmd->path, &result, resultLenOut);
@@ -1184,7 +1192,7 @@ static int RealMain(void)
     AmipSerial *serial = NULL;
     AmipTcp *tcp = NULL;
     char portName[32];
-    ULONG rexxSig, serialSig = 0;
+    ULONG rexxSig, serialSig = 0, wbSig;
     BOOL running = TRUE;
 
     IntuitionBase = (struct IntuitionBase *)OpenLibrary((CONST_STRPTR)"intuition.library", 37);
@@ -1212,6 +1220,14 @@ static int RealMain(void)
         goto cleanup;
     }
 
+    /* Unconditional, same as AmipActionInit() above -- WBLAUNCH needs
+     * no startup argument of its own (unlike SERIAL/TCP/FSROOT), only
+     * icon.library and a reply port to learn when a launch exits (see
+     * wblaunch.h). A degraded (icon.library-unavailable) start is
+     * handled per-call by AmipWbLaunch() itself, not fatal here. */
+    AmipWbInit();
+    wbSig = AmipWbSigMask();
+
     /* SERIAL requested but unopenable is fatal, not a degraded start: a
      * host-driven test session must never silently run without its
      * transport (same never-substitute philosophy as the emulator's own
@@ -1220,6 +1236,7 @@ static int RealMain(void)
     if (rdargs == NULL) {
         PrintFault(IoErr(), (CONST_STRPTR)"AmiPilotServer");
         AmipArexxClose(arexxPort);
+        AmipWbShutdown();
         AmipActionShutdown();
         goto cleanup;
     }
@@ -1239,6 +1256,7 @@ static int RealMain(void)
                 FreeArgs(rdargs);
             }
             AmipArexxClose(arexxPort);
+            AmipWbShutdown();
             AmipActionShutdown();
             goto cleanup;
         }
@@ -1258,6 +1276,7 @@ static int RealMain(void)
             AmipSerialClose(serial);
             FreeArgs(rdargs);
             AmipArexxClose(arexxPort);
+            AmipWbShutdown();
             AmipActionShutdown();
             goto cleanup;
         }
@@ -1268,6 +1287,7 @@ static int RealMain(void)
             AmipSerialClose(serial);
             FreeArgs(rdargs);
             AmipArexxClose(arexxPort);
+            AmipWbShutdown();
             AmipActionShutdown();
             goto cleanup;
         }
@@ -1278,6 +1298,7 @@ static int RealMain(void)
             AmipSerialClose(serial);
             FreeArgs(rdargs);
             AmipArexxClose(arexxPort);
+            AmipWbShutdown();
             AmipActionShutdown();
             goto cleanup;
         }
@@ -1312,6 +1333,7 @@ static int RealMain(void)
                     AmipSerialClose(serial);
                     FreeArgs(rdargs);
                     AmipArexxClose(arexxPort);
+                    AmipWbShutdown();
                     AmipActionShutdown();
                     goto cleanup;
                 }
@@ -1365,6 +1387,7 @@ static int RealMain(void)
                 AmipSerialClose(serial);
                 FreeArgs(rdargs);
                 AmipArexxClose(arexxPort);
+                AmipWbShutdown();
                 AmipActionShutdown();
                 goto cleanup;
             }
@@ -1385,11 +1408,17 @@ static int RealMain(void)
          * blocking call -- when TCP is active it replaces this plain
          * Wait() outright rather than contributing a signal bit to it. */
         ULONG sigs = tcp != NULL
-            ? AmipTcpWait(tcp, rexxSig | serialSig | SIGBREAKF_CTRL_C)
-            : Wait(rexxSig | serialSig | SIGBREAKF_CTRL_C);
+            ? AmipTcpWait(tcp, rexxSig | serialSig | wbSig | SIGBREAKF_CTRL_C)
+            : Wait(rexxSig | serialSig | wbSig | SIGBREAKF_CTRL_C);
 
         if (sigs & SIGBREAKF_CTRL_C) {
             running = FALSE;
+        }
+
+        if (sigs & wbSig) {
+            /* A WBLAUNCH process has exited and replied its WBStartup
+             * message -- reap its seglist/locks/scratch icon now. */
+            AmipWbPoll();
         }
 
         if (sigs & rexxSig) {
@@ -1555,6 +1584,7 @@ static int RealMain(void)
         FreeArgs(rdargs);
     }
     AmipArexxClose(arexxPort);
+    AmipWbShutdown();
     AmipActionShutdown();
 
 cleanup:

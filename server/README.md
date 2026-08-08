@@ -206,6 +206,57 @@ Lands in phase 0.2 onward -- see
   process is genuinely functional with the non-default stack, not just
   that it didn't immediately crash.
 
+- **`WBLAUNCH <icon-path> [TOOLTYPE=<key>=<value> ...] [ARG=<path> ...]`
+  (phase 1.0, real Workbench-style launch):** `LAUNCH` above starts a
+  Shell-style process (`SystemTagList()`); this is the other half
+  `docs/implementation-plan.md`'s "Program launch" section calls for --
+  a genuinely hand-built `WBStartup`/`WBArg` message sent to a real
+  non-CLI `CreateNewProc()` process, the same mechanism real launcher
+  utilities (AmigaOS 45's own `WBLoad`; the classic `WBRun`) use, not a
+  V44+ shortcut: `workbench.library`'s `OpenWorkbenchObjectA()` looked
+  tempting but its own autodoc BUGS section says launching (not just
+  opening drawers) was unsafe and could trash memory up to and
+  including V45.38 -- disqualifying against this project's V37 floor.
+  `<icon-path>` is a tool or project icon's path WITHOUT the ".info"
+  suffix (icon.library's own convention); a `WBPROJECT` icon resolves
+  its own `do_DefaultTool` and becomes a second `WBArg` (the RKRM's own
+  "Two Arguments" case), a `WBTOOL` icon launches directly. Repeatable
+  `ARG=<path>` entries become further `WBArg` project-file arguments
+  (Lock()-based, same containment-free convenience LAUNCH's own command
+  line already has -- WBLAUNCH has no FSROOT-style allowlist of its
+  own). **One real deviation from this feature's own original plan
+  sketch, found doing the research:** the plan assumed tooltype
+  overrides could be merged "in memory... no disk writes." That's not
+  achievable against a real, unmodified target program: a Workbench-
+  started app discovers its own tooltypes by calling `GetDiskObject()`
+  on ITS OWN icon, found via the very `WBArg[0]` this verb hands it --
+  there's no in-memory channel to hand tooltypes to an off-the-shelf
+  binary at all. Repeatable `TOOLTYPE=<key>=<value>` entries are
+  instead merged (existing keys not named are preserved, named ones
+  overridden, new ones appended) into a scratch copy of the icon
+  written to `T:` -- **never the app's own real `.info`** -- with the
+  primary `WBArg` repointed at that scratch location instead; cleaned
+  up automatically once the launched process exits and replies its
+  `WBStartup` message (`server/src/wblaunch.c`'s `AmipWbPoll()`, folded
+  into the main dispatch loop's own `Wait()`/`AmipTcpWait()`, the same
+  shape `WAITFOR`'s own polling and every other async-completion signal
+  here already uses). Same honest async caveat as `LAUNCH`: `RC 0`
+  means the process was created and the startup message queued, not
+  that the launched program actually finished starting or found its
+  tooltypes/arguments meaningful -- assert on the expected effect.
+  Unlike `FSPUT`, this carries no binary wire payload, so (like
+  `LAUNCH`) it's fully answerable over ARexx too -- no wire-only
+  asymmetry here. Verified end-to-end by `make test-target`'s WBLAUNCH
+  check (`tests/copperline/wblaunch-test.py`) against a real,
+  Workbench-startable fixture (`fixtures/wbapp`, whose own icon is
+  stamped once by a small helper, `MakeIcon`, off the system's own
+  default `WBTOOL` icon -- see `fixtures/wbapp/src/makeicon.c`'s own
+  header): a bare launch reports both baked-in tooltypes unchanged; a
+  `TOOLTYPE=` override changes one while leaving the other alone (the
+  real merge, not a full replace); an `ARG=` path becomes a second
+  `WBArg` the target actually sees; and a bad icon path is rejected
+  (`RC 10`), not silently accepted.
+
 - **File API (phase 0.4, shipped in v0.4):** `FSLIST`/`FSSTAT`/`FSMKDIR`/
   `FSDELETE`/`FSGET`, each taking a single `<path>` argument (quoted
   the same way a window pattern is if it contains a space) --

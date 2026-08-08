@@ -629,6 +629,43 @@ class Amipilot:
         else:
             self._run(f"LAUNCH {command}")
 
+    def wb_launch(
+        self,
+        icon_path: str,
+        *,
+        tooltypes: dict[str, str] | None = None,
+        args: list[str] | None = None,
+    ) -> None:
+        """WBLAUNCH <icon-path> [TOOLTYPE=<key>=<value> ...] [ARG=<path> ...]
+        -- launches `icon_path` (a tool or project icon's path, WITHOUT
+        the ".info" suffix) as if its icon had been double-clicked: a
+        real, hand-built Workbench-style start (genuine WBStartup/
+        WBArg message, real non-CLI process), not launch()'s Shell-
+        style one (SystemTagList()). See server/include/wblaunch.h for
+        the full mechanism, including why tooltype overrides need a
+        scratch icon write (never to `icon_path`'s own real .info).
+
+        `tooltypes`, if given, overrides (or appends, if the key isn't
+        already on the icon) each named tooltype for this launch only
+        -- everything else on the real icon is left alone. `args`, if
+        given, are additional fully-qualified paths passed as further
+        WBArg project-file arguments (the "multiple project files"
+        case), appended after the primary tool/project argument(s).
+
+        Asynchronous, like launch(): raises CommandError as soon as
+        the icon/path is rejected (bad icon, unsupported icon type, an
+        ARG=/TOOLTYPE= path that can't be locked), ActionFailed if
+        CreateNewProc() itself fails (out of memory, no process slot)
+        -- neither confirms the launched program actually finished
+        starting; assert on its expected effect instead, same as
+        launch()."""
+        parts = [f"WBLAUNCH {_quote(icon_path)}"]
+        for key, value in (tooltypes or {}).items():
+            parts.append(f"TOOLTYPE={_quote(f'{key}={value}')}")
+        for path in args or []:
+            parts.append(f"ARG={_quote(path)}")
+        self._run(" ".join(parts))
+
     def fs_list(self, path: str) -> list[FsEntry]:
         """FSLIST <path> -- lists a directory's entries. `path` must
         resolve inside a root granted to the server at startup via

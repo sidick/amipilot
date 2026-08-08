@@ -55,6 +55,16 @@ CLASSACT_APP_BIN := $(BUILD)/fixtures/CAApp
 SECONDSCREEN_APP_SRC := fixtures/second-screen-app/src/main.c
 SECONDSCREEN_APP_BIN := $(BUILD)/fixtures/SecondScreenApp
 
+# wbapp: a Workbench-startable (not GUI) fixture proving WBLAUNCH
+# (phase 1.0, server/include/wblaunch.h) against a real WBStartup
+# handshake -- see fixtures/wbapp/src/main.c. MakeIcon is its own
+# build/test-time-only helper that stamps a real .info for it (no
+# hand-authored binary icon file -- see makeicon.c's own header).
+WBAPP_SRC       := fixtures/wbapp/src/main.c
+WBAPP_BIN       := $(BUILD)/fixtures/WBApp
+MAKEICON_SRC    := fixtures/wbapp/src/makeicon.c
+MAKEICON_BIN    := $(BUILD)/fixtures/MakeIcon
+
 # --- server/ (phase 0.2, in progress -- see docs/implementation-plan.md) --
 ACTION_SRCDIR := server/src
 ACTION_INCDIR := server/include
@@ -83,7 +93,7 @@ SETMOUSE_BIN    := $(BUILD)/AmiSetMouse
 AREXX_SRC       := $(ACTION_SRCDIR)/arexx.c $(ACTION_SRCDIR)/arexx_cmd.c \
                    $(ACTION_SRCDIR)/manifest.c $(ACTION_SRCDIR)/serial.c \
                    $(ACTION_SRCDIR)/tcp.c $(ACTION_SRCDIR)/fs.c \
-                   $(ACTION_SRCDIR)/muirexx.c
+                   $(ACTION_SRCDIR)/muirexx.c $(ACTION_SRCDIR)/wblaunch.c
 AMIPILOTD_SRCDIR := server/src/amipilotserver
 AMIPILOTD_BIN    := $(BUILD)/AmiPilotServer
 
@@ -100,7 +110,7 @@ all: amiga
 
 amiga: $(INSPECT_BIN)
 
-fixtures: $(GADTOOLS_APP_BIN) $(CLASSACT_APP_BIN) $(SECONDSCREEN_APP_BIN)
+fixtures: $(GADTOOLS_APP_BIN) $(CLASSACT_APP_BIN) $(SECONDSCREEN_APP_BIN) $(WBAPP_BIN) $(MAKEICON_BIN)
 
 server: $(CLICKTEST_BIN) $(SETMOUSE_BIN) $(AMIPILOTD_BIN)
 
@@ -130,6 +140,14 @@ $(CLASSACT_APP_BIN): $(CLASSACT_APP_SRC)
 $(SECONDSCREEN_APP_BIN): $(SECONDSCREEN_APP_SRC)
 	@mkdir -p $(BUILD)/fixtures
 	$(CC) $(CFLAGS) -o $@ $(SECONDSCREEN_APP_SRC)
+
+$(WBAPP_BIN): $(WBAPP_SRC)
+	@mkdir -p $(BUILD)/fixtures
+	$(CC) $(CFLAGS) -o $@ $(WBAPP_SRC)
+
+$(MAKEICON_BIN): $(MAKEICON_SRC)
+	@mkdir -p $(BUILD)/fixtures
+	$(CC) $(CFLAGS) -o $@ $(MAKEICON_SRC)
 
 $(ACTION_LIB): $(ACTION_SRC) $(ACTION_INCDIR)/action_engine.h
 	@mkdir -p $(BUILD)

@@ -205,6 +205,7 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
     else if (ci_streq(kw, "MANIFEST")) out->type = AMIP_AREXX_CMD_MANIFEST;
     else if (ci_streq(kw, "VERSION"))  out->type = AMIP_AREXX_CMD_VERSION;
     else if (ci_streq(kw, "LAUNCH"))   out->type = AMIP_AREXX_CMD_LAUNCH;
+    else if (ci_streq(kw, "WBLAUNCH")) out->type = AMIP_AREXX_CMD_WBLAUNCH;
     else if (ci_streq(kw, "FSLIST"))   out->type = AMIP_AREXX_CMD_FSLIST;
     else if (ci_streq(kw, "FSSTAT"))   out->type = AMIP_AREXX_CMD_FSSTAT;
     else if (ci_streq(kw, "FSMKDIR"))  out->type = AMIP_AREXX_CMD_FSMKDIR;
@@ -364,6 +365,68 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
         }
         strncpy(out->command, p, sizeof(out->command) - 1);
         out->command[sizeof(out->command) - 1] = '\0';
+        return 0;
+    }
+
+    if (out->type == AMIP_AREXX_CMD_WBLAUNCH) {
+        int trunc;
+
+        p = skip_ws(p);
+        if (*p == '\0') {
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+        p = read_token(p, out->path, sizeof(out->path), &trunc);
+        if (fail_if_trunc(trunc, out)) return -1;
+
+        for (;;) {
+            p = skip_ws(p);
+            if (*p == '\0') {
+                break;
+            }
+            if (ci_streq_prefix(p, "TOOLTYPE=")) {
+                char buf[AMIP_AREXX_MAX_WB_TT_KEY + AMIP_AREXX_MAX_WB_TT_VALUE];
+                char *eq;
+
+                if (out->wbNumToolTypes >= AMIP_AREXX_MAX_WB_TOOLTYPES) {
+                    out->type = AMIP_AREXX_CMD_UNKNOWN;
+                    return -1;
+                }
+                p += 9; /* strlen("TOOLTYPE=") */
+                p = read_token(p, buf, sizeof(buf), &trunc);
+                if (fail_if_trunc(trunc, out)) return -1;
+                eq = strchr(buf, '=');
+                if (eq == NULL || eq == buf) {
+                    /* No '=', or an empty key -- "TOOLTYPE=KEY=VALUE"
+                     * with nothing before the inner '=' isn't a valid
+                     * tooltype at all. */
+                    out->type = AMIP_AREXX_CMD_UNKNOWN;
+                    return -1;
+                }
+                *eq = '\0';
+                if (strlen(buf) >= AMIP_AREXX_MAX_WB_TT_KEY ||
+                    strlen(eq + 1) >= AMIP_AREXX_MAX_WB_TT_VALUE) {
+                    out->argTooLong = 1;
+                    out->type = AMIP_AREXX_CMD_UNKNOWN;
+                    return -1;
+                }
+                strcpy(out->wbToolTypeKeys[out->wbNumToolTypes], buf);
+                strcpy(out->wbToolTypeValues[out->wbNumToolTypes], eq + 1);
+                out->wbNumToolTypes++;
+            } else if (ci_streq_prefix(p, "ARG=")) {
+                if (out->wbNumArgs >= AMIP_AREXX_MAX_WB_ARGS) {
+                    out->type = AMIP_AREXX_CMD_UNKNOWN;
+                    return -1;
+                }
+                p += 4; /* strlen("ARG=") */
+                p = read_token(p, out->wbArgs[out->wbNumArgs], sizeof(out->wbArgs[out->wbNumArgs]), &trunc);
+                if (fail_if_trunc(trunc, out)) return -1;
+                out->wbNumArgs++;
+            } else {
+                out->type = AMIP_AREXX_CMD_UNKNOWN;
+                return -1;
+            }
+        }
         return 0;
     }
 

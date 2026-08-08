@@ -648,6 +648,95 @@ EOF
 	fi
 }
 
+# --- WBLAUNCH check (phase 1.0, docs/implementation-plan.md's "Program
+# launch": "Workbench launch, done properly... The launched program
+# experiences a real Workbench start") -----------------------------------
+# smoke.script stages a real icon for fixtures/wbapp/WBApp (via its own
+# MakeIcon helper, stamped BEFORE AmiPilotServer starts -- same "stage
+# first, then Run the server" shape run_fs_check's own seed file uses)
+# and starts the server with FSROOT=T: (WBApp's non-GUI fixture reports
+# what it received to a T: file the wire's FSGET reads back). tests/
+# copperline/wblaunch-test.py then exercises a bare launch (both baked-
+# in tooltypes unchanged), a TOOLTYPE= override (PORT changes, GREETING
+# untouched -- the real "merge", not a full replace), an ARG= project-
+# file argument, and a bad-icon-path rejection, all against a real
+# WBStartup handshake, not a hand-simulated one.
+run_wblaunch_check() {
+	echo "run.sh: WBLAUNCH verb"
+
+	rm -f "$BUILD/wblaunch-result.txt" "$BUILD/marker-wblaunch-ready.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+Run >NIL: SRC:build/fixtures/MakeIcon SRC:build/fixtures/WBApp
+Wait 2
+Run >NIL: SRC:build/AmiPilotServer SERIAL FSROOT=T:
+Wait 5
+Echo "READY" >SRC:build/marker-wblaunch-ready.txt
+EOF
+
+	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
+	rm -f "$info"
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --chip 2M \
+		--fast 8M --noaudio --serial tcp --control :0 --control-info "$info" \
+		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
+	COPPERLINE_PID=$!
+
+	tries=0
+	while [ ! -f "$info" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 100 ]; then
+			echo "run.sh: FAIL (wblaunch): copperline never wrote $info"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			return
+		fi
+		sleep 0.1
+	done
+
+	"$COPPERLINE_CTL" --info "$info" run_until '{"seconds": 600}' > /dev/null 2>&1 &
+
+	tries=0
+	while [ ! -f "$BUILD/marker-wblaunch-ready.txt" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 120 ]; then
+			echo "run.sh: FAIL (wblaunch): guest never became ready -- crash or hang"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			rm -f "$info"
+			return
+		fi
+		sleep 0.5
+	done
+
+	python3 "$REPO_ROOT/tests/copperline/wblaunch-test.py" 127.0.0.1:1234 \
+		> "$BUILD/wblaunch-result.txt" 2>&1 || true
+
+	kill "$COPPERLINE_PID" 2>/dev/null || true
+	COPPERLINE_PID=""
+	rm -f "$info"
+
+	ok=1
+	for pattern in \
+		'BARE-LAUNCH PASS' \
+		'TOOLTYPE-OVERRIDE PASS' \
+		'ARG-EXTRA PASS' \
+		'BAD-ICON PASS rejected'; do
+		if ! grep -qF "$pattern" "$BUILD/wblaunch-result.txt" 2>/dev/null; then
+			echo "run.sh: FAIL (wblaunch): expected line not found: $pattern"
+			ok=0
+		fi
+	done
+
+	if [ "$ok" -eq 1 ]; then
+		echo "run.sh: PASS (WBLAUNCH verb)"
+	else
+		echo "run.sh:   --- actual output ---"
+		sed 's/^/run.sh:   /' "$BUILD/wblaunch-result.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+	fi
+}
+
 # --- stock-app conformance check (phase 0.5, docs/implementation-plan.md's
 # "Testing strategy": "Foreign-app tier tested against a fixed set of stock
 # programs... with golden interaction scripts") -----------------------------
@@ -1239,6 +1328,7 @@ run_arexx_check
 run_manifest_check
 run_wire_check
 run_launch_check
+run_wblaunch_check
 run_stock_app_check
 run_mui_check
 run_fs_check

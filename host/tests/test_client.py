@@ -85,6 +85,32 @@ class Quoting(unittest.TestCase):
         with self.assertRaises(ValueError):
             c.launch("SRC:build/fixtures/GTApp\nQUIT")
 
+    def test_wb_launch_bare(self):
+        c = client_with(b"RC 0 0\n")
+        c.wb_launch("SRC:build/fixtures/WBApp")
+        self.assertEqual(c._wire._t.sent[0], b"WBLAUNCH SRC:build/fixtures/WBApp\n")
+
+    def test_wb_launch_with_tooltypes_and_args(self):
+        c = client_with(b"RC 0 0\n")
+        c.wb_launch(
+            "SRC:build/fixtures/WBApp",
+            tooltypes={"PORT": "9999"},
+            args=["Work:data/one", "Work:data/two"],
+        )
+        self.assertEqual(
+            c._wire._t.sent[0],
+            b"WBLAUNCH SRC:build/fixtures/WBApp TOOLTYPE=PORT=9999 "
+            b"ARG=Work:data/one ARG=Work:data/two\n",
+        )
+
+    def test_wb_launch_quotes_spaced_tooltype_value(self):
+        c = client_with(b"RC 0 0\n")
+        c.wb_launch("SRC:build/fixtures/WBApp", tooltypes={"GREETING": "hello there"})
+        self.assertEqual(
+            c._wire._t.sent[0],
+            b'WBLAUNCH SRC:build/fixtures/WBApp TOOLTYPE="GREETING=hello there"\n',
+        )
+
     def test_pattern_with_embedded_quote_is_escaped(self):
         # A real AmigaDOS name can legitimately contain a literal '"'
         # (e.g. a `12" disk` comment/name) -- the server's own
@@ -389,6 +415,18 @@ class RcMapping(unittest.TestCase):
         c = client_with(b"RC 20 %d\n%s" % (len(payload), payload))
         with self.assertRaises(ActionFailed):
             c.launch("SRC:build/fixtures/GTApp")
+
+    def test_wb_launch_bad_icon_raises_command_error(self):
+        payload = b"icon not found (expects <path>, reads <path>.info)"
+        c = client_with(b"RC 10 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(CommandError):
+            c.wb_launch("SRC:build/fixtures/NoSuchApp")
+
+    def test_wb_launch_process_create_fail_raises_action_failed(self):
+        payload = b"could not create process (out of memory or no process slot)"
+        c = client_with(b"RC 20 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(ActionFailed):
+            c.wb_launch("SRC:build/fixtures/WBApp")
 
 
 class Verbs(unittest.TestCase):
