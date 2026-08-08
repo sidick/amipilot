@@ -10,6 +10,15 @@
 
 rom = "/path/to/your/Kickstarts/A1200.47.115.rom"
 
+# Optional, opt-in: a real Picasso96/RTG board, for
+# run_screenshot_p96_check's SCREENSHOT P96-capture-path check (see
+# README.md's own "P96/Picasso96 RTG" section for the CPU-profile and
+# monitor-driver caveats this needs to actually work, not just skip
+# cleanly). Every other check runs fine with this commented out.
+# [rtg]
+# card = "picasso2"
+# vram = "2M"
+
 [[filesys]]
 path = "/path/to/your/Workbench-install-directory"
 volume = "Workbench"

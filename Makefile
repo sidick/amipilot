@@ -65,6 +65,14 @@ WBAPP_BIN       := $(BUILD)/fixtures/WBApp
 MAKEICON_SRC    := fixtures/wbapp/src/makeicon.c
 MAKEICON_BIN    := $(BUILD)/fixtures/MakeIcon
 
+# p96-app: opens a real Picasso96/RTG CLUT screen for SCREENSHOT's P96
+# capture-path on-target check (issue #55) -- skips itself cleanly
+# (writes a SKIP status, no crash) when no P96 mode is actually
+# available, since most machines running `make test-target` won't
+# have [rtg] configured at all. See fixtures/p96-app/src/main.c.
+P96APP_SRC      := fixtures/p96-app/src/main.c
+P96APP_BIN      := $(BUILD)/fixtures/P96App
+
 # --- server/ (phase 0.2, in progress -- see docs/implementation-plan.md) --
 ACTION_SRCDIR := server/src
 ACTION_INCDIR := server/include
@@ -111,7 +119,7 @@ all: amiga
 
 amiga: $(INSPECT_BIN)
 
-fixtures: $(GADTOOLS_APP_BIN) $(CLASSACT_APP_BIN) $(SECONDSCREEN_APP_BIN) $(WBAPP_BIN) $(MAKEICON_BIN)
+fixtures: $(GADTOOLS_APP_BIN) $(CLASSACT_APP_BIN) $(SECONDSCREEN_APP_BIN) $(WBAPP_BIN) $(MAKEICON_BIN) $(P96APP_BIN)
 
 server: $(CLICKTEST_BIN) $(SETMOUSE_BIN) $(AMIPILOTD_BIN)
 
@@ -145,6 +153,10 @@ $(SECONDSCREEN_APP_BIN): $(SECONDSCREEN_APP_SRC)
 $(WBAPP_BIN): $(WBAPP_SRC)
 	@mkdir -p $(BUILD)/fixtures
 	$(CC) $(CFLAGS) -o $@ $(WBAPP_SRC)
+
+$(P96APP_BIN): $(P96APP_SRC)
+	@mkdir -p $(BUILD)/fixtures
+	$(CC) $(CFLAGS) -o $@ $(P96APP_SRC)
 
 $(MAKEICON_BIN): $(MAKEICON_SRC)
 	@mkdir -p $(BUILD)/fixtures
