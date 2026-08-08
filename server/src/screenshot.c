@@ -15,6 +15,7 @@
 
 #include "action_engine.h"
 #include "arexx_cmd.h"
+#include "errbuf.h"
 #include "p96_compat.h"
 #include "screenshot.h"
 
@@ -32,10 +33,7 @@ static char g_resultBuf[160];
 
 static void SetErr(const char **resultOut, ULONG *outLen, const char *msg)
 {
-    strncpy(g_resultBuf, msg, sizeof(g_resultBuf) - 1);
-    g_resultBuf[sizeof(g_resultBuf) - 1] = '\0';
-    *resultOut = g_resultBuf;
-    *outLen = (ULONG)strlen(g_resultBuf);
+    AmipSetErrBuf(g_resultBuf, sizeof(g_resultBuf), resultOut, outLen, msg);
 }
 
 /* Grow-only scratch buffer, reused across calls -- never pre-reserved
@@ -66,6 +64,26 @@ static void PutU16(UBYTE **p, UWORD v)
     (*p)[0] = (UBYTE)(v >> 8);
     (*p)[1] = (UBYTE)v;
     *p += 2;
+}
+
+/* TRUE if `a * b` would exceed `limit` -- checked via division, never
+ * by multiplying first and comparing after, so this stays correct
+ * even when the true product would wrap ULONG's own 32-bit range
+ * before any comparison could catch it. Defense in depth for a gap
+ * found in code review: width/height/bytesPerRow/depth are read from
+ * live Screen/BitMap fields under only a brief LockIBase hold (this
+ * file's own comments already say that narrows, but doesn't
+ * eliminate, a staleness race) -- if that race were ever hit and
+ * produced a corrupted large value, an unchecked multiply could wrap
+ * to a SMALLER totalSize than the real data, passing the size-cap
+ * check with an undersized EnsureBuf() allocation and then genuinely
+ * overflowing it in the memcpy that follows. */
+static BOOL WouldOverflow(ULONG a, ULONG b, ULONG limit)
+{
+    if (a == 0 || b == 0) {
+        return FALSE;
+    }
+    return a > limit / b;
 }
 
 /* Writes this module's shared 24-byte header (screenshot.h's own
@@ -147,6 +165,11 @@ static int CapturePlanar(PLANEPTR *planes, UBYTE depth, UWORD width, UWORD heigh
         numColors = 256;
     }
 
+    if (WouldOverflow(bytesPerRow, height, AMIP_SCREENSHOT_MAX_BYTES) ||
+        WouldOverflow(depth, bytesPerRow * (ULONG)height, AMIP_SCREENSHOT_MAX_BYTES)) {
+        SetErr(resultOut, outLen, "capture exceeds this server's size cap");
+        return AMIP_AREXX_RC_ERROR;
+    }
     totalSize = AMIP_SCREENSHOT_HEADER_SIZE + (ULONG)numColors * 3
         + (ULONG)depth * bytesPerRow * height;
     if (totalSize > AMIP_SCREENSHOT_MAX_BYTES) {
@@ -230,6 +253,11 @@ static int CaptureP96Chunky(struct BitMap *bm, UWORD cropX, UWORD cropY,
     }
     bytesPerRow = (UWORD)ri.BytesPerRow;
 
+    if (WouldOverflow(bytesPerRow, height, AMIP_SCREENSHOT_MAX_BYTES)) {
+        AmipP96UnlockBitMap(bm, lock);
+        SetErr(resultOut, outLen, "capture exceeds this server's size cap");
+        return AMIP_AREXX_RC_ERROR;
+    }
     totalSize = AMIP_SCREENSHOT_HEADER_SIZE + (ULONG)numColors * 3
         + (ULONG)bytesPerRow * height;
     if (totalSize > AMIP_SCREENSHOT_MAX_BYTES) {
@@ -287,15 +315,56 @@ int AmipScreenshotCapture(const char *screenSubstring, const char *windowPattern
     if (windowPattern != NULL && windowPattern[0] != '\0') {
         struct Window *w = AmipFindWindow((CONST_STRPTR)screenSubstring,
                                           (CONST_STRPTR)windowPattern);
+        LONG left, top, cw, ch;
+
         if (w == NULL) {
             SetErr(resultOut, outLen, "no window matched");
             return AMIP_AREXX_RC_WARN;
         }
         screen = w->WScreen;
-        cropX = (UWORD)w->LeftEdge;
-        cropY = (UWORD)w->TopEdge;
-        cropW = (UWORD)w->Width;
-        cropH = (UWORD)w->Height;
+        /* Clamp against the screen's own bounds -- LeftEdge/TopEdge
+         * are signed WORDs, and a window dragged partially off the
+         * top/left edge of its screen (entirely ordinary) has a
+         * negative value there. A bug found in code review: this
+         * used to cast straight to the wire's UWORD crop fields
+         * unconditionally, wrapping a negative edge to a huge value
+         * and silently corrupting the crop rectangle (and therefore
+         * the host's cropped output) with no error surfaced at all.
+         * A window extending past the screen's right/bottom edge
+         * (also ordinary) gets the same treatment. */
+        left = w->LeftEdge;
+        top = w->TopEdge;
+        cw = w->Width;
+        ch = w->Height;
+        if (left < 0) {
+            cw += left;
+            left = 0;
+        }
+        if (top < 0) {
+            ch += top;
+            top = 0;
+        }
+        if (left + cw > screen->Width) {
+            cw = screen->Width - left;
+        }
+        if (top + ch > screen->Height) {
+            ch = screen->Height - top;
+        }
+        if (cw <= 0 || ch <= 0) {
+            /* Entirely off-screen after clamping -- genuinely nothing
+             * to capture, and a 0-sized crop rect would otherwise be
+             * indistinguishable from "no window given" (cropW/cropH
+             * both 0 is the wire's own "no crop" sentinel -- see
+             * screenshot.h's own header comment), so this is reported
+             * as a clear error rather than silently misread as a
+             * full-screen capture. */
+            SetErr(resultOut, outLen, "window is entirely off-screen");
+            return AMIP_AREXX_RC_WARN;
+        }
+        cropX = (UWORD)left;
+        cropY = (UWORD)top;
+        cropW = (UWORD)cw;
+        cropH = (UWORD)ch;
     } else {
         screen = AmipFindScreen((CONST_STRPTR)screenSubstring);
         if (screen == NULL) {

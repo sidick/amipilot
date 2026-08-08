@@ -18,6 +18,7 @@
 #include <proto/icon.h>
 
 #include "arexx_cmd.h"
+#include "errbuf.h"
 #include "wblaunch.h"
 
 struct Library *IconBase = NULL;
@@ -52,10 +53,7 @@ static char g_resultBuf[160];
 
 static void SetErr(const char **resultOut, ULONG *outLen, const char *msg)
 {
-    strncpy(g_resultBuf, msg, sizeof(g_resultBuf) - 1);
-    g_resultBuf[sizeof(g_resultBuf) - 1] = '\0';
-    *resultOut = g_resultBuf;
-    *outLen = (ULONG)strlen(g_resultBuf);
+    AmipSetErrBuf(g_resultBuf, sizeof(g_resultBuf), resultOut, outLen, msg);
 }
 
 void AmipWbInit(void)
