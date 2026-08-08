@@ -301,42 +301,60 @@ with Amipilot.connect("127.0.0.1", 1234) as client:
 
 Same "wire stays simple, host does the rendering" split this project
 already uses for `TREE`/`amipilot dump` (no JSON on the wire, ever):
-the Amiga side sends raw, **uncompressed** bitplane bytes plus a small
-header — width, height, depth, the `CAMG` view-mode bits (`HAM`/
-`EHB`/`LACE`/`HIRES`), a palette, and (for a `WINDOW=` capture) a
-crop rectangle — see `server/include/screenshot.h`'s own header
-comment for the exact byte layout. **All image-format work happens
-host-side**, `amipilot.screenshot`, stdlib only (`zlib`, no Pillow):
+the Amiga side sends raw, **uncompressed** pixel bytes plus a small
+header — see `server/include/screenshot.h`'s own header comment for
+the exact byte layout. **All image-format and colour-space work
+happens host-side**, `amipilot.screenshot`, stdlib only (`zlib`, no
+Pillow):
 
 - `shot.to_ilbm()` — a real IFF `FORM ILBM` (`BMHD`/`CMAP`/`CAMG`/
-  `BODY`), a near-direct copy of the already-planar capture since
-  that's ILBM's own native shape. Viewable with Multiview or any
-  Amiga paint program, and preserves the exact view mode the capture
-  came from.
-- `shot.to_png()` — de-planed to chunky, palette-indexed pixels
-  first (`shot.to_chunky()`), then a straightforward indexed-color
-  PNG. Easier for modern tooling (browsers, CI artifact viewers,
-  image diffing) to work with than ILBM, at the cost of real
-  per-pixel unpacking work host-side — cheap there, which is the
-  whole point of doing it host-side rather than on the 68000.
+  `BODY`). For a planar capture, a near-direct copy since that's
+  ILBM's own native shape; for a Picasso96 CLUT (palette) capture, a
+  re-plane into a standard 8-bitplane/256-colour ILBM. Raises for a
+  P96 truecolor/hicolor capture — ILBM is fundamentally planar and has
+  no standard way to carry 15-32 bits of true colour; use `to_png()`
+  or `to_rgb888()` instead. Viewable with Multiview or any Amiga paint
+  program, and preserves the exact view mode the capture came from.
+- `shot.to_png()` — indexed-colour (palette) for anything with a
+  palette (planar or P96 CLUT), true-colour (24-bit RGB, no palette)
+  for a P96 truecolor/hicolor capture. Easier for modern tooling
+  (browsers, CI artifact viewers, image diffing) to work with than
+  ILBM, at the cost of real per-pixel unpacking/decoding work
+  host-side — cheap there, which is the whole point of doing it
+  host-side rather than on the 68000.
 - `shot.save(path)` writes both `<path>.iff` and `<path>.png` in one
-  call.
+  call (raises from `to_ilbm()` for a P96 truecolor/hicolor capture —
+  call `to_png()` directly for those).
 
-**Planar screens only by intent — with a real, currently unguarded gap
-for RTG.** A Picasso96/CGX screen's `BitMap` still has `Planes[]`/
-`BytesPerRow`/`Depth` fields, but they're not real chip-mem bitplanes
-on an RTG screen; walking them risks reading garbage pointers, the
-same risk class as the `WBPattern`/`GTYP_CUSTOMGADGET` hang found and
-fixed in issue #36. An earlier attempt to guard against this
-(`BitMap->Flags & BMF_STANDARD`) turned out to be simply wrong, not
-just imperfect — live testing against a real, completely ordinary
-Copperline Workbench screen showed that flag is never set on
-Intuition's own screen bitmaps regardless of whether they're planar,
-so it rejected the normal case it was meant to allow. It was removed
-rather than replaced with another guess. **There is currently no
-detection of a genuine RTG/P96 screen at all** — targeting one is a
-real, unverified risk. Real detection is tracked separately as
-[issue #44](https://github.com/sidick/amipilot/issues/44).
+**Picasso96/RTG support is real, optional, and never required** —
+[GitHub issue #44](https://github.com/sidick/amipilot/issues/44). A
+Picasso96/CGX screen's `BitMap` still has `Planes[]`/`BytesPerRow`/
+`Depth` fields, but they're not real chip-mem bitplanes; walking them
+risks reading garbage pointers, the same risk class as the
+`WBPattern`/`GTYP_CUSTOMGADGET` hang found and fixed in issue #36. An
+earlier attempt to guard against this (`BitMap->Flags & BMF_STANDARD`)
+turned out to be simply wrong, not just imperfect — live testing
+against a real, completely ordinary Copperline Workbench screen showed
+that flag is never set on Intuition's own screen bitmaps regardless of
+whether they're planar. The REAL, verified check, from
+Picasso96API.library's own published SDK interface data (not
+redistributed here — see `server/include/p96_compat.h`'s own header
+comment): `p96GetBitMapAttr(bm, P96BMA_ISP96)`, safe to call
+unlocked on any bitmap. The library is opened OPTIONALLY at server
+startup — absent, or the target screen isn't genuinely P96-backed,
+and the classic planar capture runs completely unchanged. When it IS
+a genuine P96 screen, its native pixel format (CLUT, or one of several
+truecolor/hicolor RGB byte orders — YUV formats aren't supported, the
+SDK's own docs mark them hardware-only) is sent raw over the wire and
+decoded host-side, including the documented `PC`-suffix byte-swap
+pitfall (16-bit `PC` formats are little-endian, non-`PC` big-endian —
+never assumed uniform). **Honestly unverified:** the P96-active
+capture path itself hasn't been exercised against a real P96/CGX board
+or emulator — Copperline (this project's on-target test environment)
+has no RTG emulation at all — so while it's built against the SDK's
+own real, documented interface, it hasn't been proven end-to-end the
+way this project holds every other feature to; see `server/README.md`'s
+own SCREENSHOT section for the fuller story.
 
 With both `screen`/`window` omitted, `screenshot()` captures the
 frontmost/default public screen; `screen` alone selects one by

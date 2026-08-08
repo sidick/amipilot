@@ -145,32 +145,47 @@ small helper reading the system's own default `WBTOOL` icon --
 changes one key while leaving another untouched (the real merge, not
 a full replace), an `ARG=` project-file argument, and a bad-icon
 rejection. `SCREENSHOT [SCREEN=<substring>] [WINDOW=<pattern>]`
-(GitHub issue #41, `server/src/screenshot.c`) is real too: raw,
-uncompressed planar bitmap capture, inspector tooling only (not a
-`CLICK`/`TYPE`/`GETTEXT`-style locator mechanism) -- the wire carries
-raw bitplane bytes plus a small header, and ALL image-format work
-(IFF ILBM, PNG) happens host-side (`host/amipilot/screenshot.py`,
-stdlib-only, no Pillow), the same "wire stays simple, host does the
-rendering" split TREE/`amipilot dump` already use. Planar screens
-only by intent, but with a real, currently unguarded gap: a
-Picasso96/CGX (RTG) screen's `BitMap` looks the same shape but its
-`Planes[]` aren't real chip-mem bitplanes -- an earlier version tried
-to guard this via `BitMap->Flags & BMF_STANDARD`, but live testing
-against a real, completely ordinary Copperline Workbench screen (this
-feature's own on-target check) proved that flag is never set on
-Intuition's own screen bitmaps at all, planar or not, so the check
-rejected the normal case it was meant to allow -- removed rather than
-replaced with another guess (real, verified functions over guessed
-heuristics is this project's own standing rule). There is currently
-no detection of a genuine RTG/P96 screen; real detection is tracked
-separately as issue #44, since it would need a whole separate
-third-party SDK, Picasso96API.library, this project's NDK doesn't
-carry. Verified end to end against a real running
-`fixtures/gadtools-app` window via `tests/copperline/run.sh`'s
-`run_screenshot_check`; the parsing/encoding logic itself (exact byte
-layout, IFF chunk shape, PNG chunk CRCs) has its own dedicated
-host-side unit tests (`host/tests/test_screenshot.py`) against a
-synthetic capture.
+(GitHub issues #41 and #44, `server/src/screenshot.c`) is real too:
+raw, uncompressed bitmap capture -- planar OR Picasso96/RTG -- inspector
+tooling only (not a `CLICK`/`TYPE`/`GETTEXT`-style locator mechanism).
+The wire carries raw pixel bytes plus a small header, and ALL image-
+format/colour-space work (IFF ILBM, PNG, P96 pixel-format decoding)
+happens host-side (`host/amipilot/screenshot.py`, stdlib-only, no
+Pillow), the same "wire stays simple, host does the rendering" split
+TREE/`amipilot dump` already use. An earlier RTG guard
+(`BitMap->Flags & BMF_STANDARD`) was found, via live testing against a
+real, completely ordinary Copperline Workbench screen, to be simply
+wrong -- that flag is never set on Intuition's own screen bitmaps at
+all, so it rejected the normal case it was meant to allow. Removed and
+replaced with the REAL, verified mechanism from Picasso96API.library's
+own published SDK interface data (not redistributed in this repo --
+see `server/include/p96_compat.h`'s own header comment for exactly
+what was independently reproduced and why):
+`p96GetBitMapAttr(bm, P96BMA_ISP96)`, documented safe to call on any
+bitmap without locking it. `Picasso96API.library` is opened
+OPTIONALLY at startup (same graceful-degradation pattern as
+`GadToolsBase`/`KeymapBase`/`GfxBase`) -- absent, or the target screen
+isn't genuinely P96-backed, and the classic planar path (issue #41)
+runs completely unchanged; never required. A genuine P96 bitmap's
+pixel memory is read via `p96LockBitMap()`'s own `RenderInfo` buffer,
+held only for the raw memcpy, matching the SDK's own explicit
+locking protocol; its native pixel format (CLUT or a truecolor/
+hicolor RGB byte order -- YUV excluded, the SDK's own docs mark those
+hardware-only) is sent raw over the wire and decoded host-side,
+including the documented `PC`-suffix byte-swap pitfall (16-bit `PC`
+formats are little-endian, non-`PC` big-endian). Verified end to end
+against a real running `fixtures/gadtools-app` window via
+`tests/copperline/run.sh`'s `run_screenshot_check` -- which, since
+Copperline has no RTG emulation at all, is really a live confirmation
+that the classic planar path (and P96Base's graceful absence) still
+works correctly, NOT a live confirmation of the P96-active capture
+path itself, which remains genuinely unverified against a real board
+or emulator (an honest, stated gap, not a silent one -- see
+`server/README.md`'s own SCREENSHOT section). The parsing/encoding
+logic itself (exact byte layout for both capture shapes, IFF chunk
+shape, PNG chunk CRCs, the P96 pixel-format decode table) has its own
+dedicated host-side unit tests (`host/tests/test_screenshot.py`)
+against synthetic captures.
 `manifest/` carries the manifest contract (`manifest/SPEC.md`, parsed
 by `server/src/manifest.c` — no screen-awareness yet, `SCREEN=` only
 applies to the classic locator form). `host/` is a real, installable
