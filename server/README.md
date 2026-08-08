@@ -365,19 +365,30 @@ Lands in phase 0.2 onward -- see
   opens there and every one of these checks exercises the classic
   planar path exactly as before issue #44 -- a real, live confirmation
   that adding optional P96 support didn't disturb the common case.
-  **Honestly unverified:** the P96-ACTIVE capture path itself (a
-  genuine RTG bitmap actually being detected and read) has NOT been
-  exercised against a real P96/CGX board or emulator in this
-  project's own tooling -- Copperline has no RTG emulation to test
-  against, so that code path is built against the SDK's own real,
-  verified interface but not yet proven end-to-end the way this
-  project holds every other feature to. The parsing/encoding logic
-  itself (exact byte layout including the P96 pixel-format decode
-  table, IFF chunk shape, PNG chunk CRCs, IDAT round-trip) has its own
-  dedicated host-side unit tests (`host/tests/test_screenshot.py`)
-  against synthetic captures of both shapes, independent of the
-  emulator -- but a synthetic capture can't stand in for confirming
-  the SDK calls themselves behave as documented against a real board.
+  **The P96-ACTIVE capture path is now verified too**, manually
+  against real Picasso96 3.6 + `uaegfx` under Amiberry (not
+  Copperline, which still has no RTG emulation at all -- this is
+  interactive/manual verification, not a `make test-target`
+  regression check, since there's no automated Amiberry harness in
+  this project yet). Both P96 pixel-format shapes were exercised
+  against a genuine P96 screen with a known pattern painted onto it:
+  a CLUT (8-bit palette) screen decoded back an exact, pixel-for-pixel
+  match of the painted pen pattern; a truecolor (16-bit) screen using
+  the byte-swapped `R5G6B5PC` layout decoded back colour values
+  matching the expected 5/6/5-bit quantization exactly (not corrupted,
+  not byte-order-garbled) -- real confirmation that the SDK's own
+  `p96LockBitMap()`/`RGBFormat` contract and this module's own
+  `PC`-suffix byte-swap handling both work as documented against
+  genuine RTG hardware emulation, not just against the SDK's paper
+  interface. The parsing/encoding logic itself (exact byte layout
+  including the P96 pixel-format decode table, IFF chunk shape, PNG
+  chunk CRCs, IDAT round-trip) has its own dedicated host-side unit
+  tests (`host/tests/test_screenshot.py`) against synthetic captures
+  of both shapes too, independent of any emulator. **Still not
+  automated:** this verification isn't wired into `make test-target`
+  or CI -- Copperline's own lack of RTG emulation means there's no
+  path to that without standing up an Amiberry-based harness, tracked
+  as real follow-up work, not silently claimed as done.
 
 - **`WINDOWMOVE [SCREEN=<substring>] <window-pattern> <dx> <dy>` /
   `WINDOWSIZE [SCREEN=<substring>] <window-pattern> <width> <height>`
