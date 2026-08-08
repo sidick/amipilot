@@ -33,6 +33,7 @@
 #include <dos/datetime.h>
 
 #include "arexx_cmd.h"
+#include "errbuf.h"
 #include "fs.h"
 
 #define AMIP_FS_MAX_ROOTS 8
@@ -58,10 +59,7 @@ static char g_fsBuf[AMIP_FS_BUF_SIZE];
 
 static void SetErr(const char **resultOut, ULONG *outLen, const char *msg)
 {
-    strncpy(g_fsBuf, msg, sizeof(g_fsBuf) - 1);
-    g_fsBuf[sizeof(g_fsBuf) - 1] = '\0';
-    *resultOut = g_fsBuf;
-    *outLen = (ULONG)strlen(g_fsBuf);
+    AmipSetErrBuf(g_fsBuf, sizeof(g_fsBuf), resultOut, outLen, msg);
 }
 
 BOOL AmipFsGrantRoot(const char *path, char *errOut, int errCap)
