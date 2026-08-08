@@ -185,7 +185,23 @@ or emulator (an honest, stated gap, not a silent one -- see
 logic itself (exact byte layout for both capture shapes, IFF chunk
 shape, PNG chunk CRCs, the P96 pixel-format decode table) has its own
 dedicated host-side unit tests (`host/tests/test_screenshot.py`)
-against synthetic captures.
+against synthetic captures. `WINDOWMOVE [SCREEN=<s>] <window-pattern>
+<dx> <dy>` / `WINDOWSIZE [SCREEN=<s>] <window-pattern> <width>
+<height>` (`server/src/action.c`'s `AmipWindowMoveBy()`/
+`AmipWindowResizeTo()`) are real too: whole-window drag and resize,
+reusing the exact same `AmipDragAt()` press/move/release primitive
+`DRAG`'s gadget forms already use, just anchored on the window's own
+title bar (`WFLG_DRAGBAR`) or sizing gadget (`WFLG_SIZEGADGET`)
+instead of a gadget. Classic locator form only, no `@name` -- same
+scope as TREE/MENU, since this acts on a whole window and there's no
+verified separate "resolve a window-only logical name" path in the
+manifest resolver. No new "get window position/size" verb was added
+-- TREE's own response already carries a window's current `[left,top
+WxH]`. Verified end to end via `tests/copperline/run.sh`'s
+`run_windowmoveresize_check` against `fixtures/second-screen-app`
+(the only fixture given a real sizing gadget, deliberately kept off
+`gadtools-app`/`classact-app` since either would risk shifting their
+own checked-in golden-tree fixture).
 `manifest/` carries the manifest contract (`manifest/SPEC.md`, parsed
 by `server/src/manifest.c` — no screen-awareness yet, `SCREEN=` only
 applies to the classic locator form). `host/` is a real, installable

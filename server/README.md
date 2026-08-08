@@ -379,6 +379,53 @@ Lands in phase 0.2 onward -- see
   emulator -- but a synthetic capture can't stand in for confirming
   the SDK calls themselves behave as documented against a real board.
 
+- **`WINDOWMOVE [SCREEN=<substring>] <window-pattern> <dx> <dy>` /
+  `WINDOWSIZE [SCREEN=<substring>] <window-pattern> <width> <height>`
+  (phase 1.0):** whole-window drag and resize, built on the exact same
+  `AmipDragAt()` press/move/release primitive `DRAG`'s gadget forms
+  already use -- not a new input-injection mechanism, just a different
+  anchor point. `WINDOWMOVE` drags the window's own title bar
+  (`WFLG_DRAGBAR`) by a relative pixel offset `<dx> <dy>`, anchored at
+  the horizontal center of the title bar vertically centered in the
+  window's `BorderTop` strip -- a documented, honest heuristic (not an
+  attempt to locate the close/depth/zoom system gadgets' exact pixel
+  extents and dodge them precisely) that's clear of them for any
+  window wider than roughly 120px, effectively all real windows.
+  `WINDOWSIZE` drags the window's own sizing gadget
+  (`WFLG_SIZEGADGET`) from its current bottom-right corner (inset by
+  half the border thickness on each axis) to wherever that corner
+  needs to land to reach an ABSOLUTE target `<width> <height>`.
+  Neither verb pre-checks the target against the window's own
+  `MinWidth`/`MinHeight`/`MaxWidth`/`MaxHeight` (real, live fields on
+  `struct Window`) -- Intuition's own sizing logic clamps the drag
+  exactly as it would a genuine user drag, so the honest way to
+  confirm the actual outcome is a follow-up `TREE` call, the same
+  "verify the real outcome, don't assume the request was granted
+  exactly" precedent `DRAG`'s own gadget forms already set. Both bring
+  the window/screen forward first, same as every other action verb.
+  `RC 20` ("window has no drag bar" / "window has no sizing gadget")
+  if the target window never had that flag set at all -- a real,
+  honest failure, not a silent no-op. **Classic locator form only, no
+  `@name` manifest support** -- same scope as `TREE`/`MENU`, since
+  this acts on a whole window, not a gadget within one, and there's no
+  verified separate "resolve a window-only logical name" path in the
+  manifest resolver as currently wired up. **No separate "get window
+  position/size" verb was added** -- `TREE`'s own response already
+  carries a window's current `[left,top WxH]` (`Window.left`/
+  `Window.top`/`Window.width`/`Window.height` host-side), so querying
+  before or after a move/resize is just another `TREE` call. Verified
+  end-to-end by `make test-target`'s check
+  (`tests/copperline/windowmoveresize-test.py`) against
+  `fixtures/second-screen-app`'s window (the only fixture with a real
+  sizing gadget -- `gadtools-app`/`classact-app` deliberately don't
+  get one, since it changes border thickness and both have their own
+  checked-in golden-tree fixture that a border-thickness change risks
+  silently invalidating): a `WINDOWMOVE` lands at exactly the expected
+  new `left`/`top`; a `WINDOWSIZE` lands at exactly the expected new
+  `width`/`height`; a `WINDOWSIZE` against a window with no sizing
+  gadget (`gadtools-app`) is honestly rejected; a `WINDOWMOVE` against
+  a nonexistent window pattern is rejected as not-found.
+
 - **File API (phase 0.4, shipped in v0.4):** `FSLIST`/`FSSTAT`/`FSMKDIR`/
   `FSDELETE`/`FSGET`, each taking a single `<path>` argument (quoted
   the same way a window pattern is if it contains a space) --

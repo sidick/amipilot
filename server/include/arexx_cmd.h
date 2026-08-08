@@ -64,6 +64,16 @@ typedef enum {
     AMIP_AREXX_CMD_MUIREXX,  /* MUIREXX <app-base> [TIMEOUT=<n>] <command...> --
                               * the MUI-ARexx bridge tier (phase 0.5); see
                               * server/include/muirexx.h */
+    AMIP_AREXX_CMD_WINDOWMOVE, /* WINDOWMOVE [SCREEN=<s>] <window-pattern> <dx> <dy> --
+                              * moves a whole window by a real title-bar
+                              * drag; classic form only, no "@name" (a
+                              * window-level action, same scope as
+                              * TREE/MENU, not a gadget-level one) */
+    AMIP_AREXX_CMD_WINDOWSIZE, /* WINDOWSIZE [SCREEN=<s>] <window-pattern> <width> <height> --
+                              * resizes a whole window to an absolute
+                              * target via a real sizing-gadget drag;
+                              * classic form only, same reasoning as
+                              * WINDOWMOVE above */
     AMIP_AREXX_CMD_QUIT      /* QUIT */
 } AmipArexxCmdType;
 
@@ -253,7 +263,19 @@ typedef struct {
                                                   * dragToManifestName are (gadget-to-
                                                   * gadget form, via "TO ..."). */
     long dragDx, dragDy;                        /* DRAG offset form: pixels from the
-                                                  * source gadget's current center. */
+                                                  * source gadget's current center.
+                                                  * Reused directly for WINDOWMOVE's
+                                                  * own <dx> <dy> -- identical
+                                                  * "pixel offset" semantic, not
+                                                  * worth a dedicated pair of
+                                                  * fields. */
+    long windowTargetWidth, windowTargetHeight; /* WINDOWSIZE's <width> <height>
+                                                  * -- an ABSOLUTE target size, a
+                                                  * genuinely different semantic
+                                                  * from dragDx/dragDy's offset
+                                                  * above, so this gets its own
+                                                  * fields rather than reusing
+                                                  * those. */
     long dragToGadgetId;                        /* DRAG gadget-to-gadget form:
                                                   * destination GA_ID, in the same
                                                   * window as the source locator.
@@ -564,6 +586,21 @@ typedef struct {
  * whether it succeeded; on ARexx/serial.device it's accepted and
  * compared but has no side effect, since neither of those transports
  * ever enforces the auth flag HandleCommand() tracks.
+ *
+ * WINDOWMOVE/WINDOWSIZE take an optional leading "SCREEN=<substring>"
+ * (same idiom TREE/CLICK's own leading one uses) then a plain
+ * <window-pattern> (classic form ONLY -- no "@name" locator; these
+ * act on a whole WINDOW, the same scope TREE/MENU already have,
+ * neither of which takes "@name" either), then two required numeric
+ * tokens: WINDOWMOVE's are <dx> <dy> (a pixel offset, into dragDx/
+ * dragDy -- the same fields DRAG's own offset form uses), WINDOWSIZE's
+ * are <width> <height> (an absolute target size, into
+ * windowTargetWidth/windowTargetHeight). See server/include/
+ * action_engine.h's AmipWindowMoveBy()/AmipWindowResizeTo() doc
+ * comments for the actual mechanism (a real title-bar or sizing-
+ * gadget drag) and their honest limits. There is no separate "get
+ * window position/size" verb -- TREE's own response already carries
+ * a window's `[left,top WxH]`, so querying needs no new verb.
  *
  * SCREENSHOT takes an optional "SCREEN=<substring>" (parsed exactly
  * like TREE/CLICK's own leading one, into the same `screenPattern`

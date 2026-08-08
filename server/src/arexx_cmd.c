@@ -219,6 +219,8 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
     else if (ci_streq(kw, "AUTH"))     out->type = AMIP_AREXX_CMD_AUTH;
     else if (ci_streq(kw, "WAITFOR"))  out->type = AMIP_AREXX_CMD_WAITFOR;
     else if (ci_streq(kw, "SCREENSHOT")) out->type = AMIP_AREXX_CMD_SCREENSHOT;
+    else if (ci_streq(kw, "WINDOWMOVE")) out->type = AMIP_AREXX_CMD_WINDOWMOVE;
+    else if (ci_streq(kw, "WINDOWSIZE")) out->type = AMIP_AREXX_CMD_WINDOWSIZE;
     else if (ci_streq(kw, "MUIREXX"))  out->type = AMIP_AREXX_CMD_MUIREXX;
     else if (ci_streq(kw, "QUIT"))     out->type = AMIP_AREXX_CMD_QUIT;
     else { out->type = AMIP_AREXX_CMD_UNKNOWN; return -1; }
@@ -550,7 +552,8 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
             out->type = AMIP_AREXX_CMD_UNKNOWN;
             return -1;
         }
-        if (*p == '@' && out->type != AMIP_AREXX_CMD_TREE && out->type != AMIP_AREXX_CMD_MENU) {
+        if (*p == '@' && out->type != AMIP_AREXX_CMD_TREE && out->type != AMIP_AREXX_CMD_MENU &&
+            out->type != AMIP_AREXX_CMD_WINDOWMOVE && out->type != AMIP_AREXX_CMD_WINDOWSIZE) {
             p++;
             p = read_token(p, out->manifestName, sizeof(out->manifestName), &trunc);
             if (fail_if_trunc(trunc, out)) return -1;
@@ -565,6 +568,32 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
     }
 
     if (out->type == AMIP_AREXX_CMD_TREE || out->type == AMIP_AREXX_CMD_MENU) {
+        return 0;
+    }
+
+    if (out->type == AMIP_AREXX_CMD_WINDOWMOVE || out->type == AMIP_AREXX_CMD_WINDOWSIZE) {
+        char numbuf[16];
+        int trunc;
+        long *first = (out->type == AMIP_AREXX_CMD_WINDOWMOVE) ? &out->dragDx : &out->windowTargetWidth;
+        long *second = (out->type == AMIP_AREXX_CMD_WINDOWMOVE) ? &out->dragDy : &out->windowTargetHeight;
+
+        p = skip_ws(p);
+        if (*p == '\0') {
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+        p = read_token(p, numbuf, sizeof(numbuf), &trunc);
+        if (fail_if_trunc(trunc, out)) return -1;
+        *first = strtol(numbuf, NULL, 10);
+
+        p = skip_ws(p);
+        if (*p == '\0') {
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+        p = read_token(p, numbuf, sizeof(numbuf), &trunc);
+        if (fail_if_trunc(trunc, out)) return -1;
+        *second = strtol(numbuf, NULL, 10);
         return 0;
     }
 

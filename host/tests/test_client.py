@@ -257,6 +257,50 @@ class Drag(unittest.TestCase):
         self.assertEqual(c._wire._t.sent[0], b"DRAG @source_item TO @dest_item\n")
 
 
+class WindowMoveResize(unittest.TestCase):
+    def test_window_move(self):
+        c = client_with(b"RC 0 0\n")
+        c.window_move("GadTools", 20, -10)
+        self.assertEqual(c._wire._t.sent[0], b"WINDOWMOVE GadTools 20 -10\n")
+
+    def test_window_move_honours_screen(self):
+        c = client_with(b"RC 0 0\n")
+        c.window_move("GadTools", 20, -10, screen="Workbench")
+        self.assertEqual(
+            c._wire._t.sent[0], b"WINDOWMOVE SCREEN=Workbench GadTools 20 -10\n"
+        )
+
+    def test_window_move_no_dragbar_raises_action_failed(self):
+        payload = b"window has no drag bar"
+        c = client_with(b"RC 20 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(ActionFailed):
+            c.window_move("GadTools", 20, -10)
+
+    def test_window_move_no_match_raises_not_found(self):
+        payload = b"no window found"
+        c = client_with(b"RC 5 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(NotFound):
+            c.window_move("NoSuchWindow", 20, -10)
+
+    def test_window_resize(self):
+        c = client_with(b"RC 0 0\n")
+        c.window_resize("GadTools", 400, 300)
+        self.assertEqual(c._wire._t.sent[0], b"WINDOWSIZE GadTools 400 300\n")
+
+    def test_window_resize_honours_screen(self):
+        c = client_with(b"RC 0 0\n")
+        c.window_resize("GadTools", 400, 300, screen="Workbench")
+        self.assertEqual(
+            c._wire._t.sent[0], b"WINDOWSIZE SCREEN=Workbench GadTools 400 300\n"
+        )
+
+    def test_window_resize_no_sizegadget_raises_action_failed(self):
+        payload = b"window has no sizing gadget"
+        c = client_with(b"RC 20 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(ActionFailed):
+            c.window_resize("GadTools", 400, 300)
+
+
 class ClickExpect(unittest.TestCase):
     def test_click_with_expect_window(self):
         c = client_with(b"RC 0 0\n")
