@@ -115,6 +115,46 @@ root-caused yet. Stock-app conformance testing is explicitly meant to
 surface exactly this kind of gap against real, OS-shipped software,
 not just prove the happy path.
 
+### Bare-machine lifecycle (phase 1.0, docs/implementation-plan.md's own success criteria)
+
+`run_bare_lifecycle_check` is the literal scenario the implementation
+plan's own success criteria describe: "Workbench-launch a tool with an
+overridden tooltype and a project argument, assert the override took
+effect in the GUI, drive it, and quit it via its own affordances...
+entirely self-contained against a bare machine over TCP -- fixtures
+staged via fs-put (icon included), artifacts harvested via fs-get,
+tmpdir cleaned -- no shared drive, mount, or emulator involved."
+
+Unlike `run_wblaunch_check` above (which stages `WBApp`'s own icon and
+launches it both via the SRC: hostfs mount), this check's own
+`smoke.script` does only two things: run `MakeIcon` once (still
+fundamentally needs a real Amiga environment, since it reads the
+system's own live default WBTOOL icon -- not different in kind from
+`fixtures/wbgui-app` itself being a pre-built cross-compiled artifact)
+to produce a reusable `fixtures/wbgui-app/WBGuiApp.info` on the host
+disk, then start `AmiPilotServer TCP FSROOT=T:` under Copperline
+0.15's `--hostsocket-net host` (see the "P96/Picasso96 RTG" section
+below for the CPU-profile fix this project needed to make TCP/RTG
+checks work at all) -- no fixture launch via SRC: at all. Everything
+else (staging the binary/icon/project-arg file, `WBLAUNCH`ing,
+driving, harvesting, cleanup) happens purely over the wire from
+`tests/copperline/bare-lifecycle-test.py`.
+
+`fixtures/wbgui-app` is a deliberately SEPARATE fixture from
+`wbapp`/`WBApp` above, not a modification of it -- giving `WBApp` a
+real GUI window would break every existing `run_wblaunch_check`
+assertion that depends on it running to completion and exiting
+promptly. It's also the only fixture in this project that's both
+Workbench-startable AND has real GUI state to assert on. A genuine,
+newly-found limitation surfaced building this: clicking a GadTools-
+context window's own system close gadget via the tier-2
+`ROLE=custom INDEX=` locator reports success but has no effect (the
+same window's drag bar responds fine to `WINDOWMOVE`) -- filed as
+issue #60, not root-caused yet. `fixtures/wbgui-app` sidesteps it with
+a real `_Quit` button instead (a numeric `GA_ID` click, the mechanism
+proven reliable everywhere else in this project) rather than relying
+on the close gadget.
+
 ### P96/Picasso96 RTG (phase 1.0, GitHub issue #55)
 
 `run_screenshot_p96_check` exercises `SCREENSHOT`'s P96-active capture
