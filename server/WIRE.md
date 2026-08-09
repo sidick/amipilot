@@ -147,21 +147,25 @@ today, not as a general request-body facility every verb can opt into.
 ## Handshake: `VERSION`
 
 A client's first command after opening the transport SHOULD be
-`VERSION`. Response payload (RC 0), three LF-terminated lines:
+`VERSION`. Response payload (RC 0), two LF-terminated lines:
 
 ```
 AMIPILOT <major>.<minor> PROTOCOL 1
-STABLE VERSION
-EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH FSLIST FSSTAT FSMKDIR FSDELETE FSGET FSPUT WBLAUNCH MENU MENUPICK DRAG WINDOWMOVE WINDOWSIZE WAITFOR SCREENS SCREENSHOT AUTH MUIREXX QUIT
+STABLE VERSION TREE CLICK TYPE GETTEXT MANIFEST LAUNCH FSLIST FSSTAT FSMKDIR FSDELETE FSGET FSPUT WBLAUNCH MENU MENUPICK DRAG WINDOWMOVE WINDOWSIZE WAITFOR SCREENS SCREENSHOT AUTH MUIREXX QUIT
 ```
 
 - Line 1: server version (from `version.mk`) and the wire protocol
   version this spec defines. A client that doesn't recognise the
   protocol number MUST disconnect rather than guess.
-- Lines 2–3: the verb sets, space-separated after the leading keyword.
-  Per the implementation plan, experimental verbs may change between
-  minor releases; stable verbs never break within a major. Everything
-  except `VERSION` itself is experimental until the 1.0 promotion pass.
+- Line 2: the stable verb set, space-separated after the leading
+  keyword. Per the implementation plan, experimental verbs may change
+  between minor releases; stable verbs never break within a major.
+  Everything but `VERSION` itself was experimental until 1.0's own
+  promotion pass — as of 1.0, every verb in this document is stable,
+  so there is no `EXPERIMENTAL` line at all (not just an empty one).
+  A client that parsed the handshake by leading keyword rather than
+  assuming a fixed line count still works unchanged against this
+  shape; one that assumed exactly three lines does not.
 
 `VERSION` is also available over ARexx (same payload as the RESULT
 string) so on-Amiga scripts can feature-test too.
