@@ -81,6 +81,14 @@ WBGUIAPP_BIN    := $(BUILD)/fixtures/WBGuiApp
 P96APP_SRC      := fixtures/p96-app/src/main.c
 P96APP_BIN      := $(BUILD)/fixtures/P96App
 
+# reaction-classes-app: one instance each of the 13 BOOPSI/ReAction
+# gadget classes issue #69 adds role classification for, attached
+# directly to a plain classic window (NOT window.class/layout.gadget
+# -- see fixtures/reaction-classes-app/src/main.c's own header for
+# why that would defeat the fixture's purpose).
+REACTION_CLASSES_APP_SRC := fixtures/reaction-classes-app/src/main.c
+REACTION_CLASSES_APP_BIN := $(BUILD)/fixtures/ReactionClassesApp
+
 # --- server/ (phase 0.2, in progress -- see docs/implementation-plan.md) --
 ACTION_SRCDIR := server/src
 ACTION_INCDIR := server/include
@@ -127,7 +135,7 @@ all: amiga
 
 amiga: $(INSPECT_BIN)
 
-fixtures: $(GADTOOLS_APP_BIN) $(CLASSACT_APP_BIN) $(SECONDSCREEN_APP_BIN) $(WBAPP_BIN) $(MAKEICON_BIN) $(P96APP_BIN) $(WBGUIAPP_BIN)
+fixtures: $(GADTOOLS_APP_BIN) $(CLASSACT_APP_BIN) $(SECONDSCREEN_APP_BIN) $(WBAPP_BIN) $(MAKEICON_BIN) $(P96APP_BIN) $(WBGUIAPP_BIN) $(REACTION_CLASSES_APP_BIN)
 
 server: $(CLICKTEST_BIN) $(SETMOUSE_BIN) $(AMIPILOTD_BIN)
 
@@ -169,6 +177,12 @@ $(WBGUIAPP_BIN): $(WBGUIAPP_SRC)
 $(P96APP_BIN): $(P96APP_SRC)
 	@mkdir -p $(BUILD)/fixtures
 	$(CC) $(CFLAGS) -o $@ $(P96APP_SRC)
+
+# -lamiga: same NewObject varargs marshaling reason as CLASSACT_APP_BIN
+# above.
+$(REACTION_CLASSES_APP_BIN): $(REACTION_CLASSES_APP_SRC)
+	@mkdir -p $(BUILD)/fixtures
+	$(CC) $(CFLAGS) -o $@ $(REACTION_CLASSES_APP_SRC) -lamiga
 
 $(MAKEICON_BIN): $(MAKEICON_SRC)
 	@mkdir -p $(BUILD)/fixtures

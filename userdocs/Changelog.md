@@ -9,6 +9,30 @@ for the full engineering detail and phase sequencing behind each one.
 
 ## Unreleased
 
+- **BOOPSI/ReAction role classification for 12 WB3.2-era gadget
+  classes** (issue #69): `clicktab.gadget`, `colorwheel.gadget`,
+  `datebrowser.gadget`, `fuelgauge.gadget`, `getcolor.gadget`,
+  `getfile.gadget`, `getfont.gadget`, `getscreenmode.gadget`,
+  `gradientslider.gadget`, `palette.gadget`, `sketchboard.gadget`,
+  `speedbar.gadget`, and `texteditor.gadget` — previously all
+  `role=custom` — now get a real, AT-SPI-style role
+  (`page_tab_list`/`color_wheel`/`calendar`/`progress_bar`/
+  `color_chooser`/`file_chooser`/`font_chooser`/`screenmode_chooser`/
+  `slider`/`palette`/`canvas`/`toolbar`/`text_editor`), addressable via
+  tier-2 `ROLE=` locators. `speedbar.gadget` turned up a real,
+  easy-to-guess-wrong exception: its registered class name is literally
+  `"speedbar"`, not `"speedbar.gadget"` like every other class here —
+  found live, not from documentation, which follows the
+  `"name.gadget"` pattern uniformly. A new fixture
+  (`fixtures/reaction-classes-app`) exercises one instance of each
+  class directly (deliberately not nested inside `window.class`/
+  `layout.gadget`, which would make them unreachable the same way
+  issue #49 already documents), with a checked-in golden-tree file
+  locking in the live-confirmed output. `space.gadget`,
+  `virtual.gadget`, `listview.gadget`, `tabs.gadget`, and
+  `tapedeck.gadget` were deliberately left unclassified — see
+  [Locator Tiers and Limits](Locator-Tiers-and-Limits.md) for why each
+  one is an honest gap rather than an oversight.
 - **`WHERE`, the cooperative geometry port** (issue #49): the honest
   escape hatch for gadgets nested inside a `window.class` window's
   `layout.gadget` — permanently invisible to structural walking on

@@ -42,6 +42,8 @@ FIXTURES = [
      os.path.join(REPO_ROOT, "fixtures", "gadtools-app", "GTApp.golden")),
     ("CAAPP", "ClassAct",
      os.path.join(REPO_ROOT, "fixtures", "classact-app", "CAApp.golden")),
+    ("RCAPP", "ReAction",
+     os.path.join(REPO_ROOT, "fixtures", "reaction-classes-app", "ReactionClassesApp.golden")),
 ]
 
 

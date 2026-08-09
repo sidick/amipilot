@@ -59,13 +59,40 @@ live class name via `OCLASS()` — a documented NDK mechanism for exactly
 this, not a private hack — and maps known classes to a role:
 `button.gadget`, `checkbox.gadget`, `string.gadget`/`getstring.gadget`,
 `integer.gadget`, `radiobutton.gadget`, `chooser.gadget`,
-`scroller.gadget`, `slider.gadget`, `listbrowser.gadget`. An unrecognised
-class still gets its real name reported (`class="..."`,
-`role=custom`) rather than a blank field. A gadget whose `GadgetType`
-bits *claim* `GTYP_CUSTOMGADGET` but doesn't actually carry a real
-BOOPSI object header (confirmed against a real, OS-shipped stock
-application) degrades the same way — `role=custom`, no class or
-label — rather than trusting the claim and dereferencing garbage.
+`scroller.gadget`, `slider.gadget`, `listbrowser.gadget`, and (issue
+#69) the WB3.2-era classes `clicktab.gadget` (`role=page_tab_list`),
+`colorwheel.gadget` (`role=color_wheel`), `datebrowser.gadget`
+(`role=calendar`), `fuelgauge.gadget` (`role=progress_bar`),
+`getcolor.gadget` (`role=color_chooser`), `getfile.gadget`
+(`role=file_chooser`), `getfont.gadget` (`role=font_chooser`),
+`getscreenmode.gadget` (`role=screenmode_chooser`),
+`gradientslider.gadget` (`role=slider` — functionally a slider variant,
+no separate AT-SPI role exists for one either), `palette.gadget`
+(`role=palette`), `sketchboard.gadget` (`role=canvas`), `speedbar.gadget`
+(`role=toolbar` — registers its class as literally `"speedbar"`, not
+`"speedbar.gadget"` like every other class here, a real, easy-to-guess-
+wrong exception confirmed live), and `texteditor.gadget`
+(`role=text_editor`). An unrecognised class still gets its real name
+reported (`class="..."`, `role=custom`) rather than a blank field. A
+gadget whose `GadgetType` bits *claim* `GTYP_CUSTOMGADGET` but doesn't
+actually carry a real BOOPSI object header (confirmed against a real,
+OS-shipped stock application) degrades the same way — `role=custom`,
+no class or label — rather than trusting the claim and dereferencing
+garbage.
+
+**Deliberately not classified** (issue #69's own research pass):
+`space.gadget` (a pure layout placeholder with no interactive state of
+its own — nothing a role would usefully describe), `virtual.gadget` (a
+scrolling container whose children are exactly as unreachable as
+`layout.gadget`'s — see the confirmed limit below), `listview.gadget`
+(its own autodoc says outright "`listbrowser.gadget` is a better
+alternative" — already covered by that mapping), and `tabs.gadget`/
+`tapedeck.gadget` (both ship as real library files on a stock WB3.2.3
+install, but neither has a documented, NDK-supported construction path
+in this project's own NDK 3.2 snapshot — no `XXX_GetClass()` proto/
+pragma header and no `reaction_macros.h` convenience macro exists for
+either, unlike every class classified above — an honest gap, not a
+guess).
 
 ## Documented gaps
 
