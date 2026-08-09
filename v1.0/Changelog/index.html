@@ -1089,6 +1089,10 @@ machine profile and against real Picasso96/RTG.</p>
   not just serial), and an automated P96 <code>SCREENSHOT</code> capture-path
   check — plus a dedicated pre-1.0 code review whose findings were
   all fixed before this release.</li>
+<li><strong>Protocol verbs promoted to stable</strong>: the implementation plan's
+  own 1.0 gate — every verb the <code>VERSION</code> handshake reports is now
+  <code>STABLE</code> (won't break within a major), not <code>EXPERIMENTAL</code>. See
+  <a href="../Wire-Protocol/#talking-to-it">Wire Protocol</a>.</li>
 </ul>
 <p>Known gaps, stated plainly: requester support is detection-only;
 menu selection still needs a keyboard shortcut (pointer-based
@@ -1096,8 +1100,8 @@ selection for shortcut-less items isn't built); a <code>window.class</code>
 window's <code>layout.gadget</code>-nested children remain unreachable on
 classic OS 3.x (a documented platform limit, not a bug — see
 <a href="../Locator-Tiers-and-Limits/">Locator Tiers and Limits</a>); and TCP
-remains LAN-only trust — no TLS, see
-<a href="../Wire-Protocol/#securing-tcp">Securing TCP</a>.</p>
+remains LAN-only trust — no TLS, even though every verb is now
+stable, see <a href="../Wire-Protocol/#securing-tcp">Securing TCP</a>.</p>
 <h2 id="v05-2026-08-08">v0.5 — 2026-08-08<a class="headerlink" href="#v05-2026-08-08" title="Permanent link">&para;</a></h2>
 <p>Reliability and reach into the wider ecosystem: waiting on real
 conditions instead of guessed sleeps, community-authored coverage for
