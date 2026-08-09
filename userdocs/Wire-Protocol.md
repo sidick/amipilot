@@ -491,18 +491,30 @@ Intuition itself reports via `IDCMP_MENUPICK`'s `MENUNUM()`/
 `ITEMNUM()`/`SUBNUM()` macros. `MenuStrip.find("some label")` looks up
 an item by its text instead of hand-counting positions.
 
-**`menu_pick()` selects by keyboard shortcut only, for now.** It
-activates the window, then strikes the item's shortcut character with
-the right-Amiga qualifier held — the same input.device path a human
-pressing Right-Amiga+key produces. Intuition resolves that
-combination against the window's own live menu strip; AmiPilot
-doesn't (and can't) synthesize the pick event directly, so `RC 0` is
-real evidence the pick reached the app through the genuine
-menu-shortcut path. Raises `ActionFailed` (`RC 20`) if the item is
-disabled, or if it has no keyboard shortcut at all — pointer-based
-navigation (open the menu, move across items, release over the
-target) for shortcut-less items is planned but not built yet; see
-`server/README.md`.
+**`menu_pick()` chooses the pick mechanism automatically, per item.**
+For an item with a keyboard shortcut, it activates the window, then
+strikes the shortcut character with the right-Amiga qualifier held —
+the same input.device path a human pressing Right-Amiga+key produces;
+Intuition resolves that combination against the window's own live
+menu strip, so `RC 0` is real evidence the pick reached the app
+through the genuine menu-shortcut path. For an item with **no**
+shortcut, it instead drives a genuine synthesized RMB-down, moves onto
+the target menu's own title, moves onto the item (auto-opening its
+one-level submenu if it has one, purely as Intuition's own reaction to
+pointer position), moves into the submenu if picking a sub-item, then
+releases (RMB-up) over the target — exactly what Intuition turns into
+a real `IDCMP_MENUPICK`, the same "genuinely synthesized input, not a
+shortcut" path `click()`/`drag()` already use. Every box this needs is
+resolved live off the window's own current menu structure immediately
+before each move, never cached — menu layout depends on the user's own
+screen/menu font. Raises `ActionFailed` (`RC 20`) if the item is
+disabled, or — pointer path only — if the window traps the right mouse
+button (`WFLG_RMBTRAP`, a real Intuition window flag some apps set):
+no synthesized RMB-down can ever open that window's menu strip, a
+permanent limit for that window rather than a transient failure. See
+`server/README.md` for the full mechanism, including the (largely
+undocumented-by-Commodore) submenu geometry this was measured against
+a real screenshot to confirm.
 
 ## Screens
 

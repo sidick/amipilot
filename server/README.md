@@ -537,26 +537,58 @@ Lands in phase 0.2 onward -- see
   reports (and what Intuition itself decodes an `IDCMP_MENUPICK`
   `Code` into via `MENUNUM()`/`ITEMNUM()`/`SUBNUM()`).
 
-  **Selection is keyboard-shortcut only for now.** `AmipMenuPickByShortcut()`
-  (`server/src/action.c`) activates the window, then strikes the
-  item's `Command` byte (inverted through the live keymap via
-  `MapANSI()`, same technique `AmipTypeString()` uses per character)
-  with the right-Amiga qualifier held -- the same input.device path a
-  human pressing Right-Amiga+key produces. Intuition resolves that
-  combination against the window's own live menu strip on its own;
-  this deliberately does not synthesize `IDCMP_MENUPICK` directly, so
-  a successful `RC 0` is genuine evidence the pick reached the app
-  through the real menu-shortcut path, not a shortcut around it.
-  **Honest limit:** an item with no keyboard shortcut (`COMMSEQ`
-  unset) can't be picked yet -- `RC 20` names this explicitly
-  ("pointer-based menu selection isn't built yet") rather than
-  silently failing or guessing a fallback. Pointer-based navigation
-  (open the menu, move across items/submenus, release over the target
-  -- `LayoutMenusA()` already precomputes every item's screen-absolute
-  geometry before the menu is ever opened, so this is buildable) is
-  real follow-up work, not invented here ahead of it. A disabled item
-  (`ITEMENABLED` unset) is rejected client-side, before any keystroke
-  is sent at all -- `RC 20`, distinct from the no-shortcut case.
+  **Selection has two paths, chosen automatically per item.** When
+  the target has a real keyboard shortcut (`COMMSEQ` set),
+  `AmipMenuPickByShortcut()` (`server/src/action.c`) activates the
+  window, then strikes the item's `Command` byte (inverted through the
+  live keymap via `MapANSI()`, same technique `AmipTypeString()` uses
+  per character) with the right-Amiga qualifier held -- the same
+  input.device path a human pressing Right-Amiga+key produces.
+  Intuition resolves that combination against the window's own live
+  menu strip on its own; this deliberately does not synthesize
+  `IDCMP_MENUPICK` directly, so a successful `RC 0` is genuine evidence
+  the pick reached the app through the real menu-shortcut path, not a
+  shortcut around it.
+
+  **For an item with no shortcut** (issue #63), `AmipMenuPickByPointer()`
+  drives the exact sequence a human would: a genuine synthesized
+  RMB-down, then a move onto the target menu's own title text in the
+  screen's title bar (this is the part that isn't obvious from the
+  autodocs -- RMB-down alone only switches the title bar into menu
+  mode, showing menu titles instead of the window title; the pulldown
+  itself doesn't open until the pointer is actually moved over the
+  title, confirmed live), then a move onto the target item (which
+  highlights it and, for a sub-item, auto-opens the one-level submenu
+  purely as an Intuition-internal reaction to pointer position -- no
+  separate event exists to synthesize for either), then a final move
+  into the submenu if picking a sub-item, then RMB-up over the target
+  -- exactly what Intuition turns into `IDCMP_MENUPICK` (only the
+  most-subordinate item under the pointer is selectable; a top-level
+  item with a submenu can't itself be picked). Every box is resolved
+  live off the actual `struct Menu`/`MenuItem` fields immediately
+  before each move (`ResolveMenuItemBox()`), never cached or computed
+  from assumed pixel metrics -- menu layout depends on the user's own
+  screen/menu font. Confirmed live (2026-08-09) against real geometry:
+  `Menu->LeftEdge` is genuinely screen-absolute; a top-level item's own
+  box is `menu->LeftEdge + item->LeftEdge`,
+  `screen->TopEdge + screen->BarHeight + 1 + item->TopEdge` (the
+  screen's own live, font-derived `BarHeight` -- "Bar sizes for this
+  Screen... BarHeight is one less than the actual menu bar height",
+  `intuition/screens.h`); a sub-item's box left-anchors flush against
+  its parent item's own right edge (`parentLeft + parentWidth` --
+  `item->LeftEdge` plays no part in a sub-item's X placement and must
+  NOT be added on top of that, confirmed the hard way: doing so
+  overshot the submenu's own box entirely), with `item->TopEdge`
+  genuinely its own per-item stacking offset from the submenu box's
+  top. The RKRM documents none of the sub-item placement -- this was
+  measured pixel-for-pixel against a real screenshot captured mid-pick
+  under Copperline (`amipilot.screenshot`'s own PNG conversion), not
+  guessed. **Honest limit:** a window with `WFLG_RMBTRAP` set opts
+  entirely out of Intuition's own menu-button handling -- no
+  synthesized RMB-down can ever open its menu strip, reported as its
+  own distinct `RC 20` reason rather than a confusing timeout. A
+  disabled item (`ITEMENABLED` unset) is rejected client-side, before
+  any input is sent at all, on either path.
 
   Verified end-to-end by `make test-target`'s MENU/MENUPICK check
   (`tests/copperline/menu-test.py`) against a menu strip added to
@@ -564,11 +596,12 @@ Lands in phase 0.2 onward -- see
   every field the walker read live (including a `CHECKIT|MENUTOGGLE`
   item's starting `checked` state and a separator bar's blank,
   disabled entry), `MENUPICK`s a top-level item and a submenu item by
-  their shortcuts and confirms each pick genuinely reached the
-  fixture's own `IDCMP_MENUPICK` handler (which writes a distinct
-  marker into its Host string gadget, read back via the
+  their shortcuts, a shortcut-less top-level item and a shortcut-less
+  sub-item by the pointer path, and confirms each pick genuinely
+  reached the fixture's own `IDCMP_MENUPICK` handler (which writes a
+  distinct marker into its Host string gadget, read back via the
   already-verified `GETTEXT` path -- proof of real delivery through
-  Intuition, not just that a keystroke was injected), and confirms the
+  Intuition, not just that input was injected), and confirms the
   fixture's permanently-disabled item is rejected without ever sending
   a keystroke.
 

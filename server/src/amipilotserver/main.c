@@ -1273,6 +1273,8 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
 
         case AMIP_AREXX_CMD_MENUPICK: {
             struct Window *w = AmipFindWindow((CONST_STRPTR)cmd->screenPattern, (CONST_STRPTR)cmd->windowPattern);
+            struct Menu *menu = NULL;
+            struct MenuItem *topItem = NULL;
             struct MenuItem *item;
             AmipMenuPickResult pickRc;
 
@@ -1280,12 +1282,23 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                 rc = AMIP_AREXX_RC_WARN;
                 break;
             }
-            item = AmipFindMenuItem(w, cmd->menuNum, cmd->itemNum, cmd->subNum);
+            item = AmipFindMenuItemWithParents(w, cmd->menuNum, cmd->itemNum, cmd->subNum,
+                                               &menu, &topItem);
             if (item == NULL || !AmipIsWindowOpen(w)) {
                 rc = AMIP_AREXX_RC_WARN;
                 break;
             }
-            pickRc = AmipMenuPickByShortcut(w, item);
+            /* A real shortcut, when the item has one, is the fast/
+             * proven path (AmipMenuPickByShortcut, unchanged) --
+             * pointer-based picking (issue #63) is purely the fallback
+             * for items that don't. */
+            if ((item->Flags & COMMSEQ) && item->Command != 0) {
+                pickRc = AmipMenuPickByShortcut(w, item);
+            } else {
+                pickRc = AmipMenuPickByPointer(w, menu,
+                                               (cmd->subNum >= 0) ? topItem : item,
+                                               (cmd->subNum >= 0) ? item : NULL);
+            }
             switch (pickRc) {
                 case AMIP_MENUPICK_OK:
                     break;
@@ -1294,14 +1307,24 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                     strncpy(g_resultBuf, "menu item is disabled", sizeof(g_resultBuf) - 1);
                     result = g_resultBuf;
                     break;
-                case AMIP_MENUPICK_NO_SHORTCUT:
+                case AMIP_MENUPICK_RMB_TRAPPED:
                     rc = AMIP_AREXX_RC_FAIL;
                     strncpy(g_resultBuf,
-                            "item has no keyboard shortcut -- pointer-based menu "
-                            "selection isn't built yet (see server/README.md)",
+                            "window traps the right mouse button (WFLG_RMBTRAP) -- "
+                            "pointer-based menu selection isn't possible for this window",
                             sizeof(g_resultBuf) - 1);
                     result = g_resultBuf;
                     break;
+                case AMIP_MENUPICK_GEOMETRY_FAILED:
+                    rc = AMIP_AREXX_RC_FAIL;
+                    strncpy(g_resultBuf, "couldn't resolve menu item geometry",
+                            sizeof(g_resultBuf) - 1);
+                    result = g_resultBuf;
+                    break;
+                case AMIP_MENUPICK_NO_SHORTCUT:  /* AmipMenuPickByShortcut only;
+                                                   * unreachable here given the
+                                                   * branch above, kept for
+                                                   * switch completeness */
                 case AMIP_MENUPICK_INJECT_FAILED:
                 default:
                     rc = AMIP_AREXX_RC_FAIL;

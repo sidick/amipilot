@@ -267,6 +267,45 @@ comment on `HandleWhereMessage()` in
 but has never been observed to actually reject a real ARexx script's
 command, so left unchanged here — outside this issue's scope).
 
+### `MENUPICK` pointer-based fallback (issue #63)
+
+`run_menu_check`'s `MENUPICK-TOGGLE-POINTER`/`MENUPICK-SUBITEM-POINTER`
+assertions drive `fixtures/gadtools-app`'s two new shortcut-less menu
+items — "Toggle" (its `NM_CommKey` was originally, incorrectly, set to
+`"T"`; the fixture's whole point as this feature's test target only
+works with it genuinely shortcut-less) and a new "Sub NoShortcut"
+sub-item under "More" — through `AmipMenuPickByPointer()`
+(`server/src/action.c`), a genuine synthesized RMB-down/move/move/
+release sequence, not the existing `AmipMenuPickByShortcut()` path.
+
+**Two real, non-obvious findings from getting this working live**
+(2026-08-09), neither derivable from the NDK/RKRM alone:
+
+1. **RMB-down alone doesn't open the pulldown.** It only switches the
+   screen's own title bar into menu mode (menu titles instead of the
+   window title) — confirmed by a screenshot captured mid-pick
+   (`amipilot.screenshot`'s PNG conversion) showing zero visible
+   change even after a full second's `Delay()`, and independently by
+   the target window never receiving even a fallback
+   `IDCMP_MOUSEBUTTONS` for the synthesized press (a live diagnostic
+   added to the fixture specifically to rule this out). The pulldown
+   only opens once the pointer is moved onto the target menu's own
+   title text in the screen's bar — `AmipMenuPickByPointer()` now does
+   this as an explicit first move, before ever touching the item
+   itself.
+2. **The RKRM documents no formula for a submenu's own screen
+   position** — only that it "overlaps its parent item's own select
+   box somewhere." The real placement was measured pixel-for-pixel: a
+   screenshot captured with the submenu genuinely open (RMB still
+   held, pointer hovering the parent item) was cropped and scanned for
+   the popup's actual border pixels, giving `parentLeft + parentWidth`
+   for the box's left edge (the sub-item's own `LeftEdge` plays no
+   part in X placement at all — an initial guess that added it on top
+   overshot the box entirely, landing clicks well past its right edge)
+   and `parentTop + item->TopEdge` for its top. See
+   `ResolveMenuItemBox()`'s own doc comment in `server/src/action.c`
+   for the confirmed formula.
+
 ## Ad hoc smoke testing (debugging, new fixtures)
 
 For anything `run.sh` doesn't already assert on, write

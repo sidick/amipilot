@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
-"""Drives AmiPilotServer's MENU/MENUPICK verbs (phase 0.4) end to end
-for the on-target regression check (tests/copperline/run.sh), against
+"""Drives AmiPilotServer's MENU/MENUPICK verbs (phase 0.4, plus the
+pointer-based fallback from issue #63) end to end for the on-target
+regression check (tests/copperline/run.sh), against
 fixtures/gadtools-app's menu strip (see its own header comment for the
 exact layout: Project > About(A) / Toggle(T, checkit) / Disabled /
-separator / More > Sub Item(S)).
+separator / More > Sub Item(S) / Sub NoShortcut).
 
 Walks the menu via MENU and asserts the structure the walker read off
 Intuition's live struct Menu/MenuItem chain, then MENUPICKs "About"
-and "Sub Item" by their keyboard shortcuts and confirms each pick
-genuinely reached the app (not just that a keystroke was injected) by
-reading back the marker text GTApp's own IDCMP_MENUPICK handler writes
-into its Host string gadget -- the same GETTEXT path every other check
-already trusts. Also confirms the permanently-disabled item is
-rejected client-side (no keystroke sent at all).
+and "Sub Item" by their keyboard shortcuts, and "Toggle"/"Sub
+NoShortcut" via the pointer-based fallback (a genuine synthesized
+RMB-down/move/RMB-up, not a shortcut keystroke -- server/src/action.c's
+AmipMenuPickByPointer()), confirming each pick genuinely reached the
+app (not just that input was injected) by reading back the marker text
+GTApp's own IDCMP_MENUPICK handler writes into its Host string gadget
+-- the same GETTEXT path every other check already trusts. Also
+confirms the permanently-disabled item is rejected client-side (no
+input sent at all).
 
 Prints one greppable line per stage (run.sh asserts on them) and exits
 non-zero on any failure.
@@ -71,6 +75,31 @@ def main() -> int:
         print(f"MENUPICK-SUBITEM PASS RESULT={result}")
     else:
         print(f"MENUPICK-SUBITEM FAIL RESULT={result}")
+        return 1
+
+    # "Toggle" is enabled but has no keyboard shortcut -- MENUPICK
+    # against it exercises the pointer-based fallback (issue #63:
+    # genuine RMB-down/move/RMB-up, not a shortcut keystroke).
+    client.menu_pick("GadTools", toggle.menu_num, toggle.item_num)
+    result = client.get_text("GadTools", 2)
+    if result == "toggle picked":
+        print(f"MENUPICK-TOGGLE-POINTER PASS RESULT={result}")
+    else:
+        print(f"MENUPICK-TOGGLE-POINTER FAIL RESULT={result}")
+        return 1
+
+    # "Sub NoShortcut" is enabled, one level deep, and has no shortcut
+    # -- the pointer-based fallback's genuinely uncertain case (issue
+    # #63: submenu box geometry is undocumented by the RKRM), unlike
+    # Toggle above (a top-level item).
+    sub_noshortcut = strip.find("Sub NoShortcut")
+    client.menu_pick("GadTools", sub_noshortcut.menu_num,
+                      sub_noshortcut.item_num, sub_noshortcut.sub_num)
+    result = client.get_text("GadTools", 2)
+    if result == "subitem noshortcut picked":
+        print(f"MENUPICK-SUBITEM-POINTER PASS RESULT={result}")
+    else:
+        print(f"MENUPICK-SUBITEM-POINTER FAIL RESULT={result}")
         return 1
 
     try:

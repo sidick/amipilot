@@ -64,6 +64,38 @@ genuinely standard, ordinary ARexx port -- nothing dedicated-port-only
 about this fix, any third-party implementer (e.g. AmiAuth) needs only
 the same one-condition change.
 
+`MENUPICK`'s pointer-based fallback for shortcut-less items is real
+too now (issue #63, not yet in a tagged release): previously,
+`MENUPICK` only worked for items with a real keyboard shortcut
+(`AmipMenuPickByShortcut()`); an item with none was rejected outright.
+`AmipMenuPickByPointer()` (`server/src/action.c`) now drives the
+pointer path automatically for such items -- a genuine synthesized
+RMB-down/move/move/RMB-up sequence, the same "real input.device
+events, not a shortcut" principle `CLICK`/`DRAG` already follow, not a
+forged `IDCMP_MENUPICK` message (considered and rejected: it would
+bypass real IDCMP/activation/`WFLG_RMBTRAP`/`IDCMP_MENUVERIFY`
+handling entirely, a false-positive risk this project's own design
+principle exists to prevent). Two real, non-obvious things had to be
+found live (2026-08-09) before this worked: (1) RMB-down alone only
+switches the screen's own title bar into menu mode -- the pulldown
+itself doesn't open until the pointer is actually moved onto the
+target menu's own title text, confirmed only after a plain RMB-down
+produced zero observable effect (no pulldown render, no fallback
+`IDCMP_MOUSEBUTTONS`) even with the pointer already positioned inside
+the window and a full second of `Delay()`; and (2) the RKRM documents
+no formula at all for a submenu's own screen position (only "overlaps
+its parent item's own select box somewhere") -- the real placement
+(`parentLeft + parentWidth` for X, ignoring the sub-item's own
+`LeftEdge` entirely; `parentTop + item->TopEdge` for Y) was measured
+pixel-for-pixel against a real screenshot captured mid-pick under
+Copperline (`amipilot.screenshot`'s own PNG conversion, cropped and
+scanned for the popup's actual border pixels) after an initial guess
+(adding `item->LeftEdge` on top of the parent's right edge) overshot
+the box entirely. See `server/README.md`'s Menus section for the full
+mechanism and `fixtures/gadtools-app`'s new shortcut-less "Toggle" and
+"Sub NoShortcut" items, verified via `run_menu_check`'s
+`MENUPICK-TOGGLE-POINTER`/`MENUPICK-SUBITEM-POINTER` checks.
+
 Phase 0.5 (reliability and reach into the wider ecosystem)
 before it: `WAITFOR` (including its
 `TEXT=` condition) and `CLICK`'s `EXPECT=` (wait/expectation
@@ -141,10 +173,10 @@ public default password, no rate-limiting; LAN/trusted-network use
 only, see `server/README.md`'s TCP section. Phase 0.4 additions
 beyond TCP: `LAUNCH` (start a test subject over the wire), the
 allowlist-scoped file API (`FSLIST`/`FSSTAT`/`FSMKDIR`/`FSDELETE`/
-`FSGET`, `server/src/fs.c`), menu walking + shortcut-based selection
-(`MENU`/`MENUPICK`, `intuition-model`'s `AmipWalkMenuStrip()` —
-pointer-based selection for shortcut-less items not yet built),
-multi-screen support (`SCREENS`/`SCREEN=`, keyed off
+`FSGET`, `server/src/fs.c`), menu walking + selection (`MENU`/
+`MENUPICK`, `intuition-model`'s `AmipWalkMenuStrip()` — shortcut-based
+and, since issue #63, genuine pointer-based selection too for items
+with no shortcut), multi-screen support (`SCREENS`/`SCREEN=`, keyed off
 `Screen->DefaultTitle`, not the live `Title` field), tier-2 semantic
 locators (`ROLE=`/`LABEL=`/`INDEX=` on CLICK/TYPE/GETTEXT's classic
 form, resolved via a fresh `AmipWalkWindow()` walk — proximity-to-

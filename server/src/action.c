@@ -332,11 +332,17 @@ BOOL AmipTypeString(CONST_STRPTR text)
     return TRUE;
 }
 
-struct MenuItem *AmipFindMenuItem(struct Window *window, LONG menuNum, LONG itemNum, LONG subNum)
+struct MenuItem *AmipFindMenuItemWithParents(struct Window *window,
+                                             LONG menuNum, LONG itemNum, LONG subNum,
+                                             struct Menu **menuOut,
+                                             struct MenuItem **parentItemOut)
 {
     struct Menu *menu;
     struct MenuItem *item;
     LONG i;
+
+    if (menuOut != NULL) *menuOut = NULL;
+    if (parentItemOut != NULL) *parentItemOut = NULL;
 
     if (window == NULL || menuNum < 0 || itemNum < 0) {
         return NULL;
@@ -349,6 +355,7 @@ struct MenuItem *AmipFindMenuItem(struct Window *window, LONG menuNum, LONG item
     if (menu == NULL) {
         return NULL;
     }
+    if (menuOut != NULL) *menuOut = menu;
 
     item = menu->FirstItem;
     for (i = 0; i < itemNum && item != NULL; i++) {
@@ -357,12 +364,18 @@ struct MenuItem *AmipFindMenuItem(struct Window *window, LONG menuNum, LONG item
     if (item == NULL || subNum < 0) {
         return item;
     }
+    if (parentItemOut != NULL) *parentItemOut = item;
 
     item = item->SubItem;
     for (i = 0; i < subNum && item != NULL; i++) {
         item = item->NextItem;
     }
     return item;
+}
+
+struct MenuItem *AmipFindMenuItem(struct Window *window, LONG menuNum, LONG itemNum, LONG subNum)
+{
+    return AmipFindMenuItemWithParents(window, menuNum, itemNum, subNum, NULL, NULL);
 }
 
 AmipMenuPickResult AmipMenuPickByShortcut(struct Window *window, struct MenuItem *item)
@@ -546,6 +559,176 @@ BOOL AmipClickWindowRelative(struct Window *window, WORD x, WORD y, WORD w, WORD
                         (WORD)(window->LeftEdge + x + w / 2),
                         (WORD)(window->TopEdge + y + h / 2),
                         AMIP_BUTTON_LEFT);
+}
+
+/* Resolves a menu item's current screen-absolute box, read directly off
+ * the live struct Menu/MenuItem fields -- never cached, since menu
+ * layout depends on the user's own screen/menu font (issue #63).
+ *
+ * Top-level item (parentItem == NULL): Menu->LeftEdge is documented
+ * screen-absolute (the screen's own LeftEdge plus its left border,
+ * already folded in -- RKRM Menu Data Structures). MenuItem->LeftEdge/
+ * Width/Height for a top-level item are relative to Menu->LeftEdge.
+ * MenuItem->TopEdge is documented as relative to "the topmost position
+ * Intuition allows", resolved here against the screen's own live,
+ * font-derived BarHeight field (intuition/screens.h: "Bar sizes for
+ * this Screen... BarHeight is one less than the actual menu bar
+ * height" -- genuinely adapts to the user's screen font, unlike any
+ * fixed pixel constant).
+ *
+ * Sub-item (parentItem != NULL, the resolved TOP-LEVEL item it hangs
+ * off of): RKRM gives no formula for this, only that the sub-item box
+ * "overlaps the parent item's own select box somewhere" -- Intuition
+ * places it itself to avoid clipping off-screen. STARTING HYPOTHESIS,
+ * NOT YET CONFIRMED ON TARGET: anchor at the parent's own resolved
+ * absolute box (its right edge, its own top), then add the sub-item's
+ * own LeftEdge/TopEdge as an offset from that anchor -- the same "read
+ * the live fields relative to a known reference point" shape as the
+ * top-level case. Verify live under Copperline against a real submenu
+ * item (tests/copperline/menu-test.py's MENUPICK-SUBITEM-POINTER
+ * check) before trusting this -- this project's own house convention
+ * is real functions verified against a real fixture, not guessed
+ * heuristics (CLAUDE.md). Update this comment with whatever's actually
+ * confirmed. */
+static BOOL ResolveMenuItemBox(struct Window *window, struct Menu *menu,
+                                struct MenuItem *parentItem, struct MenuItem *item,
+                                WORD *leftOut, WORD *topOut, WORD *widthOut, WORD *heightOut)
+{
+    struct Screen *screen;
+
+    if (window == NULL || menu == NULL || item == NULL) {
+        return FALSE;
+    }
+    screen = window->WScreen;
+    if (screen == NULL) {
+        return FALSE;
+    }
+
+    if (parentItem == NULL) {
+        *leftOut   = (WORD)(menu->LeftEdge + item->LeftEdge);
+        *topOut    = (WORD)(screen->TopEdge + screen->BarHeight + 1 + item->TopEdge);
+        *widthOut  = item->Width;
+        *heightOut = item->Height;
+    } else {
+        WORD parentLeft, parentTop, parentWidth, parentHeight;
+
+        if (!ResolveMenuItemBox(window, menu, NULL, parentItem,
+                                &parentLeft, &parentTop, &parentWidth, &parentHeight)) {
+            return FALSE;
+        }
+        /* Confirmed live (2026-08-09), via a real screenshot captured
+         * mid-pick and measured pixel-for-pixel against
+         * fixtures/gadtools-app's real "More" submenu: the submenu's
+         * own box left-anchors flush against the parent item's right
+         * edge (parentLeft + parentWidth) -- item->LeftEdge plays NO
+         * part in X placement for a sub-item and must NOT be added on
+         * top of that (doing so overshot the box entirely, landing
+         * clicks well past its right edge). item->TopEdge, by
+         * contrast, genuinely is each sub-item's own stacking offset
+         * from the submenu box's top (== the parent item's own
+         * resolved top) -- confirmed matching the visually measured
+         * row for a second-position sub-item. */
+        *leftOut   = (WORD)(parentLeft + parentWidth);
+        *topOut    = (WORD)(parentTop + item->TopEdge);
+        *widthOut  = item->Width;
+        *heightOut = item->Height;
+    }
+
+    return (*widthOut > 0 && *heightOut > 0) ? TRUE : FALSE;
+}
+
+/* ~500ms: time for the menu strip (or one-level submenu) to actually
+ * render and for Intuition's own input-handler task to catch up with
+ * the synthesized pointer position, before the next move/release
+ * depends on it -- confirmed live (2026-08-09) sufficient under
+ * Copperline for both the top-level pulldown and a one-level submenu
+ * to open reliably; same "empirically tuned, not guessed" precedent
+ * as AmipDragAt's own Delay(3) below. */
+#define AMIP_MENU_OPEN_TICKS    25
+#define AMIP_MENU_SUBOPEN_TICKS 25
+
+AmipMenuPickResult AmipMenuPickByPointer(struct Window *window, struct Menu *menu,
+                                         struct MenuItem *topItem, struct MenuItem *subItem)
+{
+    struct MenuItem *target = (subItem != NULL) ? subItem : topItem;
+    WORD left, top, width, height, x, y;
+
+    if (window == NULL || menu == NULL || topItem == NULL || target == NULL) {
+        return AMIP_MENUPICK_GEOMETRY_FAILED;
+    }
+    if (!(target->Flags & ITEMENABLED)) {
+        return AMIP_MENUPICK_DISABLED;
+    }
+    /* A window that traps the right mouse button opts entirely out of
+     * Intuition's own menu-button handling -- no synthesized RMB-down
+     * can ever open its menu strip, a real permanent limit for this
+     * window, not a transient injection failure. */
+    if (window->Flags & WFLG_RMBTRAP) {
+        return AMIP_MENUPICK_RMB_TRAPPED;
+    }
+
+    /* Same "bring the target forward first" rationale as
+     * AmipClickGadget -- input only reaches whatever's frontmost. */
+    BringWindowForward(window);
+
+    if (!SendRawMouseButton(IEQUALIFIER_RBUTTON, IECODE_RBUTTON)) {
+        return AMIP_MENUPICK_INJECT_FAILED;
+    }
+    /* RMB-down alone only switches the screen's own title bar into
+     * menu mode (showing menu titles instead of the window title) --
+     * confirmed live (2026-08-09) that the pulldown itself does NOT
+     * open until the pointer is actually moved over the target menu's
+     * own title text in that bar. Move there first: Menu->LeftEdge is
+     * documented screen-absolute (see ResolveMenuItemBox's own doc
+     * comment); the title row is the screen's own live BarHeight, not
+     * a guessed pixel constant. */
+    if (!AmipMoveMouseTo(window->WScreen,
+                         (WORD)(menu->LeftEdge + 8),
+                         (WORD)(window->WScreen->TopEdge + window->WScreen->BarHeight / 2))) {
+        SendRawMouseButton(0, (UWORD)(IECODE_RBUTTON | IECODE_UP_PREFIX));
+        return AMIP_MENUPICK_INJECT_FAILED;
+    }
+    Delay(AMIP_MENU_OPEN_TICKS);
+
+    if (!ResolveMenuItemBox(window, menu, NULL, topItem, &left, &top, &width, &height)) {
+        SendRawMouseButton(0, (UWORD)(IECODE_RBUTTON | IECODE_UP_PREFIX));
+        return AMIP_MENUPICK_GEOMETRY_FAILED;
+    }
+    x = (WORD)(left + width / 2);
+    y = (WORD)(top + height / 2);
+    if (!AmipMoveMouseTo(window->WScreen, x, y)) {
+        SendRawMouseButton(0, (UWORD)(IECODE_RBUTTON | IECODE_UP_PREFIX));
+        return AMIP_MENUPICK_INJECT_FAILED;
+    }
+    /* Highlights topItem and, if it has sub-items, auto-opens the
+     * one-level submenu -- purely Intuition-internal reactions to
+     * pointer position while RMB is held; no separate event exists to
+     * synthesize for either. */
+    Delay(AMIP_MENU_OPEN_TICKS);
+
+    if (subItem != NULL) {
+        if (!ResolveMenuItemBox(window, menu, topItem, subItem, &left, &top, &width, &height)) {
+            SendRawMouseButton(0, (UWORD)(IECODE_RBUTTON | IECODE_UP_PREFIX));
+            return AMIP_MENUPICK_GEOMETRY_FAILED;
+        }
+        x = (WORD)(left + width / 2);
+        y = (WORD)(top + height / 2);
+        if (!AmipMoveMouseTo(window->WScreen, x, y)) {
+            SendRawMouseButton(0, (UWORD)(IECODE_RBUTTON | IECODE_UP_PREFIX));
+            return AMIP_MENUPICK_INJECT_FAILED;
+        }
+        Delay(AMIP_MENU_SUBOPEN_TICKS);
+    }
+
+    /* Release over the target -- this is literally what Intuition
+     * turns into IDCMP_MENUPICK (only the most-subordinate item under
+     * the pointer is selectable, per RKRM). Best-effort even on
+     * failure paths above already released; this final one is the
+     * real commit. */
+    if (!SendRawMouseButton(0, (UWORD)(IECODE_RBUTTON | IECODE_UP_PREFIX))) {
+        return AMIP_MENUPICK_INJECT_FAILED;
+    }
+    return AMIP_MENUPICK_OK;
 }
 
 BOOL AmipDragAt(struct Screen *screen, WORD x1, WORD y1, WORD x2, WORD y2)
