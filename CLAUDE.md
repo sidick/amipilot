@@ -13,8 +13,9 @@ protocol, and phase sequencing live in `docs/implementation-plan.md` —
 read that before making architectural decisions; this file only covers
 what's needed to build and navigate the code day to day.
 
-**Current state:** v0.5 released (phase 0.5, reliability and reach
-into the wider ecosystem, complete). `WAITFOR` (including its
+**Current state:** v1.0 released (phase 1.0 complete — the first full
+release). Phase 0.5 (reliability and reach into the wider ecosystem)
+before it: `WAITFOR` (including its
 `TEXT=` condition) and `CLICK`'s `EXPECT=` (wait/expectation
 primitives, docs/implementation-plan.md's "Async by design" section)
 -- see `server/README.md`'s own section. Quirk profiles are real too:
@@ -104,7 +105,7 @@ sliders/scrollers and a gadget-to-gadget form for drag-and-drop,
 built on a single press/absolute-jump/release, not synthesized
 continuous motion). See
 `server/README.md` for the full verb set and what's verified for each.
-Phase 1.0 has started on main, not yet tagged: `FSPUT <path>
+Phase 1.0 (all of it now released as v1.0): `FSPUT <path>
 <byte-count> [TIMEOUT=<n>]` (host-to-Amiga file writes,
 `server/src/fs.c`'s `AmipFsPut()`) is real — the wire's first request
 to carry a raw binary body, via a new length-prefixed request-payload

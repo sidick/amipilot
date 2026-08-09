@@ -2,7 +2,7 @@ Short:        Object-level GUI automation for classic AmigaOS
 Author:       simond@irrelevant.org (Simon Dick)
 Uploader:     simond@irrelevant.org (Simon Dick)
 Type:         util/misc
-Version:      0.5
+Version:      1.0
 Architecture: m68k-amigaos
 Distribution: GitHub only (not yet on Aminet)
 
@@ -67,6 +67,15 @@ Features
     mechanism for catching structural UI drift as a regression; and a
     bridge into MUI (Magic User Interface) applications through their
     own built-in ARexx port (MUIREXX).
+  - From 1.0: push files from the host onto the Amiga, not just read
+    them back (FSPUT); launch a program the way Workbench itself does
+    - a genuine WBStartup message with tooltype overrides and project
+    arguments (WBLAUNCH); capture a screen or window as a screenshot,
+    on classic planar screens or genuine Picasso96/RTG boards, decoded
+    host-side to PNG and IFF ILBM (SCREENSHOT); move and resize whole
+    windows via the same synthesized drags gadgets already get
+    (WINDOWMOVE/WINDOWSIZE); and wait for an Intuition Requester to
+    appear (WAITFOR REQUESTER, detection only).
 
 Requirements
 ------------
