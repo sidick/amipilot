@@ -116,6 +116,59 @@ discriminator to tell apart) -- confirmed live under Copperline via
 now carries the new gadget's real, live-measured geometry and
 `role=integer` line.
 
+WB3.2-era BOOPSI/ReAction role classification is real too (issue #69):
+`ClassifyByClassID()` (`intuition-model/src/walk.c`) previously
+recognised only 10 of the classes documented in NDK 3.2's own
+`gadgets/` header set, leaving the rest at `role=custom`. Twelve more
+now get a real role -- `clicktab.gadget` (`role=page_tab_list`, the
+class that motivated filing this issue: Hyperion's WB3.2-native tabbed-
+panel widget), `colorwheel.gadget` (`role=color_wheel`),
+`datebrowser.gadget` (`role=calendar`), `fuelgauge.gadget`
+(`role=progress_bar`), `getcolor.gadget`/`getfile.gadget`/
+`getfont.gadget`/`getscreenmode.gadget` (`role=color_chooser`/
+`file_chooser`/`font_chooser`/`screenmode_chooser` -- AT-SPI-style
+names for "a compound button that opens a system requester and shows
+the result", which is genuinely what all four are per their own NDK
+autodocs), `gradientslider.gadget` (`role=slider` -- reuses the
+existing role rather than inventing a redundant one, since AT-SPI
+itself has no separate "gradient slider" role either), `palette.gadget`
+(`role=palette`), `sketchboard.gadget` (`role=canvas`),
+`speedbar.gadget` (`role=toolbar`), and `texteditor.gadget`
+(`role=text_editor`). Every class-ID string was confirmed against real
+NDK 3.2 headers first (pragma/*_lib.h's own "<name>.gadget" comment, or
+reaction_macros.h's convenience-Object macros for the two classes --
+colorwheel, gradientslider -- that register a PUBLIC class name instead
+of needing an explicit `XXX_GetClass()` call), not guessed, then
+live-verified against a new dedicated fixture,
+`fixtures/reaction-classes-app`, one instance of each class attached
+DIRECTLY to a plain classic window rather than via `window.class`/
+`layout.gadget` (which would make them exactly as unreachable as
+issue #49's own confirmed limit already documents -- this fixture
+exists specifically to sidestep that, not to demonstrate it). Two real
+bugs found building this, live (2026-08-09): `colorwheel.gadget`'s
+`NewObject()` silently returned NULL until `WHEEL_Screen` was supplied
+-- its own autodoc does say this tag is required, but it's easy to
+miss among a page of optional ones, and the failure mode (NULL, no
+error text) gives no hint why; and `speedbar.gadget` registers its
+class as literally `"speedbar"`, NOT `"speedbar.gadget"` like every
+other class checked here -- confirmed only by reading the walker's own
+`className` field back from a live object, since nothing in the NDK
+materials flags this exception. `fixtures/reaction-classes-app`'s own
+`ReactionClassesApp.golden` locks in the live-confirmed output for
+regression protection, verified via `tests/copperline/run.sh`'s
+`run_golden_check`. Five real classes from the same research pass were
+deliberately left unclassified, not silently missed --
+`space.gadget`/`virtual.gadget` (honest limits, `virtual.gadget`
+sharing `layout.gadget`'s own unreachable-children problem),
+`listview.gadget` (its own autodoc says `listbrowser.gadget`, already
+mapped, is a strict upgrade), and `tabs.gadget`/`tapedeck.gadget`
+(both ship as real library files on a stock WB3.2.3 install, confirmed
+on disk, but neither has a documented NDK-supported construction path
+in this project's own NDK 3.2 snapshot -- no `GetClass()` proto/pragma
+header and no `reaction_macros.h` convenience macro exists for either)
+-- see `userdocs/Locator-Tiers-and-Limits.md`'s own writeup for the
+full reasoning behind each.
+
 Phase 0.5 (reliability and reach into the wider ecosystem)
 before it: `WAITFOR` (including its
 `TEXT=` condition) and `CLICK`'s `EXPECT=` (wait/expectation

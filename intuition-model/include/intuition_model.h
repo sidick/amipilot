@@ -33,6 +33,27 @@ typedef enum {
     AMIP_ROLE_TEXT,
     AMIP_ROLE_MENU,
     AMIP_ROLE_MENU_ITEM,
+    /* issue #69 -- WB3.2-era BOOPSI/ReAction classes ClassifyByClassID()
+     * didn't have a role for. AT-SPI-style names chosen to match ATK's
+     * own vocabulary where a clean equivalent exists (PAGE_TAB_LIST,
+     * COLOR_CHOOSER, PROGRESS_BAR, CALENDAR, TOOLBAR); the rest
+     * (COLOR_WHEEL, FILE_CHOOSER, FONT_CHOOSER, SCREENMODE_CHOOSER,
+     * PALETTE, CANVAS, TEXT_EDITOR) have no single ATK role but follow
+     * the same "what it does, not how it looks" naming convention. See
+     * intuition-model/src/walk.c's ClassifyByClassID() for the exact
+     * class-ID -> role mapping and its NDK-header provenance. */
+    AMIP_ROLE_PAGE_TAB_LIST,      /* clicktab.gadget */
+    AMIP_ROLE_COLOR_WHEEL,        /* colorwheel.gadget */
+    AMIP_ROLE_CALENDAR,           /* datebrowser.gadget */
+    AMIP_ROLE_PROGRESS_BAR,       /* fuelgauge.gadget */
+    AMIP_ROLE_COLOR_CHOOSER,      /* getcolor.gadget */
+    AMIP_ROLE_FILE_CHOOSER,       /* getfile.gadget */
+    AMIP_ROLE_FONT_CHOOSER,       /* getfont.gadget */
+    AMIP_ROLE_SCREENMODE_CHOOSER, /* getscreenmode.gadget */
+    AMIP_ROLE_PALETTE,            /* palette.gadget */
+    AMIP_ROLE_CANVAS,             /* sketchboard.gadget */
+    AMIP_ROLE_TOOLBAR,            /* speedbar.gadget */
+    AMIP_ROLE_TEXT_EDITOR,        /* texteditor.gadget */
     AMIP_ROLE_CUSTOM /* recognised structurally, but not classifiable */
 } AmipRole;
 

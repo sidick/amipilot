@@ -1783,6 +1783,7 @@ run_golden_check() {
 	cat > "$SMOKE_SCRIPT" <<EOF
 Run >NIL: SRC:build/fixtures/GTApp
 Run >NIL: SRC:build/fixtures/CAApp
+Run >NIL: SRC:build/fixtures/ReactionClassesApp
 Wait 5
 Run >NIL: SRC:build/AmiPilotServer SERIAL
 Wait 5
@@ -1833,7 +1834,7 @@ EOF
 	rm -f "$info"
 
 	ok=1
-	for pattern in 'GOLDEN-GTAPP MATCH' 'GOLDEN-CAAPP MATCH'; do
+	for pattern in 'GOLDEN-GTAPP MATCH' 'GOLDEN-CAAPP MATCH' 'GOLDEN-RCAPP MATCH'; do
 		if ! grep -qF "$pattern" "$BUILD/golden-result.txt" 2>/dev/null; then
 			echo "run.sh: FAIL (golden): expected line not found: $pattern"
 			ok=0

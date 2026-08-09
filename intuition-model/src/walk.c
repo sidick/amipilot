@@ -171,6 +171,100 @@ static AmipRole ClassifyByClassID(CONST_STRPTR classID)
         return AMIP_ROLE_LISTBROWSER;
     }
 
+    /* issue #69 -- confirmed against real NDK 3.2 headers (pragma/
+     * *_lib.h's own "<name>.gadget" comment, or reaction_macros.h's
+     * convenience-Object macros for the two classes -- colorwheel,
+     * gradientslider -- that register a PUBLIC class name instead of
+     * needing an explicit XXX_GetClass() call), not guessed, and
+     * live-verified against fixtures/reaction-classes-app (one
+     * instance of each, attached directly to a plain window so it's
+     * actually reachable -- see that fixture's own header for why it
+     * doesn't use window.class/layout.gadget the way classact-app
+     * does) plus, for clicktab.gadget specifically, the real WB3.2
+     * stock app that motivated this issue (SYS:Prefs/ScreenMode). */
+    if (strcmp(id, "clicktab.gadget") == 0) {
+        return AMIP_ROLE_PAGE_TAB_LIST;
+    }
+    if (strcmp(id, "colorwheel.gadget") == 0) {
+        return AMIP_ROLE_COLOR_WHEEL;
+    }
+    if (strcmp(id, "datebrowser.gadget") == 0) {
+        return AMIP_ROLE_CALENDAR;
+    }
+    if (strcmp(id, "fuelgauge.gadget") == 0) {
+        return AMIP_ROLE_PROGRESS_BAR;
+    }
+    if (strcmp(id, "getcolor.gadget") == 0) {
+        return AMIP_ROLE_COLOR_CHOOSER;
+    }
+    if (strcmp(id, "getfile.gadget") == 0) {
+        return AMIP_ROLE_FILE_CHOOSER;
+    }
+    if (strcmp(id, "getfont.gadget") == 0) {
+        return AMIP_ROLE_FONT_CHOOSER;
+    }
+    if (strcmp(id, "getscreenmode.gadget") == 0) {
+        return AMIP_ROLE_SCREENMODE_CHOOSER;
+    }
+    /* gradientslider.gadget is functionally a slider (a single
+     * draggable knob over a bounded range) -- AT-SPI doesn't have a
+     * separate "gradient slider" role either, sliders are sliders
+     * regardless of how the track is painted. Reuses the existing
+     * role rather than adding a redundant one. */
+    if (strcmp(id, "gradientslider.gadget") == 0) {
+        return AMIP_ROLE_SLIDER;
+    }
+    if (strcmp(id, "palette.gadget") == 0) {
+        return AMIP_ROLE_PALETTE;
+    }
+    if (strcmp(id, "sketchboard.gadget") == 0) {
+        return AMIP_ROLE_CANVAS;
+    }
+    /* Registered class name is literally "speedbar", NOT
+     * "speedbar.gadget" -- confirmed live against
+     * fixtures/reaction-classes-app (every OTHER class here does
+     * follow the "name.gadget" convention; this one genuinely
+     * doesn't, an easy guess to get wrong from the library filename
+     * alone). */
+    if (strcmp(id, "speedbar") == 0) {
+        return AMIP_ROLE_TOOLBAR;
+    }
+    if (strcmp(id, "texteditor.gadget") == 0) {
+        return AMIP_ROLE_TEXT_EDITOR;
+    }
+
+    /* Deliberately NOT classified here, same issue #69 research pass
+     * (see userdocs/Locator-Tiers-and-Limits.md for the user-facing
+     * writeup of each):
+     *   - space.gadget: a pure layout placeholder with no interactive
+     *     state of its own (the class's own autodoc: "does more than
+     *     just take up space" -- rendering is entirely the
+     *     application's responsibility) -- arguably doesn't need a
+     *     role at all, so it stays role=custom rather than inventing
+     *     one nothing would ever query for.
+     *   - virtual.gadget: a scrolling container for arbitrarily large
+     *     groups -- its own children are exactly as unreachable as
+     *     layout.gadget's (the CONFIRMED LIMIT above), so a role here
+     *     would advertise a container this project can't actually see
+     *     inside.
+     *   - listview.gadget: the class's own autodoc says outright
+     *     "listbrowser.gadget is a better alternative to this gadget"
+     *     -- already covered by the existing listbrowser.gadget
+     *     mapping above; not worth a second role for the superseded
+     *     class.
+     *   - tabs.gadget, tapedeck.gadget: both ship as real library
+     *     files on a stock WB3.2.3 install (confirmed on disk), but
+     *     neither has a documented, NDK-supported construction path
+     *     in this SDK snapshot -- no XXX_GetClass() proto/pragma
+     *     header and no reaction_macros.h convenience macro exists
+     *     for either (unlike every class above). Can't build a
+     *     fixture instance without guessing an undocumented API, so
+     *     this is an honest gap, not a silent omission.
+     *   - page.gadget: documented as "part of layout.gadget" itself
+     *     (its own header comment) -- a layout-internal helper, not a
+     *     standalone top-level object an application attaches
+     *     directly; the CONFIRMED LIMIT above already covers it. */
+
     /* Genuinely unrecognised class (a third-party subclass, or a
      * ReAction class this tier hasn't been taught yet) -- className is
      * still captured for the caller, so the tree says exactly what it
@@ -744,6 +838,18 @@ const char *AmipRoleName(AmipRole role)
         case AMIP_ROLE_TEXT:          return "text";
         case AMIP_ROLE_MENU:          return "menu";
         case AMIP_ROLE_MENU_ITEM:     return "menu_item";
+        case AMIP_ROLE_PAGE_TAB_LIST:      return "page_tab_list";
+        case AMIP_ROLE_COLOR_WHEEL:        return "color_wheel";
+        case AMIP_ROLE_CALENDAR:           return "calendar";
+        case AMIP_ROLE_PROGRESS_BAR:       return "progress_bar";
+        case AMIP_ROLE_COLOR_CHOOSER:      return "color_chooser";
+        case AMIP_ROLE_FILE_CHOOSER:       return "file_chooser";
+        case AMIP_ROLE_FONT_CHOOSER:       return "font_chooser";
+        case AMIP_ROLE_SCREENMODE_CHOOSER: return "screenmode_chooser";
+        case AMIP_ROLE_PALETTE:            return "palette";
+        case AMIP_ROLE_CANVAS:             return "canvas";
+        case AMIP_ROLE_TOOLBAR:            return "toolbar";
+        case AMIP_ROLE_TEXT_EDITOR:        return "text_editor";
         case AMIP_ROLE_CUSTOM:        return "custom";
         default:                      return "unknown";
     }
@@ -780,6 +886,18 @@ AmipRole AmipRoleFromName(const char *name)
         { "text",         AMIP_ROLE_TEXT },
         { "menu",         AMIP_ROLE_MENU },
         { "menu_item",    AMIP_ROLE_MENU_ITEM },
+        { "page_tab_list",      AMIP_ROLE_PAGE_TAB_LIST },
+        { "color_wheel",        AMIP_ROLE_COLOR_WHEEL },
+        { "calendar",           AMIP_ROLE_CALENDAR },
+        { "progress_bar",       AMIP_ROLE_PROGRESS_BAR },
+        { "color_chooser",      AMIP_ROLE_COLOR_CHOOSER },
+        { "file_chooser",       AMIP_ROLE_FILE_CHOOSER },
+        { "font_chooser",       AMIP_ROLE_FONT_CHOOSER },
+        { "screenmode_chooser", AMIP_ROLE_SCREENMODE_CHOOSER },
+        { "palette",            AMIP_ROLE_PALETTE },
+        { "canvas",             AMIP_ROLE_CANVAS },
+        { "toolbar",            AMIP_ROLE_TOOLBAR },
+        { "text_editor",        AMIP_ROLE_TEXT_EDITOR },
         { "custom",       AMIP_ROLE_CUSTOM },
     };
     size_t i;
