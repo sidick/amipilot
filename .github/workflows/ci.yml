@@ -14,6 +14,16 @@
 # hook for an extra per-project job. The real docs publish (docs.yml,
 # mike-based) only runs on a release tag or manual dispatch; this job's job
 # is purely to keep the site from silently rotting in between.
+#
+# readme-lint is the same idea for amipilot.readme: release.yml already
+# validates it for real at release time (sidick/aminet-release-action,
+# validate-only), but that only runs on a pushed tag -- a readme edit that
+# breaks Aminet's own rules (e.g. Short: over 40 chars, an invalid
+# Distribution: value -- both found for real running release.yml against
+# v1.0, see PR #74) would otherwise sit unnoticed until the next release.
+# Runs the same validator here, on every push/PR, against a placeholder
+# .lha (the validator only checks the upload filename's extension/length,
+# never its content, so nothing needs building).
 
 name: CI
 
@@ -45,3 +55,18 @@ jobs:
         run: mkdocs build --strict
       - name: AmigaGuide conversion
         run: make guide
+
+  readme-lint:
+    name: Validate amipilot.readme against Aminet's rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Create placeholder archive (extension/name only, content unchecked)
+        run: touch amipilot.lha
+      - name: Validate against Aminet readme rules
+        uses: sidick/aminet-release-action@v1
+        with:
+          filename: amipilot.lha
+          readme: amipilot.readme
+          category: util/misc
+          validate-only: true
