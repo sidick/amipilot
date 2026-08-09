@@ -33,6 +33,16 @@ for the full engineering detail and phase sequencing behind each one.
   principle every other verb already follows. Verified end to end
   against two new shortcut-less items on `fixtures/gadtools-app`'s own
   menu strip — a top-level item and a one-level-deep submenu item.
+- **`STRING_KIND` vs `INTEGER_KIND` classification** (issue #64): both
+  GadTools kinds create the same underlying `GTYP_STRGADGET`, so
+  nothing in the raw gadget structure told them apart — a smaller
+  version of the `BUTTON_KIND`/`CHECKBOX_KIND` problem, solved the same
+  way. `GT_GetGadgetAttrsA`'s documented per-kind tag table lists
+  `GTIN_Number` under `INTEGER_KIND` only; asking a plain string gadget
+  for it is a safe, documented no-op, the discriminator rather than a
+  guess. Integer gadgets now report `role=integer`. Verified against a
+  new Count `INTEGER_KIND` gadget on `fixtures/gadtools-app`'s own
+  window.
 
 ## v1.0 — 2026-08-09
 

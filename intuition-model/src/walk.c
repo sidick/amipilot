@@ -68,6 +68,31 @@ static AmipRole ClassifyBoolGadget(struct Gadget *gadget, struct Window *window)
     return AMIP_ROLE_BUTTON;
 }
 
+/* GadTools' STRING_KIND and INTEGER_KIND both create a plain
+ * GTYP_STRGADGET -- the same structural ambiguity BUTTON_KIND/
+ * CHECKBOX_KIND have (both GTYP_BOOLGADGET), solved above by
+ * ClassifyBoolGadget() the same way: GT_GetGadgetAttrsA's documented
+ * per-kind tag table (gadtools.doc) lists GTIN_Number under
+ * INTEGER_KIND only, not STRING_KIND -- asking a plain string gadget
+ * for it is a safe, documented no-op (numProcessed stays 0), the same
+ * kind-probe contract GTCB_Checked already relies on. */
+static AmipRole ClassifyStringGadget(struct Gadget *gadget, struct Window *window)
+{
+    LONG number = 0;
+    LONG numProcessed;
+
+    if (GadToolsBase == NULL || window == NULL) {
+        return AMIP_ROLE_STRING;
+    }
+
+    numProcessed = GT_GetGadgetAttrs(gadget, window, NULL, GTIN_Number, (ULONG)&number, TAG_DONE);
+    if (numProcessed >= 1) {
+        return AMIP_ROLE_INTEGER;
+    }
+
+    return AMIP_ROLE_STRING;
+}
+
 static AmipRole ClassifyGadget(struct Gadget *gadget, struct Window *window)
 {
     if (gadget == NULL) {
@@ -78,7 +103,7 @@ static AmipRole ClassifyGadget(struct Gadget *gadget, struct Window *window)
         case GTYP_BOOLGADGET:
             return ClassifyBoolGadget(gadget, window);
         case GTYP_STRGADGET:
-            return AMIP_ROLE_STRING;
+            return ClassifyStringGadget(gadget, window);
         case GTYP_PROPGADGET:
             return AMIP_ROLE_SLIDER;
         default:

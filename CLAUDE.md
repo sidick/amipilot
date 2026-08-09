@@ -96,6 +96,26 @@ mechanism and `fixtures/gadtools-app`'s new shortcut-less "Toggle" and
 "Sub NoShortcut" items, verified via `run_menu_check`'s
 `MENUPICK-TOGGLE-POINTER`/`MENUPICK-SUBITEM-POINTER` checks.
 
+`STRING_KIND`/`INTEGER_KIND` role classification is real too (issue
+#64): both GadTools kinds create the same underlying `GTYP_STRGADGET`,
+so nothing in the raw gadget structure told them apart -- a smaller
+version of the `BUTTON_KIND`/`CHECKBOX_KIND` problem already solved by
+`ClassifyBoolGadget()`'s `GT_GetGadgetAttrsA` kind-probe technique.
+Applied the same way here: `GT_GetGadgetAttrsA`'s documented per-kind
+tag table (gadtools.doc) lists `GTIN_Number` under `INTEGER_KIND` only,
+not `STRING_KIND` -- asking a plain string gadget for it is a safe,
+documented no-op (`numProcessed` stays 0), the discriminator itself
+rather than a guessed heuristic. New `ClassifyStringGadget()`
+(`intuition-model/src/walk.c`) reports `role=integer` for a real
+`INTEGER_KIND` gadget and leaves `role=string` unchanged otherwise.
+Verified against a new Count `INTEGER_KIND` gadget added to
+`fixtures/gadtools-app`'s own window (it shares the Host `STRING_KIND`
+gadget's underlying type, so the two now genuinely need the
+discriminator to tell apart) -- confirmed live under Copperline via
+`tests/copperline/run.sh`'s `run_golden_check`, whose `GTApp.golden`
+now carries the new gadget's real, live-measured geometry and
+`role=integer` line.
+
 Phase 0.5 (reliability and reach into the wider ecosystem)
 before it: `WAITFOR` (including its
 `TEXT=` condition) and `CLICK`'s `EXPECT=` (wait/expectation

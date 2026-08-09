@@ -61,6 +61,12 @@
  * shortcut, sub 1 -- the fixture's only shortcut-less sub-item,
  * proving MENUPICK's pointer-based fallback reaches a genuine
  * sub-item, not just a top-level one).
+ *
+ * Also carries a Count INTEGER_KIND gadget (issue #64) -- shares the
+ * same underlying GTYP_STRGADGET as the Host STRING_KIND gadget
+ * above, exercising the walker's GTIN_Number kind-probe discriminator
+ * (intuition-model/src/walk.c's ClassifyStringGadget()) against a
+ * real target.
  */
 
 #include <exec/types.h>
@@ -86,6 +92,7 @@ struct Library *GadToolsBase;
 #define GID_SLIDER   5
 #define GID_OPENREQ  6
 #define GID_ASK      7
+#define GID_COUNT    8
 
 #define MENUNUM_PROJECT   0
 #define ITEMNUM_ABOUT     0
@@ -245,6 +252,25 @@ int main(void)
     ng.ng_Flags = PLACETEXT_IN;
     gad = CreateGadget(BUTTON_KIND, gad, &ng, GT_Underscore, '_', TAG_DONE);
 
+    /* INTEGER_KIND -- issue #64's target: both this and the Host
+     * STRING_KIND gadget above create the same underlying
+     * GTYP_STRGADGET, nothing in the raw struct Gadget tells them
+     * apart post-creation (confirmed here the same way BUTTON_KIND/
+     * CHECKBOX_KIND's shared GTYP_BOOLGADGET was: real fixture,
+     * real AmiInspect/TREE output). intuition-model/src/walk.c's
+     * ClassifyStringGadget() discriminates via GT_GetGadgetAttrsA's
+     * documented GTIN_Number probe (gadtools.doc: listed under
+     * INTEGER_KIND only, not STRING_KIND). */
+    ng.ng_TopEdge += 24;
+    ng.ng_GadgetText = (UBYTE *)"Co_unt";
+    ng.ng_GadgetID = GID_COUNT;
+    ng.ng_Flags = PLACETEXT_LEFT;
+    gad = CreateGadget(INTEGER_KIND, gad, &ng,
+                        GTIN_Number, 0,
+                        GTIN_MaxChars, 6,
+                        GT_Underscore, '_',
+                        TAG_DONE);
+
     if (gad == NULL) {
         rc = RETURN_FAIL;
         goto cleanup;
@@ -262,7 +288,7 @@ int main(void)
 
     window = OpenWindowTags(NULL,
                              WA_Left, 40, WA_Top, 40,
-                             WA_Width, 220, WA_Height, 214,
+                             WA_Width, 220, WA_Height, 238,
                              WA_Title, (ULONG)"AmiPilot GadTools Fixture",
                              WA_Gadgets, (ULONG)glist,
                              WA_CloseGadget, TRUE,
