@@ -234,9 +234,27 @@ ANY window-owned system requester with the positive choice:
 Confirmed live (`tests/copperline/requester-test.py`'s
 `REQUESTER-YES-CLICKED`/`REQUESTER-DISMISSED` checks) — a real dismiss,
 verified by `WAITFOR REQUESTER` correctly timing out again afterward.
-One real limit remains: the system-wide (no owning window) case — a
-real disk-swap/DOS-error/Guru requester — is still detection-only,
-since it opens with no known title to pattern-match against at all.
+
+**System-wide requesters (no owning window) work too**, the same way
+(`BuildSysRequest(NULL, ...)` — exactly what `dos.library` calls
+internally for a real disk-swap "Please insert volume..." prompt or a
+DOS error requester): confirmed live to produce a window titled
+EXACTLY `"System Request"` — Intuition's own documented fallback
+title when no owning window (or explicit title) is given, not a
+coincidence:
+
+```rexx
+'CLICK GadTools 9'
+'WAITFOR REQUESTER TIMEOUT=10'
+'CLICK "System Request" 1'
+```
+
+Same fixed `GadgetID` convention, same plain `CLICK` mechanism — no
+special casing needed once you know the title. English-locale
+specific (like every window/screen title this project already treats
+as Locale-sensitive), and a real app titling its own window exactly
+`"System Request"` would false-positive here — an accepted,
+exceedingly unlikely collision.
 
 **`GETTEXT` cannot read a Requester's body text — confirmed as a
 permanent limit, not left open.** `struct Requester->ReqText` (a

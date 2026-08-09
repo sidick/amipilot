@@ -793,11 +793,37 @@ Lands in phase 0.2 onward -- see
   requester-test.py`'s `REQUESTER-YES-CLICKED`/`REQUESTER-DISMISSED`
   checks confirm this end to end: a plain `CLICK` genuinely dismisses
   a real `AutoRequest()`, verified by `WAITFOR REQUESTER` correctly
-  timing out again afterward (not a stale-state false pass). One real
-  limit remains, genuinely open, not silently worked around: the
-  system-wide (no owning window) case above is still detection-only --
-  `BuildSysRequest(NULL, ...)` opens on the default public screen with
-  no known title to `CLICK`/`TREE` pattern-match against at all.
+  timing out again afterward (not a stale-state false pass).
+
+  **The system-wide (no owning window) case is real too now**
+  (2026-08-09) -- `BuildSysRequest(NULL, ...)` (exactly what
+  `dos.library` itself calls internally for a genuine disk-swap
+  "Please insert volume..." prompt or a DOS error requester, per
+  `AutoRequest()`'s own autodoc NOTES section, not a simulation)
+  confirmed live to produce a window titled EXACTLY `"System
+  Request"` -- Intuition's own documented fallback title for a
+  titleless requester (`EasyRequestArgs()`'s own autodoc: "if this is
+  NULL, the title will be taken to be the same as the title of
+  'Window', if provided, or else 'System Request.'"), not a
+  coincidence tied to any one fixture, since `AutoRequest()`/
+  `BuildSysRequest()` have no title parameter of their own to override
+  it with. `WaitForRequesterPresent()` now matches that exact title as
+  a third detection branch, and -- since the resulting window is
+  structurally identical to the window-owned case (same
+  `frbuttonclass` Yes/No gadgets, same fixed `GadgetID` convention --
+  `CLICK "System Request" 1` reaches it via the exact same mechanism
+  already proven above, no new action-engine code needed.
+  `fixtures/gadtools-app`'s second button, "Ask System"
+  (`GID_ASK_SYSTEM`), exercises this real path;
+  `SYSTEM-REQUESTER-DETECTED`/`SYSTEM-REQUESTER-YES-CLICKED`/
+  `SYSTEM-REQUESTER-DISMISSED` in `tests/copperline/requester-test.py`
+  confirm detection, action, and a genuine dismiss end to end, the
+  same rigor as the window-owned case. English-locale specific, like
+  every other window/screen title this project already treats as
+  Locale-sensitive -- and, in principle, a real third-party app
+  titling its own window exactly `"System Request"` would
+  false-positive here, an accepted, exceedingly unlikely real-world
+  collision, not a design flaw.
 
   **`GETTEXT` genuinely cannot read a Requester's own body text, on
   this target -- a confirmed permanent limit, not an unfinished

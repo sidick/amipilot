@@ -1656,7 +1656,11 @@ EOF
 		'ASK-CLICKED OK' \
 		'REQUESTER-DETECTED PASS' \
 		'REQUESTER-YES-CLICKED OK' \
-		'REQUESTER-DISMISSED PASS'; do
+		'REQUESTER-DISMISSED PASS' \
+		'ASK-SYSTEM-CLICKED OK' \
+		'SYSTEM-REQUESTER-DETECTED PASS' \
+		'SYSTEM-REQUESTER-YES-CLICKED OK' \
+		'SYSTEM-REQUESTER-DISMISSED PASS'; do
 		if ! grep -qF "$pattern" "$BUILD/requester-result.txt" 2>/dev/null; then
 			echo "run.sh: FAIL (requester): expected line not found: $pattern"
 			ok=0

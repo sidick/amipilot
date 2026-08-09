@@ -36,11 +36,24 @@ clicking id=1 and getting a real dismiss. No REQ= locator, no wire
 protocol change, no new manifest field needed for this case -- issue
 #52's own "sketch, not yet scoped in detail" design turned out to be
 solving a problem this project's real target OS/ROM doesn't actually
-have. The still-real, still-open gap: a SYSTEM-WIDE requester (no
-owning window -- BuildSysRequest(NULL, ...), the disk-swap/DOS-error/
-Guru case) opens on the default public screen with no known title to
-pattern-match against at all, and remains genuinely unaddressed by
-this test or by CLICK/WAITFOR.
+have.
+
+The SYSTEM-WIDE case (no owning window -- a real disk-swap/DOS-error/
+Guru requester) is real too now (2026-08-09), exercised via
+fixtures/gadtools-app's second button, "Ask System" (GID_ASK_SYSTEM):
+calls AutoRequest(NULL, ...), exactly what dos.library itself does
+internally for a genuine disk-swap prompt (AutoRequest()'s own
+autodoc NOTES section), not a hand-rolled simulation. Confirmed live
+that this produces a window titled EXACTLY "System Request" --
+Intuition's own documented fallback title for a titleless requester
+(intuition.doc's EasyRequestArgs() autodoc), not a coincidence tied
+to this fixture. AmipPilotServer's WaitForRequesterPresent()
+(server/src/amipilotserver/main.c) now matches that exact title as a
+third detection branch alongside FirstRequest and the same-title-pair
+heuristic above. Structurally identical to the window-owned case --
+same frbuttonclass Yes/No gadgets, same fixed GadgetID convention --
+so CLICK reaches it via the exact same mechanism already proven above,
+no new action-engine code needed.
 
 Assertions:
 - WAITFOR REQUESTER *before* clicking Ask correctly times out (RC 15)
@@ -54,6 +67,10 @@ Assertions:
 - WAITFOR REQUESTER once more, now correctly timing out again -- proving
   the dismiss was genuine (FreeSysRequest() ran, the duplicate window
   and FirstRequest are both gone), not a false PASS on stale state.
+- The same four-step sequence again, now against Ask System (the
+  system-wide, no-owning-window case) and the "System Request" window
+  title instead -- detection, action, and dismiss confirmation all
+  proven for this case too, not just the window-owned one.
 
 Prints one greppable line per stage (run.sh asserts on them) and exits
 non-zero on any failure.
@@ -69,6 +86,8 @@ from amipilot.wire import WireError  # noqa: E402
 
 WINDOW = "AmiPilot GadTools Fixture"
 GID_ASK = 7
+GID_ASK_SYSTEM = 9
+SYSTEM_REQUEST_WINDOW = "System Request"
 
 
 def main() -> int:
@@ -113,6 +132,31 @@ def main() -> int:
         return 1
     except Timeout:
         print("REQUESTER-DISMISSED PASS")
+
+    # System-wide case (no owning window) -- Ask System calls
+    # AutoRequest(NULL, ...), producing a window titled exactly
+    # "System Request" (Intuition's own documented default -- see this
+    # file's own header comment). Same four-step sequence as above,
+    # against that title instead of WINDOW.
+    client.click(WINDOW, GID_ASK_SYSTEM)
+    print("ASK-SYSTEM-CLICKED OK")
+
+    try:
+        client.wait_for("requester", timeout=10)
+        print("SYSTEM-REQUESTER-DETECTED PASS")
+    except Timeout:
+        print("SYSTEM-REQUESTER-DETECTED FAIL")
+        return 1
+
+    client.click(SYSTEM_REQUEST_WINDOW, 1)
+    print("SYSTEM-REQUESTER-YES-CLICKED OK")
+
+    try:
+        client.wait_for("requester", timeout=2)
+        print("SYSTEM-REQUESTER-DISMISSED FAIL stillpresent")
+        return 1
+    except Timeout:
+        print("SYSTEM-REQUESTER-DISMISSED PASS")
 
     client.quit()
     client.close()

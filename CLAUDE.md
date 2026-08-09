@@ -169,9 +169,10 @@ header and no `reaction_macros.h` convenience macro exists for either)
 -- see `userdocs/Locator-Tiers-and-Limits.md`'s own writeup for the
 full reasoning behind each.
 
-Issue #52's Requester gap is real too now, on the acting half (the
-detection half, `WAITFOR REQUESTER`, already shipped in phase 0.5 --
-see below): investigating live (2026-08-09) whether the original
+Issue #52's Requester gap is fully closed now (the detection half,
+`WAITFOR REQUESTER`, already shipped in phase 0.5 -- see below;
+acting and the system-wide case both landed 2026-08-09): investigating
+live whether the original
 design sketch's `REQ=` locator idea was actually needed turned up a
 genuine surprise that made it unnecessary for the common case. A
 window-owned `AutoRequest()`/`BuildSysRequest()`/`EasyRequest()`
@@ -192,14 +193,38 @@ confirmed by actually clicking `GadgetID` 1 against
 `AutoRequest()` genuinely dismiss (`tests/copperline/
 requester-test.py`'s `REQUESTER-YES-CLICKED`/`REQUESTER-DISMISSED`
 checks, verified by a subsequent `WAITFOR REQUESTER` correctly timing
-out again -- not a stale-state false pass). One real limit remains,
-genuinely open, not silently worked around: the system-wide,
-no-owning-window case (a real disk-swap/DOS-error/Guru requester,
-`BuildSysRequest(NULL, ...)`) opens on the default public screen with
-no known title to pattern-match against at all -- still detection-only,
-the harder half of the original issue that stays genuinely open. See
-`server/README.md`'s own WAITFOR REQUESTER section for the full
-mechanism.
+out again -- not a stale-state false pass).
+
+The system-wide, no-owning-window case (a real disk-swap/DOS-error/
+Guru requester, `BuildSysRequest(NULL, ...)`) -- the harder half of the
+original issue -- is real too now, closing #52 fully. It turned out to
+have its own real, documented signal: confirmed live that
+`AutoRequest(NULL, ...)` (exactly what `dos.library` itself calls
+internally for a genuine disk-swap "Please insert volume..." prompt,
+per `AutoRequest()`'s own autodoc NOTES section, not a simulation)
+produces a window titled EXACTLY `"System Request"` -- Intuition's own
+documented fallback title for a titleless requester
+(`EasyRequestArgs()`'s own autodoc: "if this is NULL... 'System
+Request.'"), not a coincidence, since `AutoRequest()`/
+`BuildSysRequest()` have no title parameter to override it with.
+`WaitForRequesterPresent()` (`server/src/amipilotserver/main.c`) now
+matches that exact title as a third detection branch. Structurally
+identical to the window-owned case (same `frbuttonclass` Yes/No
+gadgets, same fixed `GadgetID` convention), so `CLICK "System Request"
+1` reaches it through the exact same mechanism already proven above --
+no new action-engine code needed for THIS half either.
+`fixtures/gadtools-app` gained a second button, "Ask System"
+(`GID_ASK_SYSTEM`), exercising the real `AutoRequest(NULL, ...)` path;
+`tests/copperline/requester-test.py`'s
+`SYSTEM-REQUESTER-DETECTED`/`SYSTEM-REQUESTER-YES-CLICKED`/
+`SYSTEM-REQUESTER-DISMISSED` checks confirm detection, action, and a
+genuine dismiss end to end, the same rigor as the window-owned case.
+English-locale specific (like every other window/screen title this
+project already treats as Locale-sensitive) -- and a real third-party
+app titling its own window exactly `"System Request"` would
+false-positive here, an accepted, exceedingly unlikely real-world
+collision, not a design flaw. See `server/README.md`'s own WAITFOR
+REQUESTER section for the full mechanism.
 
 Whether `GETTEXT` could read a requester's own body text was
 investigated the same day and settled as a confirmed PERMANENT limit,

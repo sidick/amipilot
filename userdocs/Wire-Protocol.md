@@ -625,8 +625,15 @@ client method at all: since it's a genuinely separate window sharing
 its owner's exact title, `client.click(window_pattern, gadget_id=1)`
 (the RKRM-documented, fixed `GadgetID` for the positive/"Yes" choice —
 `0` for negative/"No") already reaches it through the ordinary `click()`
-path. Confirmed live in `tests/copperline/requester-test.py`. The
-system-wide no-owning-window case remains detection-only.
+path. Confirmed live in `tests/copperline/requester-test.py`.
+
+System-wide requesters (no owning window, e.g. a real disk-swap
+prompt via `BuildSysRequest(NULL, ...)`) are detectable AND
+click-able too now: confirmed live to produce a window titled EXACTLY
+`"System Request"` (Intuition's own documented default), which
+`wait_for("requester")` now matches, and which `client.click("System
+Request", gadget_id=1)` reaches through the exact same mechanism as
+the window-owned case.
 
 `get_text()` cannot read a requester's own body text -- confirmed as a
 permanent limit (2026-08-09): `struct Requester->ReqText` would be the
