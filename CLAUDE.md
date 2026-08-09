@@ -462,3 +462,13 @@ before starting work in any of these.
   discrimination), find the documented contract (autodocs, RKRM) rather
   than assuming a plausible-looking flag check is right — then verify
   against a real fixture in the emulator, don't trust compilation alone.
+- Releases are tag-driven: `.github/workflows/release.yml` fires on any
+  pushed `v*` tag, checks the tag matches `version.mk`/`amipilot.readme`
+  (`scripts/verify-version.sh`), then delegates to
+  `sidick/amiga-workflows/aminet-release.yml` — builds `make dist`,
+  creates the GitHub release with the `.lha`/`.readme` attached, then
+  waits on the `aminet` environment's required reviewer before actually
+  uploading to Aminet. Same shape as sibling repos sana2loop/AmiAuth. A
+  release PR should still bump `version.mk` and `amipilot.readme`'s
+  `Version:` field through normal review before the tag is pushed — the
+  workflow verifies that match, it doesn't do the bump itself.
