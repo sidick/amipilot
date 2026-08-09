@@ -625,10 +625,16 @@ client method at all: since it's a genuinely separate window sharing
 its owner's exact title, `client.click(window_pattern, gadget_id=1)`
 (the RKRM-documented, fixed `GadgetID` for the positive/"Yes" choice —
 `0` for negative/"No") already reaches it through the ordinary `click()`
-path. Confirmed live in `tests/copperline/requester-test.py`. Still
-open: a requester's own body text isn't exposed as any gadget's
-attribute (`get_text()` has nothing to read), and the system-wide
-no-owning-window case remains detection-only.
+path. Confirmed live in `tests/copperline/requester-test.py`. The
+system-wide no-owning-window case remains detection-only.
+
+`get_text()` cannot read a requester's own body text -- confirmed as a
+permanent limit (2026-08-09): `struct Requester->ReqText` would be the
+obvious field, but a live dump of every open window's `FirstRequest`
+while a real `AutoRequest()` was up showed it NULL on both the owning
+window and the requester's own separate window -- no `struct
+Requester` exists anywhere reachable here for this OS/ROM's
+`AutoRequest()`, so there is no field for `get_text()` to query.
 
 This IS a genuine server-side blocking wait, not a host-side
 workaround: `AmiPilotServer`'s dispatch is single-threaded, so while

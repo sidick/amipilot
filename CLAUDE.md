@@ -192,16 +192,33 @@ confirmed by actually clicking `GadgetID` 1 against
 `AutoRequest()` genuinely dismiss (`tests/copperline/
 requester-test.py`'s `REQUESTER-YES-CLICKED`/`REQUESTER-DISMISSED`
 checks, verified by a subsequent `WAITFOR REQUESTER` correctly timing
-out again -- not a stale-state false pass). Two real limits remain,
-both genuinely open, not silently worked around: a requester's own
-body text (`ReqText`) is rendered directly as `IntuiText`, never
-exposed as any gadget's attribute, so `GETTEXT` has nothing to read;
-and the system-wide, no-owning-window case (a real disk-swap/DOS-
-error/Guru requester, `BuildSysRequest(NULL, ...)`) opens on the
-default public screen with no known title to pattern-match against at
-all -- still detection-only, the harder half of the original issue
-that stays genuinely open. See `server/README.md`'s own WAITFOR
-REQUESTER section for the full mechanism.
+out again -- not a stale-state false pass). One real limit remains,
+genuinely open, not silently worked around: the system-wide,
+no-owning-window case (a real disk-swap/DOS-error/Guru requester,
+`BuildSysRequest(NULL, ...)`) opens on the default public screen with
+no known title to pattern-match against at all -- still detection-only,
+the harder half of the original issue that stays genuinely open. See
+`server/README.md`'s own WAITFOR REQUESTER section for the full
+mechanism.
+
+Whether `GETTEXT` could read a requester's own body text was
+investigated the same day and settled as a confirmed PERMANENT limit,
+not a gap left for later: `struct Requester->ReqText` (a `struct
+IntuiText *`, per `BuildSysRequest()`'s own autodoc) is where the body
+text would live -- but a live dump of `FirstRequest`/`ReqCount` for
+EVERY open window while a real `AutoRequest()` was up (a temporary
+`AmiInspect` diagnostic, reverted after use) showed both NULL/0 on
+BOTH the owning window (genuinely blocked inside `AutoRequest()` at
+the time) and the requester's own separate window -- ruling out "just
+checking the wrong window" as an alternative explanation. No `struct
+Requester` exists anywhere reachable in this scenario on this
+project's real target OS/ROM; the body text is rendered directly into
+the requester window's own bitmap at open time, with no structural
+field retaining it afterward for anything to read back. The same shape
+as this project's other confirmed structural-reading limits (a
+`PLACETEXT_IN` button's baked-in label, `layout.gadget`'s invisible
+children) -- `GETTEXT` needs a live field to query, and there
+genuinely isn't one here.
 
 Phase 0.5 (reliability and reach into the wider ecosystem)
 before it: `WAITFOR` (including its

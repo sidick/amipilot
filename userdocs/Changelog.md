@@ -21,12 +21,16 @@ for the full engineering detail and phase sequencing behind each one.
   `GadgetID` convention (`TRUE`=1 for the positive choice, `FALSE`=0
   for the negative), confirmed live: `CLICK <same-pattern> 1`
   genuinely dismisses the requester, verified by `WAITFOR REQUESTER`
-  correctly timing out again afterward. Two real limits remain, both
-  genuinely open: a requester's own body text isn't exposed as any
-  gadget attribute (`GETTEXT` has nothing to read), and a system-wide
-  requester with no owning window (a disk-swap prompt, a Guru) is
-  still detection-only, since it opens with no known title to
-  pattern-match against at all.
+  correctly timing out again afterward. One real limit remains,
+  genuinely open: a system-wide requester with no owning window (a
+  disk-swap prompt, a Guru) is still detection-only, since it opens
+  with no known title to pattern-match against at all. Confirmed
+  separately (2026-08-09) that `GETTEXT` reading a requester's own body
+  text is a permanent limit, not an open gap: a live dump of every open
+  window's `FirstRequest` while a real `AutoRequest()` was up showed it
+  NULL on both the owning window and the requester's own window — no
+  `struct Requester` exists anywhere reachable here to read `ReqText`
+  off of on this target's real OS/ROM.
 - **BOOPSI/ReAction role classification for 12 WB3.2-era gadget
   classes** (issue #69): `clicktab.gadget`, `colorwheel.gadget`,
   `datebrowser.gadget`, `fuelgauge.gadget`, `getcolor.gadget`,

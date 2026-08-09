@@ -793,14 +793,34 @@ Lands in phase 0.2 onward -- see
   requester-test.py`'s `REQUESTER-YES-CLICKED`/`REQUESTER-DISMISSED`
   checks confirm this end to end: a plain `CLICK` genuinely dismisses
   a real `AutoRequest()`, verified by `WAITFOR REQUESTER` correctly
-  timing out again afterward (not a stale-state false pass). Two real
-  limits remain, both genuinely open, not silently worked around: a
-  Requester's own body text (`ReqText`) is rendered directly as
-  `IntuiText`, not exposed as any gadget's attribute, so `GETTEXT` has
-  no way to read "Are you sure?" itself; and the system-wide (no
-  owning window) case above is still detection-only -- `BuildSysRequest
-  (NULL, ...)` opens on the default public screen with no known title
-  to `CLICK`/`TREE` pattern-match against at all.
+  timing out again afterward (not a stale-state false pass). One real
+  limit remains, genuinely open, not silently worked around: the
+  system-wide (no owning window) case above is still detection-only --
+  `BuildSysRequest(NULL, ...)` opens on the default public screen with
+  no known title to `CLICK`/`TREE` pattern-match against at all.
+
+  **`GETTEXT` genuinely cannot read a Requester's own body text, on
+  this target -- a confirmed permanent limit, not an unfinished
+  feature.** `struct Requester`'s `ReqText` field (a `struct
+  IntuiText *`, per `BuildSysRequest()`'s own autodoc: "this IntuiText
+  pointer will be stored in the ReqText variable of the new
+  requester") would be the obvious place to read "Are you sure?" back
+  from -- but that field is only reachable via a live `struct
+  Requester`, and confirmed directly (2026-08-09, dumping
+  `FirstRequest`/`ReqCount` for EVERY open window while a real
+  `AutoRequest()` was up): `FirstRequest` is NULL and `ReqCount` is 0
+  on BOTH the owning window (genuinely blocked inside `AutoRequest()`
+  at the time) and the new synthetic requester window this section
+  above already established CLICK can reach -- not just on one of
+  them, ruling out "checked the wrong window" as the explanation. No
+  `struct Requester` exists anywhere in this scenario on this target's
+  real OS/ROM to read `ReqText` off of at all; the body text is
+  rendered directly into the requester window's own bitmap at open
+  time with no structural field retaining it afterward. `GETTEXT`
+  needs a live field to query -- there genuinely isn't one here, the
+  same shape as this project's other confirmed structural-reading
+  limits (a `PLACETEXT_IN` button's baked-in label, `layout.gadget`'s
+  invisible children).
 
 - **MUI-ARexx bridge tier (phase 0.5, shipped in v0.5):** `MUIREXX <app-base> [TIMEOUT=<n>]
   <command...>` sends `<command>` verbatim to the ARexx port of the MUI

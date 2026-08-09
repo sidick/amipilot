@@ -234,11 +234,22 @@ ANY window-owned system requester with the positive choice:
 Confirmed live (`tests/copperline/requester-test.py`'s
 `REQUESTER-YES-CLICKED`/`REQUESTER-DISMISSED` checks) — a real dismiss,
 verified by `WAITFOR REQUESTER` correctly timing out again afterward.
-Two real limits remain: a requester's own body text (`ReqText`) is
-rendered directly, not exposed as any gadget's attribute, so `GETTEXT`
-can't read it; and the system-wide (no owning window) case — a real
-disk-swap/DOS-error/Guru requester — is still detection-only, since it
-opens with no known title to pattern-match against at all.
+One real limit remains: the system-wide (no owning window) case — a
+real disk-swap/DOS-error/Guru requester — is still detection-only,
+since it opens with no known title to pattern-match against at all.
+
+**`GETTEXT` cannot read a Requester's body text — confirmed as a
+permanent limit, not left open.** `struct Requester->ReqText` (a
+`struct IntuiText *`) is where `BuildSysRequest()`'s own autodoc says
+the body text ends up — but that field lives on a `struct Requester`
+this project confirmed (2026-08-09) genuinely does not exist anywhere
+reachable here: dumping `FirstRequest`/`ReqCount` for every open
+window while a real `AutoRequest()` was up showed both NULL/0 on the
+owning window (blocked inside `AutoRequest()` at the time) AND the
+requester's own separate window. The text is rendered directly at
+open time with no structural field retaining it — `GETTEXT` has
+nothing to query, the same shape as other confirmed structural-reading
+limits (a `PLACETEXT_IN` button's baked-in label).
 
 **Scope today:** `WINDOW=`/`NOWINDOW=`/`TEXT=`/`REQUESTER` conditions
 are understood, and only `CLICK` composes with `EXPECT=` (`WINDOW=`/
