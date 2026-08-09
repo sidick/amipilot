@@ -9,7 +9,7 @@ Stdlib-only by design, matching the wire's own no-dependency spirit
 (`docs/implementation-plan.md`, "Protocol and client") -- nothing here
 needs installing beyond Python 3.9+.
 
-## Current state (phase 0.5)
+## Current state (1.0)
 
 - **`amipilot.wire`** -- `WireClient`: transport-level framing (strict
   by-byte-count reads, `VERSION` handshake with protocol pinning). The
@@ -19,8 +19,10 @@ needs installing beyond Python 3.9+.
   `Gadget` dataclasses.
 - **`amipilot.client`** -- `Amipilot`, the object API test code
   actually imports: `tree()`, `click()`, `type()`, `get_text()`,
-  `manifest()`, `drag()`, `wait_for()`, `launch()`, `mui_command()`,
-  the file API (`fs_list()` etc.), `quit()`, plus `@name`- and
+  `manifest()`, `drag()`, `wait_for()`, `launch()`, `wb_launch()`,
+  `mui_command()`, the file API (`fs_list()`/`fs_get()`/`fs_put()`
+  etc.), `window_move()`/`window_resize()`, `screenshot()`, `quit()`,
+  plus `@name`- and
   tier-2 `ROLE=`/`LABEL=`/`INDEX=`-locator variants
   (`click_by_name()`, `click_by_role()`, etc.). Non-OK RCs raise typed
   exceptions (`NotFound`/`CommandError`/`ActionFailed`/`Timeout`)
@@ -46,6 +48,13 @@ needs installing beyond Python 3.9+.
   `tests/copperline/README.md`'s "Golden-tree fixtures and Locale"
   section before treating a golden file as portable across machines
   with different Locale preferences.
+- **`amipilot.screenshot`** (1.0) -- the host half of `SCREENSHOT`'s
+  "wire stays simple, host does the rendering" split: decodes a raw
+  capture (classic planar or a genuine Picasso96 pixel format,
+  including the 16-bit `PC`-suffix byte-swap pitfall) and writes PNG
+  and IFF ILBM, stdlib-only, no Pillow. `Amipilot.screenshot()` is
+  the client entry point; the byte-exact decode/encode logic has its
+  own unit tests against synthetic captures.
 - **The MUI-ARexx bridge tier** (phase 0.5 -- `Amipilot.mui_command()`):
   `MUIREXX <app-base> [TIMEOUT=<n>] <command...>`'s host wrapper --
   sends `command` verbatim to a MUI application's own ARexx port and

@@ -17,7 +17,7 @@ full design, phase sequencing, and minimum requirements, and
 
 ## Status
 
-**v0.5 released; phase 1.0 work in progress on `main`, not yet tagged.**
+**v1.0 — the first full release.**
 What shipped in v0.1 (`intuition-model`, the standalone `AmiInspect`
 Shell command) is still there, but this is no longer a read-only
 inspector: `AmiPilotServer`, an on-Amiga commodity, actually drives a
@@ -32,7 +32,7 @@ ARexx-driven apps, and real Picasso96/RTG hardware emulation. See the
 [Changelog](userdocs/Changelog.md) for what's in each release and its
 known gaps, `CLAUDE.md`'s "Current state" section for what's real on
 `main` right now, and the implementation plan's "Phases" section for
-what 1.0 itself still needs.
+how each phase built up to 1.0.
 
 ## Repository layout
 

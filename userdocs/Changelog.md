@@ -7,6 +7,70 @@ the repository's
 [`docs/implementation-plan.md`](https://github.com/sidick/amipilot/blob/main/docs/implementation-plan.md)
 for the full engineering detail and phase sequencing behind each one.
 
+## v1.0 — 2026-08-09
+
+The first full release: everything the implementation plan's 1.0 gate
+asked for — getting files and programs *onto* the machine the way a
+real user would, seeing what's actually on screen, and manipulating
+whole windows — verified end to end, including on a completely bare
+machine profile and against real Picasso96/RTG.
+
+- **`FSPUT`**: push a file from the host onto the Amiga, completing
+  the file API's round trip (`FSGET` could already read one back).
+  The wire's first request to carry a raw binary body — and
+  deliberately wire-only, with no ARexx form at all, since ARexx
+  messages can only ever carry string arguments (a real, permanent
+  transport asymmetry, stated rather than papered over). See
+  [Wire Protocol](Wire-Protocol.md#file-api).
+- **`WBLAUNCH`**: launch a program the way Workbench itself does — a
+  genuine `WBStartup`/`WBArg` message to a real non-CLI process, the
+  same technique real launcher utilities use — with `TOOLTYPE=`
+  overrides (merged into a scratch copy of the icon in `T:`, never
+  the application's own `.info` file, because a Workbench-started
+  program reads its tooltypes back off disk — there is no in-memory
+  channel) and `ARG=` project-file arguments. `LAUNCH` (0.4) covers
+  the Shell-start case; this covers the other half of how real
+  software actually starts. See
+  [Wire Protocol](Wire-Protocol.md#wblaunch).
+- **`SCREENSHOT`**: capture a screen (or one window's region of it)
+  as raw pixels — classic planar screens *and* genuine
+  Picasso96/RTG bitmaps in their native pixel formats — with all
+  image-format work (PNG, IFF ILBM, P96 pixel-format decoding,
+  including the documented 16-bit `PC`-suffix byte-order pitfall)
+  done host-side, stdlib-only. The P96 path is verified against real
+  Picasso96 under emulation, both CLUT and truecolor, not just
+  compiled. Inspector tooling, not a locator mechanism. See
+  [Wire Protocol](Wire-Protocol.md#screenshot).
+- **`WINDOWMOVE`/`WINDOWSIZE`**: move or resize a whole window via
+  the same genuinely synthesized press/move/release drags gadgets
+  already get, anchored on the window's own title bar or sizing
+  gadget. See [Wire Protocol](Wire-Protocol.md#window-move-and-resize).
+- **`WAITFOR REQUESTER`**: wait for a genuine Intuition Requester to
+  appear — the detection-only first slice of requester support
+  (window-attached requesters only; addressing or clicking a
+  requester's own gadgets is stated, open follow-up work, not
+  quietly missing). See
+  [ARexx Reference](ARexx-Reference.md#waitexpectation-primitives).
+- **Fixed**: `CLICK` with a `ROLE=`/`INDEX=` locator could silently
+  act on the wrong *system* gadget (close/depth/drag) instead of the
+  application gadget the locator actually matched.
+- **Verification hardened for 1.0**: the on-target suite now includes
+  the implementation plan's own "bare machine" lifecycle check (a
+  stock boot with nothing pre-staged), an automated TCP-transport
+  check (real `bsdsocket.library` over Copperline's host networking,
+  not just serial), and an automated P96 `SCREENSHOT` capture-path
+  check — plus a dedicated pre-1.0 code review whose findings were
+  all fixed before this release.
+
+Known gaps, stated plainly: requester support is detection-only;
+menu selection still needs a keyboard shortcut (pointer-based
+selection for shortcut-less items isn't built); a `window.class`
+window's `layout.gadget`-nested children remain unreachable on
+classic OS 3.x (a documented platform limit, not a bug — see
+[Locator Tiers and Limits](Locator-Tiers-and-Limits.md)); and TCP
+remains LAN-only trust — no TLS, see
+[Securing TCP](Wire-Protocol.md#securing-tcp).
+
 ## v0.5 — 2026-08-08
 
 Reliability and reach into the wider ecosystem: waiting on real

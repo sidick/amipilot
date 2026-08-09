@@ -83,7 +83,7 @@ AmiInspect x.y
 AmiPilotServer x.y
 ```
 
-(`x.y` will be the actual release version, e.g. `0.5` — shown
+(`x.y` will be the actual release version, e.g. `1.0` — shown
 genericized here so this example doesn't go stale every release; see
 the [Changelog](Changelog.md) for what's current.)
 
