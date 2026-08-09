@@ -20,7 +20,16 @@
  * muirexx.c's own (a second, deliberate copy -- same "separate copies
  * on purpose" convention arexx_cmd.c/manifest.c's shared portable
  * helpers already follow, here because the two are subtly different on
- * purpose, not by oversight). */
+ * purpose, not by oversight).
+ *
+ * A receiver implementing WHERE must NOT gate incoming messages on
+ * rexxsyslib.library's own IsRexxMsg() -- confirmed experimentally
+ * (2026-08-09, including two separate attempted sender-side fixes,
+ * neither of which changed the outcome) that a message built here via
+ * CreateRexxMsg()/FillRexxMsg()/PutMsg() never satisfies it, for
+ * reasons this module's own send code can't control. See the doc
+ * comment on fixtures/classact-app/src/main.c's HandleWhereMessage()
+ * for the full investigation and what a receiver should do instead. */
 #ifndef AMIPILOT_WHERE_H
 #define AMIPILOT_WHERE_H
 
