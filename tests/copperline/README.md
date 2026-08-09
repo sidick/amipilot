@@ -239,20 +239,33 @@ node type left at `NT_MESSAGE`, not `NT_REPLYMSG`.
 `rexxsyslib.library`'s own `IsRexxMsg()` call reports such a message
 as not a genuine `RexxMsg` at all, even though every other field
 (`rm_Action`'s `RXCOMM` bit, `ARG0()`'s command text) is exactly
-correct. This was invisible in the MUIREXX check because MUI-Demo's
-own ARexx handling never calls `IsRexxMsg()` on what it receives —
-only `CAAPP.WHERE`, written to match `server/src/arexx.c`'s own
-receiver-side convention of gating on it, ever exposed the gap.
-Root-caused by direct inspection: a debug build of the fixture dumped
-`ln_Type`/`rm_Action` straight from the message it received, off a
-port dedicated to nothing else, ruling out every "wrong message" or
-"wrong port" theory before landing on the real one. Fixed by having
-`CAAPP.WHERE` trust any message that arrives on its own dedicated
-port rather than gating on `IsRexxMsg()` at all — see the doc comment
-on `HandleWhereMessage()` in `fixtures/classact-app/src/main.c` for
-the full account, and `server/README.md`'s own WHERE section for what
-this means for `MUIREXX` (same latent gap, not fixed there since it
-isn't this issue's scope and no real MUI target has ever tripped it).
+correct. Root-caused by direct inspection: a debug build of the
+fixture dumped `ln_Type`/`rm_Action` straight from the message it
+received, off a port dedicated to nothing else, ruling out every
+"wrong message" or "wrong port" theory. Two attempted sender-side
+fixes — pre-marking the outgoing message's own node type
+`NT_REPLYMSG` (the commonly cited technique for a hand-sent ARexx
+command), and using a genuine `CreateArgstring()`-backed `rm_Args[0]`
+instead of a raw C string pointer — changed nothing; the receiver's
+own `ln_Type` stayed `NT_MESSAGE` regardless, each rebuilt and
+retested live. The actual explanation: `IsRexxMsg()` checks
+`ln_Type == NT_REPLYMSG`, which `ReplyMsg()` sets — the right
+question for a *sender* inspecting what came back on its own reply
+port, not a *receiver* validating an incoming, not-yet-answered
+command, which is legitimately still `NT_MESSAGE` at that point no
+matter how carefully the sender is built. `RXCOMM` (`rexx/storage.h`'s
+own "a command-level invocation") is the field that actually answers
+the receiver's real question, and every sender here already sets it
+correctly. Fixed by having `CAAPP.WHERE` validate incoming messages
+with `rm_Action & RXCOMM` instead of `IsRexxMsg()` — a genuinely
+ordinary, one-condition receive-loop change any third-party ARexx port
+implementation can make, not a dedicated-port workaround; see the doc
+comment on `HandleWhereMessage()` in
+`fixtures/classact-app/src/main.c` for the full account, and
+`server/README.md`'s own WHERE section for what this means for
+`server/src/arexx.c`'s own receiver (checks the same wrong condition,
+but has never been observed to actually reject a real ARexx script's
+command, so left unchanged here — outside this issue's scope).
 
 ## Ad hoc smoke testing (debugging, new fixtures)
 

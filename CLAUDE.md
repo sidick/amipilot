@@ -48,15 +48,21 @@ muirexx.c`) already used successfully against real MUI-Demo -- arrives
 at the receiver with its node type left at `NT_MESSAGE`, not
 `NT_REPLYMSG`; `rexxsyslib.library`'s own `IsRexxMsg()` reports such a
 message as not a genuine `RexxMsg` at all despite every other field
-being correct, confirmed by direct inspection of the raw message from
-the fixture's own receiving side. This was invisible in the existing
-MUIREXX check only because MUI-Demo's own ARexx handling never calls
-`IsRexxMsg()` on what it receives -- fixed by having `CAAPP.WHERE`
-(a port dedicated solely to this one protocol) trust any message that
-arrives on it rather than gating on `IsRexxMsg()`, see the doc comment
-on `HandleWhereMessage()` in `fixtures/classact-app/src/main.c`.
-`MUIREXX` has this same latent gap, not fixed there since no real MUI
-target has ever tripped it and it's outside this issue's scope.
+being correct. Two attempted sender-side fixes (pre-marking
+`ln_Type = NT_REPLYMSG` before sending; using a genuine
+`CreateArgstring()`-backed `rm_Args[0]`) changed nothing. Root cause:
+`IsRexxMsg()` checks `ln_Type == NT_REPLYMSG`, which `ReplyMsg()`
+sets -- the right check for a *sender* inspecting its own reply, not
+a *receiver* validating an incoming, not-yet-answered command, which
+is legitimately still `NT_MESSAGE` regardless of how the sender is
+built. The field that actually means "this is a command invocation"
+is `RXCOMM` itself (already set correctly by every sender here) --
+fixed by having `CAAPP.WHERE` validate incoming messages with
+`rm_Action & RXCOMM` instead of `IsRexxMsg()`, see the doc comment on
+`HandleWhereMessage()` in `fixtures/classact-app/src/main.c`. A
+genuinely standard, ordinary ARexx port -- nothing dedicated-port-only
+about this fix, any third-party implementer (e.g. AmiAuth) needs only
+the same one-condition change.
 
 Phase 0.5 (reliability and reach into the wider ecosystem)
 before it: `WAITFOR` (including its

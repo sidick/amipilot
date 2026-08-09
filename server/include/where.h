@@ -22,14 +22,20 @@
  * helpers already follow, here because the two are subtly different on
  * purpose, not by oversight).
  *
- * A receiver implementing WHERE must NOT gate incoming messages on
- * rexxsyslib.library's own IsRexxMsg() -- confirmed experimentally
- * (2026-08-09, including two separate attempted sender-side fixes,
- * neither of which changed the outcome) that a message built here via
- * CreateRexxMsg()/FillRexxMsg()/PutMsg() never satisfies it, for
- * reasons this module's own send code can't control. See the doc
- * comment on fixtures/classact-app/src/main.c's HandleWhereMessage()
- * for the full investigation and what a receiver should do instead. */
+ * A receiver implementing WHERE should validate an incoming message
+ * with `rm_Action & RXCOMM` ("a command-level invocation",
+ * rexx/storage.h), NOT rexxsyslib.library's own IsRexxMsg() --
+ * confirmed experimentally (2026-08-09) that IsRexxMsg() checks
+ * ln_Type == NT_REPLYMSG, which ReplyMsg() sets: the right question
+ * for a SENDER inspecting what came back on its own reply port, not
+ * for a RECEIVER validating an incoming, not-yet-answered command,
+ * which is correctly still NT_MESSAGE at that point regardless of how
+ * carefully the sender is built. This module's own send
+ * (CreateRexxMsg()/FillRexxMsg()/PutMsg(), the same recipe muirexx.c's
+ * AmipMuiRexxSend() uses) already sets RXCOMM correctly, matching any
+ * genuine ARexx command invocation -- see the doc comment on
+ * fixtures/classact-app/src/main.c's HandleWhereMessage() for the
+ * full account. */
 #ifndef AMIPILOT_WHERE_H
 #define AMIPILOT_WHERE_H
 

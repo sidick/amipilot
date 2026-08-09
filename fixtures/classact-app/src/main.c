@@ -208,37 +208,28 @@ static void ReplyWhere(struct RexxMsg *msg, int rc, const char *text)
  * same convention AmipGadgetCenter()/AmipClickWindowRelative() expect
  * on the AmiPilot side (server/src/action.c).
  *
- * Deliberately does NOT gate on rexxsyslib.library's own IsRexxMsg()
- * first, unlike server/src/arexx.c's own receiver. Two rounds of
- * experimentation (2026-08-09) against this exact port, with a
- * completely ordinary, unmodified IsRexxMsg() gate restored each
- * time, ruled out every sender-side fix tried: neither pre-marking
- * the outgoing message's own node type NT_REPLYMSG (the commonly
- * cited technique for a hand-built ARexx command send) nor using a
- * genuine CreateArgstring()-allocated rm_Args[0] (instead of a raw C
- * string pointer) made IsRexxMsg() accept a message built via
- * CreateRexxMsg()/FillRexxMsg()/PutMsg() (server/src/where.c's own
- * AmipWhereQuery() -- the same recipe server/src/muirexx.c's
- * AmipMuiRexxSend() already uses). The receiver's own ln_Type read
- * stayed NT_MESSAGE regardless of what the sender set beforehand --
- * consistent with PutMsg() itself resetting it, a real Exec message-
- * queueing behavior a real ARexx interpreter's own outgoing command
- * sends must go through some other, non-public mechanism to avoid.
- * IsRexxMsg() (a real rexxsyslib.library call, not just a header-
- * field check) is seemingly reachable in its "true" state only for
- * messages a live Rexx interpreter task itself constructs -- not
- * achievable for this project's own hand-built sends by any public
- * API combination tried. arexx.c's own receiver-side use of
- * IsRexxMsg() only ever works because its senders are real ARexx
- * scripts (`rx`), never this project's own MUIREXX/WHERE bridges.
- * CAAPP.WHERE is a port dedicated solely to this one protocol
- * (manifest/SPEC.md's own "Clash guard" -- a general-purpose port
- * sharing this same MsgPort would need a real discriminator here
- * instead), so trusting every message that arrives on it is the
- * correct, verified choice -- not a shortcut. Any third-party
- * application implementing WHERE needs the same: a receive loop that
- * does NOT call IsRexxMsg() on what it gets, on a port used for
- * nothing else. */
+ * Gates on rm_Action & RXCOMM ("a command-level invocation",
+ * rexx/storage.h) in the caller (ProcessEvents() below), NOT
+ * rexxsyslib.library's own IsRexxMsg() the way server/src/arexx.c's
+ * receiver does -- found empirically (2026-08-09) that IsRexxMsg()
+ * checks ln_Type == NT_REPLYMSG, which ReplyMsg() sets (a documented
+ * Exec behavior); it answers "has this message already been
+ * replied", the right question for a SENDER inspecting what it got
+ * back on its own reply port, not for a RECEIVER validating an
+ * incoming, not-yet-answered command. A message built via
+ * CreateRexxMsg()/FillRexxMsg()/PutMsg() -- ours (server/src/where.c's
+ * AmipWhereQuery(), the same recipe server/src/muirexx.c's
+ * AmipMuiRexxSend() uses) and, most likely, any well-behaved
+ * third-party sender's -- is correctly NOT yet "replied" at the
+ * moment its receiver first sees it, so IsRexxMsg() correctly (if
+ * unhelpfully, for this purpose) reports false regardless of how
+ * carefully the sender is built. RXCOMM is the field actually meant
+ * to answer "is this a command invocation I should act on" -- see
+ * rexx/storage.h's own comment on it. arexx.c's receiver-side
+ * IsRexxMsg() gate happens to work for its own senders (real ARexx
+ * scripts via `rx`) but is checking the wrong condition for this
+ * purpose too; not touched here since it's outside this issue's
+ * scope and works for what it actually receives. */
 static void HandleWhereMessage(struct RexxMsg *msg)
 {
     const char *cmdline = (const char *)ARG0(msg);
@@ -310,7 +301,7 @@ static void CloseWherePort(struct MsgPort *port)
     Permit();
 
     while ((msg = (struct RexxMsg *)GetMsg(port)) != NULL) {
-        if (IsRexxMsg(msg)) {
+        if (msg->rm_Action & RXCOMM) {
             ReplyWhere(msg, 20, NULL);
         } else {
             ReplyMsg((struct Message *)msg);
@@ -368,16 +359,18 @@ static void ProcessEvents(Object *windowObject, struct MsgPort *wherePort)
         signals = Wait(windowSignal | whereSignal);
 
         if (whereSignal != 0 && (signals & whereSignal) != 0) {
-            /* No IsRexxMsg() gate here -- see HandleWhereMessage()'s
-             * own doc comment for why not, and why that's the
-             * correct choice for a port dedicated solely to this one
-             * protocol, not a shortcut. Every message on this port
-             * must still be replied by its receiver, or the sender
-             * leaks/hangs waiting for a reply that never comes --
-             * HandleWhereMessage() always does, on every path. */
             struct RexxMsg *msg;
             while ((msg = (struct RexxMsg *)GetMsg(wherePort)) != NULL) {
-                HandleWhereMessage(msg);
+                /* rm_Action & RXCOMM, not IsRexxMsg() -- see
+                 * HandleWhereMessage()'s own doc comment for why.
+                 * Every message on this port must still be replied
+                 * by its receiver, or the sender leaks/hangs waiting
+                 * for a reply that never comes. */
+                if (msg->rm_Action & RXCOMM) {
+                    HandleWhereMessage(msg);
+                } else {
+                    ReplyMsg((struct Message *)msg);
+                }
             }
         }
 

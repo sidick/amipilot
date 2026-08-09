@@ -935,28 +935,30 @@ Lands in phase 0.2 onward -- see
   not `NT_REPLYMSG`. `rexxsyslib.library`'s own `IsRexxMsg()` reports
   such a message as not a `RexxMsg` at all, even though `rm_Action`
   correctly carries `RXCOMM` and `ARG0()` reads back the real command
-  text -- confirmed by direct inspection (dumping `ln_Type`/
-  `rm_Action` from the fixture's own receiving side) that a message
-  built exactly this way is structurally sound in every way
-  `IsRexxMsg()` doesn't check. A real ARexx interpreter's own
-  outgoing command messages (a genuine `rx` script's `ADDRESS`)
-  apparently arrive already marked `NT_REPLYMSG` through some internal
-  `rexxsyslib` mechanism this project's own hand-built sends don't
-  reproduce -- `IsRexxMsg()` seems intended for a *sender* validating
-  its own reply, not a receiver validating an incoming command, and
-  `server/src/arexx.c`'s own receiver-side use of it only ever works
-  because its senders are real ARexx scripts, never this project's own
-  bridges. Fixed by having `CAAPP.WHERE` -- a port dedicated solely to
-  this one protocol, per the "Clash guard" convention above -- trust
-  every message that arrives on it rather than gating on `IsRexxMsg()`
-  first; see the doc comment on `HandleWhereMessage()` in
+  text. Two attempted sender-side fixes (pre-marking the outgoing
+  message's own node type `NT_REPLYMSG`, and using a genuine
+  `CreateArgstring()`-allocated `rm_Args[0]` instead of a raw pointer)
+  changed nothing -- the receiver's own `ln_Type` stayed `NT_MESSAGE`
+  regardless. The actual explanation: `IsRexxMsg()` checks
+  `ln_Type == NT_REPLYMSG`, which `ReplyMsg()` sets -- the right
+  question for a *sender* inspecting what came back on its own reply
+  port, not for a *receiver* validating an incoming, not-yet-answered
+  command, which is correctly still `NT_MESSAGE` at that point no
+  matter how the sender is built. The field actually meaning "this is
+  a command invocation" is `RXCOMM` itself (`rexx/storage.h`'s own
+  comment on it), which every correct sender -- ours included --
+  already sets. Fixed by having `CAAPP.WHERE` validate incoming
+  messages with `rm_Action & RXCOMM` instead of `IsRexxMsg()`; see the
+  doc comment on `HandleWhereMessage()` in
   `fixtures/classact-app/src/main.c` for the full account.
-  `MUIREXX`'s own `AmipMuiRexxSend()` has this same latent gap, masked
-  there only because MUI-Demo's built-in ARexx handling never calls
-  `IsRexxMsg()` on what it receives either -- not fixed here, since
-  MUIREXX genuinely works against every real target tried and isn't
-  this issue's scope, but worth knowing if a future MUIREXX target
-  ever does check.
+  `server/src/arexx.c`'s own receiver-side `IsRexxMsg()` gate checks
+  the same condition; it's never actually been observed to reject a
+  real ARexx script's (`rx`) own command (a genuine `rx`/interpreter
+  send is a different code path than this project's own hand-built
+  `CreateRexxMsg()`/`PutMsg()` sends, and exactly why it satisfies
+  `IsRexxMsg()` wasn't chased down here) -- not touched in this PR,
+  since it's outside this issue's scope and continues to work
+  correctly for what it actually receives.
 
 ## Phase 0.2 (shipped)
 
