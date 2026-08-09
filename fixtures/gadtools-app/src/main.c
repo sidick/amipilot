@@ -48,11 +48,19 @@
  * string gadget's text so a MENUPICK-by-shortcut round trip is
  * observable via the existing GETTEXT path), a "Toggle" checkmark
  * item (CHECKIT|MENUTOGGLE, starts checked -- exercises the walker's
- * checkit/checked fields), a permanently "Disabled" item (no
- * shortcut, ITEMENABLED off), a separator bar, and a "More" item with
- * one submenu entry "Sub Item" (shortcut S, also sets the Host text)
- * -- exercises the one-level-deep submenu walk and its own shortcut
- * addressing (menu 0, item 4, sub 0).
+ * checkit/checked fields, and is also the fixture's only enabled,
+ * shortcut-less leaf item, so it doubles as the MENUPICK
+ * pointer-based-fallback target, issue #63 -- its own IDCMP_MENUPICK
+ * marker write proves a real RMB-down/move/RMB-up round trip reached
+ * Intuition's own menu tracking, not just that a shortcut keystroke
+ * was struck), a permanently "Disabled" item (no shortcut,
+ * ITEMENABLED off), a separator bar, and a "More" item with two
+ * submenu entries: "Sub Item" (shortcut S, also sets the Host text --
+ * exercises the one-level-deep submenu walk and its own shortcut
+ * addressing, menu 0, item 4, sub 0) and "Sub NoShortcut" (no
+ * shortcut, sub 1 -- the fixture's only shortcut-less sub-item,
+ * proving MENUPICK's pointer-based fallback reaches a genuine
+ * sub-item, not just a top-level one).
  */
 
 #include <exec/types.h>
@@ -81,17 +89,20 @@ struct Library *GadToolsBase;
 
 #define MENUNUM_PROJECT   0
 #define ITEMNUM_ABOUT     0
+#define ITEMNUM_TOGGLE    1
 #define ITEMNUM_MORE      4
 #define SUBNUM_SUBITEM    0
+#define SUBNUM_SUBNOSHORTCUT 1
 
 static struct NewMenu g_newMenu[] = {
     { NM_TITLE, (STRPTR)"Project",  NULL,        0,                        0, NULL },
     { NM_ITEM,  (STRPTR)"About",    (STRPTR)"A", 0,                        0, NULL },
-    { NM_ITEM,  (STRPTR)"Toggle",   (STRPTR)"T", CHECKIT | MENUTOGGLE | CHECKED, 0, NULL },
+    { NM_ITEM,  (STRPTR)"Toggle",   NULL,        CHECKIT | MENUTOGGLE | CHECKED, 0, NULL },
     { NM_ITEM,  (STRPTR)"Disabled", NULL,        NM_ITEMDISABLED,          0, NULL },
     { NM_ITEM,  NM_BARLABEL,        NULL,        0,                        0, NULL },
     { NM_ITEM,  (STRPTR)"More",     NULL,        0,                        0, NULL },
     { NM_SUB,   (STRPTR)"Sub Item", (STRPTR)"S", 0,                        0, NULL },
+    { NM_SUB,   (STRPTR)"Sub NoShortcut", NULL,  0,                        0, NULL },
     { NM_END,   NULL,               NULL,        0,                        0, NULL },
 };
 
@@ -398,10 +409,30 @@ int main(void)
                         GT_SetGadgetAttrs(hostGad, window, NULL,
                                           GTST_String, (ULONG)"about picked", TAG_DONE);
                     } else if (MENUNUM(msg->Code) == MENUNUM_PROJECT
+                               && ITEMNUM(msg->Code) == ITEMNUM_TOGGLE
+                               && SUBNUM(msg->Code) == NOSUB) {
+                        /* Enabled, shortcut-less -- the fixture's only
+                         * candidate for proving MENUPICK's pointer-based
+                         * fallback (issue #63) genuinely reaches Intuition's
+                         * own IDCMP_MENUPICK, not just that a shortcut
+                         * keystroke was struck. */
+                        GT_SetGadgetAttrs(hostGad, window, NULL,
+                                          GTST_String, (ULONG)"toggle picked", TAG_DONE);
+                    } else if (MENUNUM(msg->Code) == MENUNUM_PROJECT
                                && ITEMNUM(msg->Code) == ITEMNUM_MORE
                                && SUBNUM(msg->Code) == SUBNUM_SUBITEM) {
                         GT_SetGadgetAttrs(hostGad, window, NULL,
                                           GTST_String, (ULONG)"subitem picked", TAG_DONE);
+                    } else if (MENUNUM(msg->Code) == MENUNUM_PROJECT
+                               && ITEMNUM(msg->Code) == ITEMNUM_MORE
+                               && SUBNUM(msg->Code) == SUBNUM_SUBNOSHORTCUT) {
+                        /* Enabled, shortcut-less, one level deep -- the
+                         * fixture's only candidate for proving
+                         * MENUPICK's pointer-based fallback (issue #63)
+                         * reaches a genuine sub-item, not just a
+                         * top-level one (Toggle, above). */
+                        GT_SetGadgetAttrs(hostGad, window, NULL,
+                                          GTST_String, (ULONG)"subitem noshortcut picked", TAG_DONE);
                     }
                     break;
                 default:

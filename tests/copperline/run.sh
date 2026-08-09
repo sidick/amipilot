@@ -1390,6 +1390,8 @@ EOF
 		'MENU-FIELDS PASS' \
 		'MENUPICK-ABOUT PASS' \
 		'MENUPICK-SUBITEM PASS' \
+		'MENUPICK-TOGGLE-POINTER PASS' \
+		'MENUPICK-SUBITEM-POINTER PASS' \
 		'MENUPICK-DISABLED PASS'; do
 		if ! grep -qF "$pattern" "$BUILD/menu-result.txt" 2>/dev/null; then
 			echo "run.sh: FAIL (menu): expected line not found: $pattern"

@@ -259,16 +259,41 @@ BOOL AmipIsWindowOpen(struct Window *target);
  * if window has no menu strip or any index is out of range. */
 struct MenuItem *AmipFindMenuItem(struct Window *window, LONG menuNum, LONG itemNum, LONG subNum);
 
+/* Same resolution as AmipFindMenuItem, but also hands back the
+ * resolved top-level struct Menu* (menuOut) and, when subNum >= 0,
+ * the top-level struct MenuItem* the sub-item hangs off of
+ * (parentItemOut) -- both optional (pass NULL to ignore). Needed for
+ * pointer-based picking (issue #63): a sub-item's on-screen box has no
+ * meaning without knowing which top-level menu/item it belongs to,
+ * which the plain GA_ID-shaped AmipFindMenuItem() doesn't expose.
+ * AmipFindMenuItem() itself is a thin wrapper over this with both outs
+ * NULL. */
+struct MenuItem *AmipFindMenuItemWithParents(struct Window *window,
+                                             LONG menuNum, LONG itemNum, LONG subNum,
+                                             struct Menu **menuOut,
+                                             struct MenuItem **parentItemOut);
+
 typedef enum {
     AMIP_MENUPICK_OK = 0,
     AMIP_MENUPICK_DISABLED,     /* item->Flags lacks ITEMENABLED */
-    AMIP_MENUPICK_NO_SHORTCUT,  /* no COMMSEQ/Command, or Command isn't a
-                                  * single keystroke under the active
-                                  * keymap -- pointer-based menu
-                                  * navigation isn't built yet (see
-                                  * server/README.md) */
-    AMIP_MENUPICK_INJECT_FAILED /* keymap.library unavailable, or
+    AMIP_MENUPICK_NO_SHORTCUT,  /* AmipMenuPickByShortcut only: no COMMSEQ/
+                                  * Command, or Command isn't a single
+                                  * keystroke under the active keymap --
+                                  * the caller should fall back to
+                                  * AmipMenuPickByPointer() instead of
+                                  * treating this as a final failure */
+    AMIP_MENUPICK_INJECT_FAILED, /* keymap.library unavailable, or
                                   * input.device event injection failed */
+    AMIP_MENUPICK_RMB_TRAPPED,  /* AmipMenuPickByPointer only: window has
+                                  * WFLG_RMBTRAP set -- it opts out of
+                                  * Intuition's own menu-button handling
+                                  * entirely, so no synthesized RMB-down
+                                  * can ever open its menu strip. A real,
+                                  * permanent limit for that window, not
+                                  * a transient injection failure. */
+    AMIP_MENUPICK_GEOMETRY_FAILED /* AmipMenuPickByPointer only: couldn't
+                                  * resolve a sane screen-absolute box
+                                  * for the target item (or its parent) */
 } AmipMenuPickResult;
 
 /* Selects `item` via its keyboard shortcut: activates window, then
@@ -277,9 +302,24 @@ typedef enum {
  * produce -- Intuition itself resolves that combination against the
  * window's live MenuStrip, so this doesn't need to (and doesn't)
  * synthesize IDCMP_MENUPICK directly. Does NOT open the menu or move
- * the pointer -- pointer-based selection (for items without a
- * shortcut) is planned but not built (docs/implementation-plan.md,
- * "menu-pick"). */
+ * the pointer -- for an item with no shortcut, use
+ * AmipMenuPickByPointer() instead (issue #63). */
 AmipMenuPickResult AmipMenuPickByShortcut(struct Window *window, struct MenuItem *item);
+
+/* Pointer-based fallback for items with no keyboard shortcut (issue
+ * #63): opens the menu strip with a genuine synthesized RMB-down,
+ * moves the pointer onto topItem (letting Intuition's own tracking
+ * highlight it and, if it has sub-items, auto-open the one-level
+ * submenu -- no separate "open submenu" event exists to synthesize),
+ * moves onto subItem if non-NULL, then releases (RMB-up) over the
+ * final target -- exactly what Intuition turns into IDCMP_MENUPICK.
+ * `menu` is topItem's own parent struct Menu* (from
+ * AmipFindMenuItemWithParents()); geometry for every box is resolved
+ * live, immediately before each move, never cached or precomputed --
+ * menu layout depends on the user's own screen/menu font. Does NOT
+ * check whether topItem/subItem actually has a shortcut -- callers
+ * decide which pick function to use. */
+AmipMenuPickResult AmipMenuPickByPointer(struct Window *window, struct Menu *menu,
+                                         struct MenuItem *topItem, struct MenuItem *subItem);
 
 #endif /* AMIPILOT_ACTION_ENGINE_H */

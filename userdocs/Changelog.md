@@ -25,6 +25,14 @@ for the full engineering detail and phase sequencing behind each one.
   own new `CAAPP.WHERE` port, whose three gadgets are now addressed
   entirely via `WHEREGADGET` (its manifest previously, deliberately,
   named none at all). See [ARexx Reference](ARexx-Reference.md#driving-layoutgadget-only-applications).
+- **`MENUPICK`'s pointer-based fallback** (issue #63): a menu item
+  with no keyboard shortcut used to be rejected outright — now it's
+  picked via a genuine synthesized right-mouse-button-down/move/move/
+  release sequence instead, chosen automatically whenever an item has
+  no shortcut, the same "real input.device events, not a shortcut"
+  principle every other verb already follows. Verified end to end
+  against two new shortcut-less items on `fixtures/gadtools-app`'s own
+  menu strip — a top-level item and a one-level-deep submenu item.
 
 ## v1.0 — 2026-08-09
 
