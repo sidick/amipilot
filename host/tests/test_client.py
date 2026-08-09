@@ -1174,5 +1174,62 @@ class MuiRexx(unittest.TestCase):
             c.mui_command("MUIDEMO", "quit")
 
 
+class Where(unittest.TestCase):
+    """Tests for the WHERE wire verb (where()) -- the cooperative
+    geometry port diagnostic (issue #49). See manifest/SPEC.md's "The
+    cooperative geometry port" for the underlying contract."""
+
+    def test_sends_at_name_verbatim(self):
+        payload = b"10 20 100 14"
+        c = client_with(b"RC 0 %d\n%s" % (len(payload), payload))
+        c.where("connect_button")
+        self.assertEqual(
+            c._wire._t.sent[0], b"WHERE @connect_button TIMEOUT=10\n"
+        )
+
+    def test_honours_custom_timeout(self):
+        payload = b"10 20 100 14"
+        c = client_with(b"RC 0 %d\n%s" % (len(payload), payload))
+        c.where("connect_button", timeout=30)
+        self.assertEqual(
+            c._wire._t.sent[0], b"WHERE @connect_button TIMEOUT=30\n"
+        )
+
+    def test_returns_parsed_geometry(self):
+        payload = b"10 20 100 14"
+        c = client_with(b"RC 0 %d\n%s" % (len(payload), payload))
+        self.assertEqual(c.where("connect_button"), (10, 20, 100, 14))
+
+    def test_port_not_found_raises_not_found(self):
+        payload = b"WHERE port not found"
+        c = client_with(b"RC 5 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(NotFound):
+            c.where("connect_button")
+
+    def test_unknown_name_raises_command_error(self):
+        payload = b"no such name in manifest: nosuchgadget"
+        c = client_with(b"RC 10 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(CommandError):
+            c.where("nosuchgadget")
+
+    def test_malformed_reply_raises_command_error(self):
+        payload = b'malformed WHERE reply (expected "x y w h")'
+        c = client_with(b"RC 10 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(CommandError):
+            c.where("connect_button")
+
+    def test_no_reply_raises_timeout(self):
+        payload = b"no reply from WHERE port within TIMEOUT"
+        c = client_with(b"RC 15 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(Timeout):
+            c.where("connect_button")
+
+    def test_alloc_fail_raises_action_failed(self):
+        payload = b"could not allocate an ARexx message (out of memory)"
+        c = client_with(b"RC 20 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(ActionFailed):
+            c.where("connect_button")
+
+
 if __name__ == "__main__":
     unittest.main()

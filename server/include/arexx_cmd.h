@@ -64,6 +64,22 @@ typedef enum {
     AMIP_AREXX_CMD_MUIREXX,  /* MUIREXX <app-base> [TIMEOUT=<n>] <command...> --
                               * the MUI-ARexx bridge tier (phase 0.5); see
                               * server/include/muirexx.h */
+    AMIP_AREXX_CMD_WHERE,    /* WHERE @<name> [TIMEOUT=<n>] --
+                              * diagnostic form of the cooperative
+                              * geometry port (issue #49): queries a
+                              * WHEREGADGET manifest entry's declared
+                              * WHEREPORT and returns the raw
+                              * "<x> <y> <w> <h>" reply; manifest-only
+                              * (no classic <window-pattern> <gadget-id>
+                              * form -- there is nothing to resolve
+                              * without a WHEREPORT). See
+                              * server/include/where.h and
+                              * manifest/SPEC.md's "WHERE port" section.
+                              * CLICK/TYPE @<name> route through the
+                              * same query automatically when the
+                              * manifest resolves the name to a
+                              * WHEREGADGET -- this verb exists only as
+                              * a standalone diagnostic/test probe. */
     AMIP_AREXX_CMD_WINDOWMOVE, /* WINDOWMOVE [SCREEN=<s>] <window-pattern> <dx> <dy> --
                               * moves a whole window by a real title-bar
                               * drag; classic form only, no "@name" (a
@@ -681,6 +697,18 @@ typedef struct {
  * universal command set plus whatever the target app chose to add;
  * nothing generic enough to build a CLICK/TYPE-shaped verb on top of
  * exists).
+ *
+ * WHERE takes exactly "@<name>" (manifest form only -- no classic
+ * <window-pattern> <gadget-id> alternative; there is no live gadget to
+ * name numerically here, only a manifest entry naming a WHEREPORT), then
+ * an optional trailing "TIMEOUT=<n>" (seconds; default 10, same idiom as
+ * MUIREXX's own query timeout -- reuses expectTimeout). Returns the raw
+ * "<x> <y> <w> <h>" reply as its RESULT text. RC_ERROR if the name isn't
+ * in the manifest, or resolves to a plain GADGET rather than a
+ * WHEREGADGET (this verb is WHEREGADGET-only, by design -- CLICK/TYPE
+ * already handle a plain GADGET @name without going anywhere near a
+ * port); RC mapping for the port query itself is in
+ * server/include/where.h.
  *
  * FSPUT takes <path> (parsed exactly like FSLIST's own), then a
  * required <byte-count> token (decimal). A negative count, or one

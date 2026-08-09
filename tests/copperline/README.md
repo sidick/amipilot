@@ -218,6 +218,55 @@ manual Amiberry verification (`server/README.md`'s SCREENSHOT
 section): a known `x%4` pen-ramp pattern painted on a genuine P96 CLUT
 screen decodes back exactly.
 
+### Cooperative geometry port / `WHERE` (issue #49)
+
+`run_where_check` drives `where-test.py` against `fixtures/classact-app`'s
+new `CAAPP.WHERE` ARexx port — the first thing this fixture ever
+exposed over ARexx at all, and the first end-to-end confirmation that
+a manifest's `WHEREGADGET` records genuinely resolve to real clicks,
+not just plausible-looking geometry. All three of the fixture's
+gadgets (button/string/checkbox) are `layout.gadget` children,
+permanently invisible to structural walking, so `CAApp.manifest`
+(now format version 2) addresses every one of them this way instead
+of the plain `GADGET` records it never had.
+
+**A real bug found running this live** (2026-08-09), not caught by
+any amount of reading the NDK: a `RexxMsg` built by hand via
+`CreateRexxMsg()`/`FillRexxMsg()`/`PutMsg()` — exactly the recipe
+`server/src/muirexx.c`'s own `AmipMuiRexxSend()` already used
+successfully against real MUI-Demo — arrives at the receiver with its
+node type left at `NT_MESSAGE`, not `NT_REPLYMSG`.
+`rexxsyslib.library`'s own `IsRexxMsg()` call reports such a message
+as not a genuine `RexxMsg` at all, even though every other field
+(`rm_Action`'s `RXCOMM` bit, `ARG0()`'s command text) is exactly
+correct. Root-caused by direct inspection: a debug build of the
+fixture dumped `ln_Type`/`rm_Action` straight from the message it
+received, off a port dedicated to nothing else, ruling out every
+"wrong message" or "wrong port" theory. Two attempted sender-side
+fixes — pre-marking the outgoing message's own node type
+`NT_REPLYMSG` (the commonly cited technique for a hand-sent ARexx
+command), and using a genuine `CreateArgstring()`-backed `rm_Args[0]`
+instead of a raw C string pointer — changed nothing; the receiver's
+own `ln_Type` stayed `NT_MESSAGE` regardless, each rebuilt and
+retested live. The actual explanation: `IsRexxMsg()` checks
+`ln_Type == NT_REPLYMSG`, which `ReplyMsg()` sets — the right
+question for a *sender* inspecting what came back on its own reply
+port, not a *receiver* validating an incoming, not-yet-answered
+command, which is legitimately still `NT_MESSAGE` at that point no
+matter how carefully the sender is built. `RXCOMM` (`rexx/storage.h`'s
+own "a command-level invocation") is the field that actually answers
+the receiver's real question, and every sender here already sets it
+correctly. Fixed by having `CAAPP.WHERE` validate incoming messages
+with `rm_Action & RXCOMM` instead of `IsRexxMsg()` — a genuinely
+ordinary, one-condition receive-loop change any third-party ARexx port
+implementation can make, not a dedicated-port workaround; see the doc
+comment on `HandleWhereMessage()` in
+`fixtures/classact-app/src/main.c` for the full account, and
+`server/README.md`'s own WHERE section for what this means for
+`server/src/arexx.c`'s own receiver (checks the same wrong condition,
+but has never been observed to actually reject a real ARexx script's
+command, so left unchanged here — outside this issue's scope).
+
 ## Ad hoc smoke testing (debugging, new fixtures)
 
 For anything `run.sh` doesn't already assert on, write

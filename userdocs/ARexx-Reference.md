@@ -60,6 +60,7 @@ for disambiguating two same-titled windows on different screens; see
 | `WAITFOR` | `[SCREEN=<s>] WINDOW=<pattern> [TIMEOUT=<n>]` or `[SCREEN=<s>] NOWINDOW=<pattern> [TIMEOUT=<n>]` or `[SCREEN=<s>] <window-pattern> (<gadget-id> \| ROLE=<r> [LABEL=<l>] [INDEX=<n>]) TEXT=<value> [TIMEOUT=<n>]` or `@<name> TEXT=<value> [TIMEOUT=<n>]` or `[SCREEN=<s>] REQUESTER [TIMEOUT=<n>]` | Polls (server-side, one round trip) until a window matching `<pattern>` appears, until none does, until a gadget's text exactly equals `<value>`, or until a genuine Intuition Requester appears (window-attached only — issue #52's detection-only slice). `TIMEOUT` defaults to 10 seconds. `RC=15` if the condition never becomes true in time — a new RC distinct from "nothing matched" (`RC=5`) or "the action itself failed" (`RC=20`). See [Wait/expectation primitives](#waitexpectation-primitives). |
 | `AUTH` | `<password>` | Authenticates a TCP connection (no effect on ARexx or serial.device, which have their own implicit trust boundaries). Until it succeeds, the TCP transport refuses every command except `VERSION`/`AUTH`/`QUIT` with `RC=10`. See [Securing TCP](Wire-Protocol.md#securing-tcp). |
 | `MUIREXX` | `<app-base> [TIMEOUT=<n>] <command...>` | Sends `<command>` verbatim to a MUI application's own ARexx port. The MUI-ARexx bridge tier — see [Driving MUI applications](#driving-mui-applications). |
+| `WHERE` | `@<name> [TIMEOUT=<n>]` | Diagnostic query of the cooperative geometry port: returns `<name>`'s current `"<x> <y> <w> <h>"` geometry from the application's own declared `WHEREPORT`. Manifest-only, `WHEREGADGET` names only — see [Driving layout.gadget-only applications](#driving-layoutgadget-only-applications). |
 | `QUIT` | (none) | Shuts the commodity down cleanly. |
 
 The same command set is also reachable from a host machine over
@@ -88,6 +89,14 @@ touch anything, and then only the manifest.
 
 Using `@name` with no manifest loaded, or with a name the manifest
 doesn't define, is `RC=10` with the reason in `RESULT`.
+
+A format-version-2 manifest can also declare a name via `WHEREGADGET`
+instead of `GADGET` — for a gadget structural walking can never reach
+at all (a `layout.gadget` child on classic OS 3.x). `CLICK @name`/
+`TYPE @name` work exactly the same either way; see [Driving
+layout.gadget-only applications](#driving-layoutgadget-only-applications)
+for what's different underneath and `GETTEXT`/`DRAG`'s own honest
+limit against such a name.
 
 ## Tier-2 semantic locators
 
@@ -261,6 +270,61 @@ code prefixed onto `RESULT` when nonzero; `RC=15` if the target never
 replied within `TIMEOUT` (default 10 seconds); `RC=20` only if
 `AmiPilotServer` itself couldn't allocate the ARexx message (its own
 resource problem, not the target's).
+
+## Driving layout.gadget-only applications
+
+A `window.class` window attaches only its single top-level layout
+object to `window->FirstGadget` — its own button/string/checkbox
+children aren't individually walkable, and classic OS 3.x has no
+public API to enumerate them (see [Locator Tiers and
+Limits](Locator-Tiers-and-Limits.md)). A plain `GADGET` manifest entry
+can't name such a gadget; a `WHEREGADGET` entry can, if the
+application itself cooperates.
+
+An application implementing this (issue #49) exposes a small,
+optional ARexx port answering `WHERE <name>` with that gadget's own
+live geometry — it already holds the object pointer for its own event
+dispatch, so it just reads `GetAttr(GA_Left/GA_Top/GA_Width/
+GA_Height)` and reports back. Its manifest declares the port's name
+with `WHEREPORT`:
+
+```
+MANIFEST 2
+APP MyApp
+WHEREPORT MYAPP.WHERE
+WINDOW main "My App"
+WHEREGADGET connect_button main
+```
+
+Once that manifest is loaded, `CLICK @connect_button`/
+`TYPE @connect_button ...` work exactly like they would for a plain
+`GADGET` name — AmiPilot queries the port for the gadget's current
+geometry, then clicks it with a genuine `input.device` event. **Only
+discovery is cooperative; the click is real input**, unlike `MUIREXX`
+above, where the target's own port does the acting too. No coordinate
+ever appears in the script — it's resolved live, at action time, so
+relayout and font changes can't break anything.
+
+`WHERE @<name> [TIMEOUT=<n>]` is the standalone diagnostic form —
+useful for confirming a third-party port answers correctly, or for
+asserting on geometry directly:
+
+```rexx
+'WHERE @connect_button'
+SAY 'RESULT is "x y w h": 'RESULT
+```
+
+`GETTEXT`/`DRAG` have no path through a `WHEREPORT` — a `WHEREGADGET`
+name given to either is `RC=10` with an explicit "geometry only"
+message, an honest stated limit rather than a silent fallback.
+`RC=5` if the declared `WHEREPORT` doesn't exist (checked by its
+*exact* declared name — no `.1`-slot fallback the way `MUIREXX`'s
+MUI-specific convention gets); `RC=10` if the port itself reports the
+name unknown, or its reply doesn't parse as exactly four integers;
+`RC=15` if it never replies within `TIMEOUT` (default 10 seconds).
+Full contract for application authors: [`manifest/SPEC.md`'s "The
+cooperative geometry port"
+section](https://github.com/sidick/amipilot/blob/main/manifest/SPEC.md).
 
 ## Example
 

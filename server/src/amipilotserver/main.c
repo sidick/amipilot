@@ -54,6 +54,7 @@
 #include "serial.h"
 #include "tcp.h"
 #include "wblaunch.h"
+#include "where.h"
 
 #define STR(s)  #s
 #define XSTR(s) STR(s)
@@ -659,6 +660,112 @@ static char g_treeBuf[AMIP_TREE_BUF_SIZE];
 #define AMIP_TCP_DEFAULT_PASSWORD "amipilot"
 static char g_tcpPassword[AMIP_TCP_PASSWORD_MAX] = AMIP_TCP_DEFAULT_PASSWORD;
 
+/* Issue #49: handles a CLICK/TYPE/WHERE verb whose "@name" locator
+ * resolved to a WHEREGADGET (the manifest-resolution block ahead of
+ * HandleCommand()'s own verb switch already filled in
+ * cmd->windowPattern/screenPattern -- the window itself is still found
+ * structurally, only the gadget's geometry comes from the port) rather
+ * than a plain GADGET. Queries g_manifest.wherePort for cmd-
+ * >manifestName's current geometry (AmipWhereQuery(), where.h), then
+ * either reports it raw (WHERE) or acts on it with a real
+ * AmipClickWindowRelative() (CLICK/TYPE) -- the same "cooperative
+ * discovery, real actuation" split manifest/SPEC.md's own "The
+ * cooperative geometry port" section documents. Returns the
+ * AMIP_AREXX_RC_* code; on any non-OK/non-plain-click outcome the
+ * result text is left in g_resultBuf and *resultOut is pointed at it. */
+static int HandleWhereAction(AmipArexxParsed *cmd, const char **resultOut)
+{
+    struct Window *w;
+    long x = 0, y = 0, gw = 0, gh = 0;
+    long queryTimeout;
+    char appText[128];
+    AmipWhereResult outcome;
+
+    w = AmipFindWindow((CONST_STRPTR)cmd->screenPattern, (CONST_STRPTR)cmd->windowPattern);
+    if (w == NULL) {
+        return AMIP_AREXX_RC_WARN;
+    }
+
+    /* Only the standalone WHERE verb takes an explicit TIMEOUT= for
+     * the port query itself; CLICK/TYPE reuse expectTimeout for their
+     * OWN, different purpose (CLICK's post-click EXPECT= wait), so
+     * they always use AmipWhereQuery's own 10s default here instead. */
+    queryTimeout = (cmd->type == AMIP_AREXX_CMD_WHERE) ? cmd->expectTimeout : 0;
+
+    outcome = AmipWhereQuery(g_manifest.wherePort, cmd->manifestName, queryTimeout,
+                              &x, &y, &gw, &gh, appText, sizeof(appText));
+
+    switch (outcome) {
+        case AMIP_WHERE_OK:
+            break;
+        case AMIP_WHERE_APP_ERROR:
+            snprintf(g_resultBuf, sizeof(g_resultBuf),
+                     "WHERE port: no such name%s%s",
+                     appText[0] != '\0' ? ": " : "", appText);
+            *resultOut = g_resultBuf;
+            return AMIP_AREXX_RC_ERROR;
+        case AMIP_WHERE_PORT_NOT_FOUND:
+            strncpy(g_resultBuf, "WHERE port not found", sizeof(g_resultBuf) - 1);
+            *resultOut = g_resultBuf;
+            return AMIP_AREXX_RC_WARN;
+        case AMIP_WHERE_TIMEOUT:
+            strncpy(g_resultBuf, "no reply from WHERE port within TIMEOUT",
+                    sizeof(g_resultBuf) - 1);
+            *resultOut = g_resultBuf;
+            return AMIP_AREXX_RC_TIMEOUT;
+        case AMIP_WHERE_BAD_REPLY:
+            snprintf(g_resultBuf, sizeof(g_resultBuf),
+                     "malformed WHERE reply (expected \"x y w h\"), got: %s", appText);
+            *resultOut = g_resultBuf;
+            return AMIP_AREXX_RC_ERROR;
+        case AMIP_WHERE_ALLOC_FAIL:
+        default:
+            strncpy(g_resultBuf, "could not allocate an ARexx message (out of memory)",
+                    sizeof(g_resultBuf) - 1);
+            *resultOut = g_resultBuf;
+            return AMIP_AREXX_RC_FAIL;
+    }
+
+    /* The query can take real time (up to its own timeout) -- re-check
+     * the window is still open before acting on/reporting a possibly
+     * stale target, same recheck CLICK/TYPE's classic path performs
+     * right after ResolveTargetGadget(). */
+    if (!AmipIsWindowOpen(w)) {
+        return AMIP_AREXX_RC_WARN;
+    }
+
+    if (cmd->type == AMIP_AREXX_CMD_WHERE) {
+        snprintf(g_resultBuf, sizeof(g_resultBuf), "%ld %ld %ld %ld", x, y, gw, gh);
+        *resultOut = g_resultBuf;
+        return AMIP_AREXX_RC_OK;
+    }
+
+    if (!AmipClickWindowRelative(w, (WORD)x, (WORD)y, (WORD)gw, (WORD)gh)) {
+        return AMIP_AREXX_RC_FAIL;
+    }
+
+    if (cmd->type == AMIP_AREXX_CMD_TYPE) {
+        if (!AmipTypeString((CONST_STRPTR)cmd->text)) {
+            return AMIP_AREXX_RC_FAIL;
+        }
+        return AMIP_AREXX_RC_OK;
+    }
+
+    /* CLICK: honor EXPECT= exactly like the classic path's own tail
+     * (the click already happened above regardless of EXPECT=). */
+    if (cmd->expectMode == 1) {
+        if (!WaitForWindowPattern(NULL, (CONST_STRPTR)cmd->expectPattern,
+                                  cmd->expectTimeout, TRUE)) {
+            return AMIP_AREXX_RC_TIMEOUT;
+        }
+    } else if (cmd->expectMode == 2) {
+        if (!WaitForWindowClosed(w, cmd->expectTimeout)) {
+            return AMIP_AREXX_RC_TIMEOUT;
+        }
+    }
+    return AMIP_AREXX_RC_OK;
+}
+
 /* Executes one parsed command -- the single dispatch both transports
  * share (ARexx RESULT string and wire payload are the same bytes; see
  * server/WIRE.md). Returns the AMIP_AREXX_RC_* code, points *resultOut
@@ -688,6 +795,10 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
 {
     int rc = AMIP_AREXX_RC_OK;
     const char *result = NULL;
+    int viaWherePort = 0;   /* set below when "@name" resolves to a
+                              * WHEREGADGET (issue #49) -- consulted by
+                              * CLICK/TYPE/WHERE's own cases in the verb
+                              * switch further down */
 
     *resultLenOut = 0;
 
@@ -730,25 +841,62 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
      * same windowPattern/gadgetId fields the classic form fills, so the
      * verb handlers below run identically for both. Unknown name / no
      * manifest loaded are both script errors (RC 10), same class as a
-     * bad argument. */
-    if (cmd->manifestName[0] != '\0') {
+     * bad argument.
+     *
+     * A name resolving to a WHEREGADGET (viaWherePort set, issue #49)
+     * carries no GA_ID at all -- cmd->gadgetId is left untouched.
+     * CLICK/TYPE/WHERE route around ResolveTargetGadget() entirely for
+     * such a name (see HandleWhereAction() below, called from those
+     * verbs' own cases); GETTEXT/DRAG have no WHERE-based path in this
+     * cut and reject it here, immediately, as an honest stated limit
+     * rather than falling through into ResolveTargetGadget() with a
+     * meaningless zero gadgetId. */
+    {
         const char *title;
-        long id;
+        long id = 0;
 
-        if (!g_manifestLoaded) {
-            strncpy(g_resultBuf, "no manifest loaded", sizeof(g_resultBuf) - 1);
+        if (cmd->manifestName[0] != '\0') {
+            if (!g_manifestLoaded) {
+                strncpy(g_resultBuf, "no manifest loaded", sizeof(g_resultBuf) - 1);
+                *resultOut = g_resultBuf;
+                return AMIP_AREXX_RC_ERROR;
+            }
+            if (AmipManifestResolve(&g_manifest, cmd->manifestName, &title, &id,
+                                     &viaWherePort) != 0) {
+                snprintf(g_resultBuf, sizeof(g_resultBuf),
+                         "no such name in manifest: %s", cmd->manifestName);
+                *resultOut = g_resultBuf;
+                return AMIP_AREXX_RC_ERROR;
+            }
+            strncpy(cmd->windowPattern, title, sizeof(cmd->windowPattern) - 1);
+            cmd->windowPattern[sizeof(cmd->windowPattern) - 1] = '\0';
+            cmd->gadgetId = id;
+
+            if (viaWherePort && (cmd->type == AMIP_AREXX_CMD_GETTEXT
+                                  || cmd->type == AMIP_AREXX_CMD_DRAG)) {
+                snprintf(g_resultBuf, sizeof(g_resultBuf),
+                         "@%s resolves via a WHERE port (geometry only) -- "
+                         "%s cannot act on it", cmd->manifestName,
+                         cmd->type == AMIP_AREXX_CMD_GETTEXT ? "GETTEXT" : "DRAG");
+                *resultOut = g_resultBuf;
+                return AMIP_AREXX_RC_ERROR;
+            }
+            if (!viaWherePort && cmd->type == AMIP_AREXX_CMD_WHERE) {
+                snprintf(g_resultBuf, sizeof(g_resultBuf),
+                         "@%s is a plain GADGET, not a WHEREGADGET -- "
+                         "nothing to query", cmd->manifestName);
+                *resultOut = g_resultBuf;
+                return AMIP_AREXX_RC_ERROR;
+            }
+        } else if (cmd->type == AMIP_AREXX_CMD_WHERE) {
+            /* Parser guarantees manifestName is always set for WHERE
+             * (arexx_cmd.c rejects any non-"@name" form at parse time)
+             * -- this branch is unreachable, kept only so the switch
+             * below never sees WHERE with an empty windowPattern. */
+            strncpy(g_resultBuf, "WHERE requires @<name>", sizeof(g_resultBuf) - 1);
             *resultOut = g_resultBuf;
             return AMIP_AREXX_RC_ERROR;
         }
-        if (AmipManifestResolve(&g_manifest, cmd->manifestName, &title, &id) != 0) {
-            snprintf(g_resultBuf, sizeof(g_resultBuf),
-                     "no such name in manifest: %s", cmd->manifestName);
-            *resultOut = g_resultBuf;
-            return AMIP_AREXX_RC_ERROR;
-        }
-        strncpy(cmd->windowPattern, title, sizeof(cmd->windowPattern) - 1);
-        cmd->windowPattern[sizeof(cmd->windowPattern) - 1] = '\0';
-        cmd->gadgetId = id;
     }
 
     /* DRAG's SECOND locator ("TO @<dest-name>") -- same manifest
@@ -756,19 +904,31 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
      * dragToGadgetId is resolved against the SAME window as the
      * source (arexx_cmd.h's DRAG doc comment), so a destination whose
      * own manifest entry names a DIFFERENT window is a real,
-     * explicit error rather than a silent wrong-window drag. */
+     * explicit error rather than a silent wrong-window drag. A
+     * destination resolving via a WHERE port has no GA_ID either, and
+     * DRAG has no WHERE-based path (see above) -- rejected the same
+     * way. */
     if (cmd->type == AMIP_AREXX_CMD_DRAG && cmd->dragToManifestName[0] != '\0') {
         const char *destTitle;
         long destId;
+        int destViaWherePort = 0;
 
         if (!g_manifestLoaded) {
             strncpy(g_resultBuf, "no manifest loaded", sizeof(g_resultBuf) - 1);
             *resultOut = g_resultBuf;
             return AMIP_AREXX_RC_ERROR;
         }
-        if (AmipManifestResolve(&g_manifest, cmd->dragToManifestName, &destTitle, &destId) != 0) {
+        if (AmipManifestResolve(&g_manifest, cmd->dragToManifestName, &destTitle,
+                                 &destId, &destViaWherePort) != 0) {
             snprintf(g_resultBuf, sizeof(g_resultBuf),
                      "no such name in manifest: %s", cmd->dragToManifestName);
+            *resultOut = g_resultBuf;
+            return AMIP_AREXX_RC_ERROR;
+        }
+        if (destViaWherePort) {
+            snprintf(g_resultBuf, sizeof(g_resultBuf),
+                     "drag destination @%s resolves via a WHERE port (geometry "
+                     "only) -- DRAG cannot act on it", cmd->dragToManifestName);
             *resultOut = g_resultBuf;
             return AMIP_AREXX_RC_ERROR;
         }
@@ -780,6 +940,17 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
             return AMIP_AREXX_RC_ERROR;
         }
         cmd->dragToGadgetId = destId;
+    }
+
+    /* CLICK/TYPE @name resolving to a WHEREGADGET, and the standalone
+     * WHERE verb (always WHEREGADGET-only, enforced above), route
+     * around the verb switch below entirely -- ResolveTargetGadget()
+     * has nothing to walk to for these (issue #49). */
+    if (cmd->type == AMIP_AREXX_CMD_WHERE
+        || ((cmd->type == AMIP_AREXX_CMD_CLICK || cmd->type == AMIP_AREXX_CMD_TYPE)
+            && viaWherePort)) {
+        rc = HandleWhereAction(cmd, &result);
+        goto done;
     }
 
     switch (cmd->type) {
@@ -808,7 +979,7 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                      "STABLE VERSION TREE CLICK TYPE GETTEXT MANIFEST LAUNCH "
                      "FSLIST FSSTAT FSMKDIR FSDELETE FSGET FSPUT WBLAUNCH MENU "
                      "MENUPICK DRAG WINDOWMOVE WINDOWSIZE WAITFOR SCREENS "
-                     "SCREENSHOT AUTH MUIREXX QUIT\n");
+                     "SCREENSHOT AUTH MUIREXX WHERE QUIT\n");
             result = g_resultBuf;
             break;
 
@@ -1306,6 +1477,7 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
             break;
     }
 
+done:
     if (result != NULL && *resultLenOut == 0) {
         *resultLenOut = (ULONG)strlen(result);
     }

@@ -865,6 +865,101 @@ Lands in phase 0.2 onward -- see
   forward correctly, not just in the single-screen case every prior
   on-target check has ever exercised.
 
+- **Cooperative geometry port (issue #49, not yet released):** `WHERE @<name> [TIMEOUT=<n>]`
+  is the diagnostic form of the escape hatch for gadgets structural
+  walking can never reach -- `layout.gadget` children on classic OS
+  3.x (the project's own documented "Confirmed limit"; see
+  `docs/implementation-plan.md`'s "future tier between 1 and 2" design
+  note, now implemented). A manifest gadget declared with
+  `WHEREGADGET` (format version 2, `manifest/SPEC.md`) instead of
+  `GADGET` has no `GA_ID` at all; resolving its name queries the
+  manifest's declared `WHEREPORT` -- a small, optional ARexx port the
+  *application itself* exposes, answering `WHERE <name>` with its own
+  live `GetAttr(GA_Left/GA_Top/GA_Width/GA_Height)` geometry (window-
+  relative, including the border/title-bar area -- the exact
+  convention `AmipGadgetCenter()` already uses for ordinary gadgets,
+  `server/src/action.c`). `WHERE`'s own RESULT is the raw
+  `"<x> <y> <w> <h>"` text; it exists mainly as a test/debugging probe
+  -- `CLICK @name`/`TYPE @name` route through the identical query
+  automatically whenever the manifest resolves the name to a
+  `WHEREGADGET`, then act with a genuine `input.device` click via the
+  new `AmipClickWindowRelative()` (`server/src/action.c`), the same
+  real-input path every other locator tier uses. **Discovery is
+  cooperative; actuation stays real input** -- unlike `MUIREXX`, where
+  the target's own port does the acting too. No coordinates ever
+  appear in a script: they're resolved live, at action time, so
+  relayout and font changes can't break anything, the same immunity a
+  plain manifest already gives `GA_ID`-addressed gadgets.
+
+  `GETTEXT`/`DRAG` have no `WHERE`-based path in this cut -- a
+  `WHEREGADGET` name given to either is `RC 10` with an explicit
+  "geometry only" message, a stated limit rather than a silent
+  fallback to nothing. `server/include/where.h`/`server/src/where.c`
+  hold the query primitive (`AmipWhereQuery()`); it deliberately does
+  **not** share `muirexx.c`'s `AmipMuiRexxSend()`, even though the
+  underlying `RexxMsg` send/poll mechanics are the same shape --
+  `WHEREPORT` name resolution is exact-match only, with no `<name>.1`
+  fallback the way `MUIREXX`'s MUI-specific port-slot convention gets
+  (`manifest/SPEC.md`'s "Clash guard" section explains why: a
+  `WHEREPORT` that doesn't exist under the exact declared spelling
+  must fail loudly, not silently probe a related name that happens to
+  exist for an unrelated reason).
+
+  RC mapping: port not found → `RC 5`; the target's own reply RC
+  nonzero (unknown name) → `RC 10`; no reply within `TIMEOUT` → `RC
+  15`; a reply that doesn't parse as exactly four decimal integers →
+  `RC 10` ("malformed WHERE reply", the *application's* WHERE
+  implementation being at fault, not this bridge); this server's own
+  `RexxMsg` allocation failing → `RC 20`.
+
+  **Confirmed live** against `fixtures/classact-app`'s own new
+  `CAAPP.WHERE` port (`tests/copperline/where-test.py`,
+  `run_where_check` in `tests/copperline/run.sh`): all three of that
+  fixture's gadgets (button/string/checkbox, all `layout.gadget`
+  children, all invisible to the walker -- `CAApp.golden` is
+  unchanged, proving it) are addressed purely via `WHEREGADGET`;
+  `WHERE @connect_button` returns geometry that lands inside the
+  window's own reported bounds; an unknown name and a `GETTEXT` on a
+  `WHEREGADGET` both reject cleanly; `TYPE @host_field` genuinely
+  lands text in the layout child's own string gadget (confirmed via
+  the fixture's own log line, since `GETTEXT` can't read it back --
+  see `where-test.py`'s header for why); and `CLICK @connect_button`
+  reaches and presses the real button, confirmed the same way every
+  other teardown check in this suite is -- `EXPECT=NOWINDOW` catching
+  the window actually closing.
+
+  **A real bug found building this** (2026-08-09): a `RexxMsg`
+  constructed by hand via `CreateRexxMsg()`/`FillRexxMsg()`/`PutMsg()`
+  -- the same recipe `MUIREXX`'s own `AmipMuiRexxSend()` already uses
+  -- arrives at the receiver with its node type left at `NT_MESSAGE`,
+  not `NT_REPLYMSG`. `rexxsyslib.library`'s own `IsRexxMsg()` reports
+  such a message as not a `RexxMsg` at all, even though `rm_Action`
+  correctly carries `RXCOMM` and `ARG0()` reads back the real command
+  text. Two attempted sender-side fixes (pre-marking the outgoing
+  message's own node type `NT_REPLYMSG`, and using a genuine
+  `CreateArgstring()`-allocated `rm_Args[0]` instead of a raw pointer)
+  changed nothing -- the receiver's own `ln_Type` stayed `NT_MESSAGE`
+  regardless. The actual explanation: `IsRexxMsg()` checks
+  `ln_Type == NT_REPLYMSG`, which `ReplyMsg()` sets -- the right
+  question for a *sender* inspecting what came back on its own reply
+  port, not for a *receiver* validating an incoming, not-yet-answered
+  command, which is correctly still `NT_MESSAGE` at that point no
+  matter how the sender is built. The field actually meaning "this is
+  a command invocation" is `RXCOMM` itself (`rexx/storage.h`'s own
+  comment on it), which every correct sender -- ours included --
+  already sets. Fixed by having `CAAPP.WHERE` validate incoming
+  messages with `rm_Action & RXCOMM` instead of `IsRexxMsg()`; see the
+  doc comment on `HandleWhereMessage()` in
+  `fixtures/classact-app/src/main.c` for the full account.
+  `server/src/arexx.c`'s own receiver-side `IsRexxMsg()` gate checks
+  the same condition; it's never actually been observed to reject a
+  real ARexx script's (`rx`) own command (a genuine `rx`/interpreter
+  send is a different code path than this project's own hand-built
+  `CreateRexxMsg()`/`PutMsg()` sends, and exactly why it satisfies
+  `IsRexxMsg()` wasn't chased down here) -- not touched in this PR,
+  since it's outside this issue's scope and continues to work
+  correctly for what it actually receives.
+
 ## Phase 0.2 (shipped)
 
 - `src/action.c` + `include/action_engine.h` -- the action engine's

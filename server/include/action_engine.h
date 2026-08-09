@@ -79,6 +79,17 @@ BOOL AmipGadgetCenter(struct Window *window, struct Gadget *gadget, WORD *xOut, 
  * target screen/window forward. */
 BOOL AmipClickGadget(struct Window *window, struct Gadget *gadget);
 
+/* The WHEREGADGET counterpart to AmipClickGadget() above (issue #49,
+ * manifest/SPEC.md's "The cooperative geometry port"): clicks the
+ * center of a window-relative rectangle (x, y, w, h -- the same
+ * convention AmipGadgetCenter() uses, including borders/title-bar; a
+ * WHERE port's own reply is already in this form) instead of a live
+ * struct Gadget*, after bringing the target screen/window forward. Used
+ * when a gadget is invisible to structural walking and its geometry
+ * came from the application's own cooperative ARexx port rather than a
+ * GA_Left/GA_Top read here. */
+BOOL AmipClickWindowRelative(struct Window *window, WORD x, WORD y, WORD w, WORD h);
+
 /* --- drag: press, move, release ------------------------------------ */
 
 /* The raw two-point drag primitive: moves to (x1, y1), presses the left

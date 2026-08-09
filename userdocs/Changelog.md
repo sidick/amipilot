@@ -7,6 +7,25 @@ the repository's
 [`docs/implementation-plan.md`](https://github.com/sidick/amipilot/blob/main/docs/implementation-plan.md)
 for the full engineering detail and phase sequencing behind each one.
 
+## Unreleased
+
+- **`WHERE`, the cooperative geometry port** (issue #49): the honest
+  escape hatch for gadgets nested inside a `window.class` window's
+  `layout.gadget` — permanently invisible to structural walking on
+  classic AmigaOS 3.x, so no plain manifest entry could ever name
+  them. An application implementing this exposes a small, optional
+  ARexx port answering `WHERE <name>` with a gadget's own live
+  geometry (it already holds the object pointer for its own event
+  dispatch); a format-version-2 manifest names such a gadget with
+  `WHEREGADGET` instead of `GADGET`. `CLICK`/`TYPE @name` then work
+  exactly as they would for any other manifest name — discovery is
+  cooperative, but the click itself is still genuine `input.device`
+  input, unlike `MUIREXX`, where the target's own port does the
+  acting too. Verified end to end against `fixtures/classact-app`'s
+  own new `CAAPP.WHERE` port, whose three gadgets are now addressed
+  entirely via `WHEREGADGET` (its manifest previously, deliberately,
+  named none at all). See [ARexx Reference](ARexx-Reference.md#driving-layoutgadget-only-applications).
+
 ## v1.0 — 2026-08-09
 
 The first full release: everything the implementation plan's 1.0 gate
