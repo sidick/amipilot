@@ -1847,6 +1847,110 @@ EOF
 	fi
 }
 
+# --- WHERE / cooperative geometry port check (issue #49) ------------------
+# fixtures/classact-app's three gadgets are all layout.gadget children --
+# permanently unreachable by GA_ID (the project's documented "Confirmed
+# limit") -- so CAApp.manifest (format version 2) names every one as a
+# WHEREGADGET, resolved through the fixture's own CAAPP.WHERE ARexx port
+# instead. Launched directly by this check's own smoke script (same
+# pattern run_mui_check uses for MUI-Demo). CAApp writes its own
+# host-readable log itself (build/caapp-log.txt, opened directly via
+# dos.library, not via "Run >file" -- see fixtures/classact-app/src/
+# main.c's DiagFile() for why the latter didn't reliably work) -- the
+# only external way to confirm TYPE @host_field's text genuinely landed
+# in a gadget GETTEXT can't read back (see tests/copperline/where-
+# test.py's own header for the full rationale).
+run_where_check() {
+	echo "run.sh: cooperative geometry port (WHERE)"
+
+	rm -f "$BUILD/where-result.txt" "$BUILD/marker-where-ready.txt" "$BUILD/caapp-log.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+Run >NIL: SRC:build/fixtures/CAApp
+Wait 5
+Run >NIL: SRC:build/AmiPilotServer SERIAL
+Wait 5
+Echo "READY" >SRC:build/marker-where-ready.txt
+EOF
+
+	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
+	rm -f "$info"
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --serial tcp --control :0 --control-info "$info" \
+		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
+	COPPERLINE_PID=$!
+
+	tries=0
+	while [ ! -f "$info" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 100 ]; then
+			echo "run.sh: FAIL (where): copperline never wrote $info"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			return
+		fi
+		sleep 0.1
+	done
+
+	"$COPPERLINE_CTL" --info "$info" run_until '{"seconds": 600}' > /dev/null 2>&1 &
+
+	tries=0
+	while [ ! -f "$BUILD/marker-where-ready.txt" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 150 ]; then
+			echo "run.sh: FAIL (where): guest never became ready -- crash or hang"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			rm -f "$info"
+			return
+		fi
+		sleep 0.5
+	done
+
+	python3 "$REPO_ROOT/tests/copperline/where-test.py" 127.0.0.1:1234 \
+		> "$BUILD/where-result.txt" 2>&1 || true
+
+	# Give CAApp's own process a moment to actually exit and flush its
+	# redirected log after the click that closes its window -- the
+	# Python script's own CLICK-VIA-WHERE/WINDOW-GONE checks only prove
+	# the WINDOW closed, not that the guest process (and its Run-owned
+	# output redirection) has finished tearing down yet.
+	sleep 2
+
+	kill "$COPPERLINE_PID" 2>/dev/null || true
+	COPPERLINE_PID=""
+	rm -f "$info"
+
+	ok=1
+	for pattern in \
+		'WHERE-GEOMETRY PASS' \
+		'UNKNOWN-NAME PASS' \
+		'GETTEXT-LIMIT PASS' \
+		'TYPE-VIA-WHERE SENT' \
+		'CLICK-VIA-WHERE PASS' \
+		'WINDOW-GONE PASS'; do
+		if ! grep -qF "$pattern" "$BUILD/where-result.txt" 2>/dev/null; then
+			echo "run.sh: FAIL (where): expected line not found: $pattern"
+			ok=0
+		fi
+	done
+	if ! grep -qF "caapp: host=AmigaTest" "$BUILD/caapp-log.txt" 2>/dev/null; then
+		echo "run.sh: FAIL (where): CAApp's own log never showed the typed text landing in host_field"
+		ok=0
+	fi
+
+	if [ "$ok" -eq 1 ]; then
+		echo "run.sh: PASS (cooperative geometry port)"
+	else
+		echo "run.sh:   --- actual output ---"
+		sed 's/^/run.sh:   /' "$BUILD/where-result.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		echo "run.sh:   --- CAApp's own log ---"
+		sed 's/^/run.sh:   /' "$BUILD/caapp-log.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+	fi
+}
+
 # --- pytest release gate (phase 0.3, host/amipilot/pytest_plugin.py) ------
 # The literal phase 0.3 release gate (docs/implementation-plan.md): "a
 # host pytest clicks a button and asserts a label changed,
@@ -1910,6 +2014,7 @@ run_screens_check
 run_windowmoveresize_check
 run_requester_check
 run_golden_check
+run_where_check
 run_pytest_release_gate_check
 
 if [ "$FAILED" -eq 0 ]; then
@@ -1931,6 +2036,7 @@ if [ "$FAILED" -eq 0 ]; then
 		"$BUILD"/menu-result.txt "$BUILD"/marker-menu-ready.txt \
 		"$BUILD"/screens-result.txt "$BUILD"/marker-screens-ready.txt \
 		"$BUILD"/golden-result.txt "$BUILD"/marker-golden-ready.txt \
+		"$BUILD"/where-result.txt "$BUILD"/marker-where-ready.txt "$BUILD"/caapp-log.txt \
 		"$BUILD"/pytest-result.txt
 	echo "run.sh: all fixtures PASS"
 	exit 0

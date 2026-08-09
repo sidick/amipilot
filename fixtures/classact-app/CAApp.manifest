@@ -1,14 +1,22 @@
 ; AmiPilot manifest for the ClassAct/ReAction conformance fixture -- see
 ; manifest/SPEC.md for the format.
 ;
-; Deliberately names NO gadgets: this fixture's button/string/checkbox
-; are children of a window.class window's layout.gadget, which classic
-; AmigaOS 3.x provides no public API to enumerate (see the project's
-; documented "Confirmed limit") -- they are unreachable by GA_ID, and
-; the manifest format has no way to express "unreachable but trust me"
-; on purpose. This file exists as the honest example of that boundary:
-; a manifest names exactly what a consumer can actually reach, nothing
-; more.
-MANIFEST 1
+; This fixture's button/string/checkbox are children of a window.class
+; window's layout.gadget, which classic AmigaOS 3.x provides no public
+; API to enumerate (see the project's documented "Confirmed limit") --
+; they are unreachable by GA_ID, and a plain GADGET record has no way
+; to express "unreachable but trust me" on purpose. This is the format
+; version 2 example of the honest escape hatch for exactly that
+; boundary (issue #49): the fixture itself exposes a small, optional
+; ARexx port ("CAAPP.WHERE", see fixtures/classact-app/src/main.c)
+; answering WHERE queries with each gadget's own live geometry, and
+; every gadget below is a WHEREGADGET resolved through it -- not a
+; workaround for the walker's own limit, a real, live-queried answer
+; to it.
+MANIFEST 2
 APP CAApp
+WHEREPORT CAAPP.WHERE
 WINDOW main "AmiPilot ClassAct Fixture"
+WHEREGADGET connect_button main
+WHEREGADGET host_field main
+WHEREGADGET enabled_checkbox main

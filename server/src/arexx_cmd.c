@@ -222,6 +222,7 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
     else if (ci_streq(kw, "WINDOWMOVE")) out->type = AMIP_AREXX_CMD_WINDOWMOVE;
     else if (ci_streq(kw, "WINDOWSIZE")) out->type = AMIP_AREXX_CMD_WINDOWSIZE;
     else if (ci_streq(kw, "MUIREXX"))  out->type = AMIP_AREXX_CMD_MUIREXX;
+    else if (ci_streq(kw, "WHERE"))    out->type = AMIP_AREXX_CMD_WHERE;
     else if (ci_streq(kw, "QUIT"))     out->type = AMIP_AREXX_CMD_QUIT;
     else { out->type = AMIP_AREXX_CMD_UNKNOWN; return -1; }
 
@@ -507,6 +508,36 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
         }
         strncpy(out->command, p, sizeof(out->command) - 1);
         out->command[sizeof(out->command) - 1] = '\0';
+        return 0;
+    }
+
+    if (out->type == AMIP_AREXX_CMD_WHERE) {
+        int trunc;
+
+        /* Manifest form only -- see arexx_cmd.h's doc comment on
+         * AmipArexxParse: there is no classic <window-pattern>
+         * <gadget-id> alternative for this verb. */
+        p = skip_ws(p);
+        if (*p != '@') {
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+        p++;
+        p = read_token(p, out->manifestName, sizeof(out->manifestName), &trunc);
+        if (fail_if_trunc(trunc, out)) return -1;
+        if (out->manifestName[0] == '\0') {
+            out->type = AMIP_AREXX_CMD_UNKNOWN;
+            return -1;
+        }
+
+        p = skip_ws(p);
+        if (ci_streq_prefix(p, "TIMEOUT=")) {
+            char numbuf[16];
+            p += 8; /* strlen("TIMEOUT=") */
+            p = read_token(p, numbuf, sizeof(numbuf), &trunc);
+            if (fail_if_trunc(trunc, out)) return -1;
+            out->expectTimeout = strtol(numbuf, NULL, 10);
+        }
         return 0;
     }
 

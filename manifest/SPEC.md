@@ -1,4 +1,4 @@
-# The AmiPilot manifest contract, format version 1
+# The AmiPilot manifest contract, format versions 1 and 2
 
 A manifest is a small, machine-readable text file an application ships
 alongside its binary, mapping **stable logical names** to the window
@@ -26,7 +26,7 @@ window.
   reviewable.
 - **Versioned from day one**: the first record declares the format
   version. Consumers reject versions they don't speak rather than
-  guessing. This file documents version **1**.
+  guessing. This file documents versions **1** and **2**.
 
 ## File format
 
@@ -40,28 +40,44 @@ Record types, in the order they must appear:
 ```
 MANIFEST <format-version>
 APP <name>
+WHEREPORT <port-name>
 WINDOW <logical-name> <title-substring>
 GADGET <logical-name> <window-logical-name> <ga-id>
+WHEREGADGET <logical-name> <window-logical-name>
 ```
 
 - **`MANIFEST`** — must be the first record. `<format-version>` is a
-  positive integer; this spec is version `1`. A consumer that doesn't
-  speak the declared version must reject the whole file (with a clear
-  error), not skim it for records it recognises.
+  positive integer; this spec documents `1` and `2`. A consumer that
+  doesn't speak the declared version must reject the whole file (with a
+  clear error), not skim it for records it recognises. A version-`1`
+  file must not contain `WHEREPORT`/`WHEREGADGET` records — those
+  require version `2` (see "Versioning policy" below).
 - **`APP`** — the application's name, informational (error messages,
   tooling output). Exactly one.
+- **`WHEREPORT`** (version 2 only) — declares the name of the ARexx
+  port this application exposes to answer `WHERE` queries (see "The
+  cooperative geometry port" below). At most one; if present, it must
+  appear before any `WHEREGADGET` record. Optional — a version-2 file
+  with no `WHEREPORT` simply has no `WHEREGADGET` entries either.
 - **`WINDOW`** — declares a logical window name and the title substring
   that locates it (the same first-match-wins substring matching
   AmiPilot's other locators use). At least one.
 - **`GADGET`** — declares a logical gadget name: which logical window
   it lives in, and its `GA_ID` there. The window must have been
   declared before it.
+- **`WHEREGADGET`** (version 2 only, requires a `WHEREPORT` declared
+  above it) — declares a logical gadget name resolved not by `GA_ID`
+  but by querying the declared `WHEREPORT` at action time (see below).
+  No `GA_ID` field — there deliberately isn't one, since a
+  `WHEREGADGET` exists precisely for gadgets with no reachable one.
 
 Logical names are `[a-z0-9_]+` (lowercase by convention; consumers
 match them case-insensitively). Names must be unique within their kind
-(no two windows with the same logical name; no two gadgets either —
-gadget names are globally unique in the file, not per-window, so a
-script can say `@connect_button` without qualifying the window).
+(no two windows with the same logical name), and `GADGET`/`WHEREGADGET`
+names share one namespace — no two gadget records of either kind may
+share a name, gadget names are globally unique in the file, not
+per-window, so a script can say `@connect_button` without qualifying
+the window or caring which of the two record types resolved it.
 
 ## Example
 
@@ -75,6 +91,20 @@ GADGET host_field main 2
 GADGET enabled_checkbox main 3
 ```
 
+A version-2 example, for an app whose gadgets sit behind a
+`layout.gadget` wall (see "The cooperative geometry port" below):
+
+```
+; CAApp.manifest -- ships next to the CAApp binary.
+MANIFEST 2
+APP CAApp
+WHEREPORT CAAPP.WHERE
+WINDOW main "AmiPilot ClassAct Fixture"
+WHEREGADGET connect_button main
+WHEREGADGET host_field main
+WHEREGADGET enabled_checkbox main
+```
+
 ## Resolution semantics
 
 Resolving a logical gadget name yields a `(title-substring, GA_ID)`
@@ -85,14 +115,23 @@ never cached. The manifest pins the *identity* of a target; it says
 nothing about position, size, label, or ordering, which is exactly why
 relayout and relabelling can't break it.
 
-What a manifest can name is bounded by what AmiPilot's walker can reach:
-a gadget invisible to structural walking (e.g. a `layout.gadget` child
-on classic OS 3.x — see the project's documented limits) can't be
-clicked by `GA_ID` no matter what the manifest says. An application
-whose scriptable gadgets sit behind that limit needs to restructure
-(attach them where they're reachable) before a manifest helps — the
-manifest format deliberately has no way to express "unreachable but
-trust me", because that would be a lie waiting to be shipped.
+What a plain `GADGET` record can name is bounded by what AmiPilot's
+walker can reach: a gadget invisible to structural walking (e.g. a
+`layout.gadget` child on classic OS 3.x — see the project's documented
+limits) can't be clicked by `GA_ID` no matter what the manifest says.
+Version 1 of this format deliberately had no way to express
+"unreachable but trust me", because that would have been a lie waiting
+to be shipped. Version 2's `WHEREGADGET` record is the honest answer to
+that limit, not an exception to it: it doesn't ask AmiPilot to trust an
+unreachable `GA_ID` — it names a gadget whose *geometry* the
+application itself will report, live, on request. See "The cooperative
+geometry port" below.
+
+Resolving a `WHEREGADGET` name yields `(title-substring, wherePort)`
+instead of `(title-substring, GA_ID)`. The consumer locates the window
+by title substring exactly as above, then queries `wherePort` for the
+gadget's current geometry — again at action time, against the live
+application, never cached.
 
 ## Naming and shipping conventions
 
@@ -105,6 +144,95 @@ trust me", because that would be a lie waiting to be shipped.
 - Removing a logical name is a breaking change to every script using
   it; renaming a gadget's on-screen label is not a change at all. This
   asymmetry is the entire point.
+
+## The cooperative geometry port (WHERE)
+
+A `window.class`/`layout.gadget` window attaches only its single
+top-level layout object to `window->FirstGadget` — the layout's own
+button/string/checkbox children aren't individually walkable, and
+there's no public API to enumerate them on classic OS 3.x (see the
+project's documented "Confirmed limit"). This blocks a plain `GADGET`
+record for any such gadget, permanently — no manifest can fix an
+enumeration limit.
+
+The escape hatch: the application itself already holds a live object
+pointer to every gadget it created (it needs them for its own event
+dispatch). It can expose a small, optional ARexx port that answers a
+`WHERE <logical-name>` query by calling
+`GetAttr(GA_Left/GA_Top/GA_Width/GA_Height)` on its own object and
+reporting the live, current geometry back. AmiPilot resolves a
+`WHEREGADGET` name to that geometry and then acts with a genuine
+`input.device` click at the resolved coordinates — discovery is
+cooperative (the app tells AmiPilot where things are), but **actuation
+stays real input through the real event path**, the same as every
+other locator tier. No coordinates ever appear in a script; they are
+resolved live, at action time, by the application itself, so relayout
+and font changes can't break anything — the same immunity a plain
+manifest already gives `GA_ID`-addressed gadgets, extended to the one
+place structural walking can't reach.
+
+### Request
+
+A standard ARexx command message (`RXCOMM|RXFF_RESULT`, the same
+message shape ARexx's own `ADDRESS` mechanism uses), with the command
+string:
+
+```
+WHERE <logical-name>
+```
+
+`<logical-name>` matches case-insensitively and is otherwise passed
+through verbatim (no quoting rules beyond ARexx's own).
+
+### Reply
+
+- **Success**: `rm_Result1` (the RC) is `0`; `rm_Result2` is an
+  argstring of exactly four whitespace-separated decimal integers,
+  `"<x> <y> <w> <h>"`, and nothing else. Units are pixels, relative to
+  the gadget's own window's top-left corner **including the window's
+  border and title bar** — i.e. exactly what
+  `GetAttr(GA_Left/GA_Top/GA_Width/GA_Height)` already returns; a
+  consumer converts to screen coordinates by adding the window's own
+  `LeftEdge`/`TopEdge` and nothing else (do not add `BorderLeft`/
+  `BorderTop` — they're already folded in).
+- **Unknown name**: `rm_Result1` is nonzero (`10` by convention,
+  matching this project's own RC scale); `rm_Result2` may optionally
+  carry a short reason string.
+- The application must reply to every `WHERE` message it receives, from
+  the same task that owns the objects being queried (an ARexx message
+  handled off-task risks reading geometry mid-relayout). A sub-second
+  response is expected — AmiPilot's own default query timeout is 10
+  seconds, generous enough for a busy app but not for a hung one.
+
+### Clash guard: pick a dedicated port name
+
+`WHERE` is an ordinary ARexx command string on whatever port the
+manifest's `WHEREPORT` record names — nothing about this contract
+reserves the word globally. If an application points `WHEREPORT` at a
+general-purpose port that also implements its own command vocabulary,
+a genuine collision (an existing `WHERE` command doing something else
+entirely) is possible, and would silently misdirect every `WHEREGADGET`
+click on that app. To make that risk structural rather than incidental:
+
+- **An application implementing this contract MUST make `WHERE` behave
+  exactly as specified above on the port its manifest names** — it may
+  not repurpose the word for something else on that same port.
+- **Applications SHOULD expose a dedicated port for this purpose**
+  (e.g. `<APPNAME>.WHERE`, matching the naming convention this spec's
+  own example manifest uses) rather than reusing a port that already
+  serves a broader, app-specific command set — the smaller the
+  vocabulary sharing that port, the smaller the chance any future
+  command it gains collides with this one.
+- AmiPilot's own port resolution for `WHERE` queries matches the
+  declared port name **exactly** — it does not apply MUIREXX's own
+  `<base>.1` fallback probe (a MUI-specific naming convention that
+  doesn't apply here), so a manifest that names the wrong port fails
+  loudly (port-not-found) rather than silently guessing at a related
+  one. Combined with the strict four-integer reply format above, a
+  reply that doesn't parse as expected is a hard error, not a silent
+  misclick — an accidental clash with an unrelated `WHERE` command on
+  the same port is far more likely to surface as an obvious rejected
+  reply than as a plausible-looking wrong coordinate.
 
 ## Quirk profiles: the same format for apps you don't control
 
@@ -151,17 +279,23 @@ it changes in the same commit as the `GA_ID`s it describes and a
 third-party file can silently drift out of date. The "Resolution
 semantics" section's limit above applies here too, and matters more:
 a quirk profile can *record* a `GA_ID` for a gadget invisible to
-structural walking, but recording it doesn't make it reachable — the
-same "no way to express 'unreachable but trust me'" honesty applies
-regardless of who wrote the file.
+structural walking, but recording it doesn't make it reachable — a
+plain `GADGET` record naming such a gadget is still a lie waiting to be
+shipped, `WHEREGADGET` or not. A version-2 quirk profile can name a
+`WHEREGADGET` only for an application that genuinely implements the
+`WHERE` port itself; a third party cannot retrofit cooperative geometry
+onto a binary that doesn't offer it.
 
 ## Versioning policy
 
-- Format version bumps only for changes that would make a version-1
+- Format version bumps only for changes that would make an older
   parser misread a file (new record types, field-order changes). Adding
-  a new *optional* record type is still a version bump — version-1
-  consumers must be able to trust that a file they accept contains
-  nothing they silently skipped.
+  a new *optional* record type is still a version bump — a version-1
+  consumer must be able to trust that a file it accepts contains
+  nothing it silently skipped. Version 2 added `WHEREPORT`/
+  `WHEREGADGET`; a version-1 file must not contain either record, and a
+  consumer that only speaks version 1 correctly rejects any file that
+  declares version 2.
 - This spec lives at `manifest/SPEC.md` in the AmiPilot repository and
   is versioned with it; released spec versions never change meaning
   after the fact.

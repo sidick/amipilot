@@ -2,9 +2,9 @@
 (server/WIRE.md framing) matching the verb set `AmiPilotServer`
 currently implements (TREE/CLICK/TYPE/GETTEXT/MANIFEST/LAUNCH/
 FSLIST/FSSTAT/FSMKDIR/FSDELETE/FSGET/MENU/MENUPICK/DRAG/WAITFOR/
-SCREENS/VERSION/QUIT -- see server/README.md; windows/list, find, and
-fs-put are still future scope, not invented here ahead of the server
-actually offering them).
+SCREENS/VERSION/MUIREXX/WHERE/QUIT -- see server/README.md; windows/
+list, find, and fs-put are still future scope, not invented here ahead
+of the server actually offering them).
 
 Quoting matches the ARexx port's own command grammar (arexx_cmd.c):
 window-pattern/path arguments containing a space, a literal '"', or a
@@ -1079,6 +1079,36 @@ class Amipilot:
         return self._run(
             f"MUIREXX {_quote(app_base)} TIMEOUT={int(timeout)} {command}"
         ).text
+
+    def where(self, name: str, *, timeout: float = 10.0) -> tuple[int, int, int, int]:
+        """WHERE @<name> [TIMEOUT=<n>] -- diagnostic query of the
+        cooperative geometry port (issue #49, manifest/SPEC.md's "The
+        cooperative geometry port"). `name` must be a `WHEREGADGET`
+        entry in the currently loaded manifest (see `manifest()`), not
+        a plain `GADGET`. Returns the gadget's current geometry as
+        `(x, y, w, h)` -- pixels, relative to its own window's
+        top-left corner INCLUDING the border/title bar (add a window's
+        own reported `[left, top ...]` from `tree()` to convert to
+        screen coordinates).
+
+        This is a probe/test primitive, not part of the normal
+        automation flow: `click_by_name()`/`type_by_name()` already
+        route through this same query automatically whenever the
+        manifest resolves `name` to a `WHEREGADGET`, with no separate
+        call needed. `where()` exists for asserting on geometry
+        directly, or diagnosing a misbehaving third-party `WHERE`
+        port.
+
+        Raises `NotFound` if the declared `WHEREPORT` doesn't exist,
+        `CommandError` if `name` isn't in the manifest, resolves to a
+        plain `GADGET` instead of a `WHEREGADGET`, the port reports an
+        unknown name, or its reply doesn't parse as exactly four
+        integers, `Timeout` if no reply arrived within `timeout`
+        seconds, and `ActionFailed` if the server itself couldn't
+        allocate the ARexx message (out of memory)."""
+        text = self._run(f"WHERE @{name} TIMEOUT={int(timeout)}").text
+        x, y, w, h = (int(v) for v in text.split())
+        return (x, y, w, h)
 
     def quit(self) -> None:
         """QUIT -- shuts the server down cleanly. The connection is

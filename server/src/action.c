@@ -527,6 +527,27 @@ BOOL AmipClickGadget(struct Window *window, struct Gadget *gadget)
     return AmipClickAt(window->WScreen, centerX, centerY, AMIP_BUTTON_LEFT);
 }
 
+BOOL AmipClickWindowRelative(struct Window *window, WORD x, WORD y, WORD w, WORD h)
+{
+    if (window == NULL) {
+        return FALSE;
+    }
+
+    BringWindowForward(window);
+
+    /* Same window-relative-including-borders convention as
+     * AmipGadgetCenter() above (see its comment) -- the geometry here
+     * comes from a WHERE port's own GetAttr(GA_Left/GA_Top/GA_Width/
+     * GA_Height) reply (manifest/SPEC.md's "The cooperative geometry
+     * port" section) rather than a live struct Gadget*, but the
+     * conversion to a screen-relative click point is identical: add
+     * the window's own LeftEdge/TopEdge, nothing else. */
+    return AmipClickAt(window->WScreen,
+                        (WORD)(window->LeftEdge + x + w / 2),
+                        (WORD)(window->TopEdge + y + h / 2),
+                        AMIP_BUTTON_LEFT);
+}
+
 BOOL AmipDragAt(struct Screen *screen, WORD x1, WORD y1, WORD x2, WORD y2)
 {
     if (!AmipMoveMouseTo(screen, x1, y1)) {

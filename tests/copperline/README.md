@@ -218,6 +218,42 @@ manual Amiberry verification (`server/README.md`'s SCREENSHOT
 section): a known `x%4` pen-ramp pattern painted on a genuine P96 CLUT
 screen decodes back exactly.
 
+### Cooperative geometry port / `WHERE` (issue #49)
+
+`run_where_check` drives `where-test.py` against `fixtures/classact-app`'s
+new `CAAPP.WHERE` ARexx port — the first thing this fixture ever
+exposed over ARexx at all, and the first end-to-end confirmation that
+a manifest's `WHEREGADGET` records genuinely resolve to real clicks,
+not just plausible-looking geometry. All three of the fixture's
+gadgets (button/string/checkbox) are `layout.gadget` children,
+permanently invisible to structural walking, so `CAApp.manifest`
+(now format version 2) addresses every one of them this way instead
+of the plain `GADGET` records it never had.
+
+**A real bug found running this live** (2026-08-09), not caught by
+any amount of reading the NDK: a `RexxMsg` built by hand via
+`CreateRexxMsg()`/`FillRexxMsg()`/`PutMsg()` — exactly the recipe
+`server/src/muirexx.c`'s own `AmipMuiRexxSend()` already used
+successfully against real MUI-Demo — arrives at the receiver with its
+node type left at `NT_MESSAGE`, not `NT_REPLYMSG`.
+`rexxsyslib.library`'s own `IsRexxMsg()` call reports such a message
+as not a genuine `RexxMsg` at all, even though every other field
+(`rm_Action`'s `RXCOMM` bit, `ARG0()`'s command text) is exactly
+correct. This was invisible in the MUIREXX check because MUI-Demo's
+own ARexx handling never calls `IsRexxMsg()` on what it receives —
+only `CAAPP.WHERE`, written to match `server/src/arexx.c`'s own
+receiver-side convention of gating on it, ever exposed the gap.
+Root-caused by direct inspection: a debug build of the fixture dumped
+`ln_Type`/`rm_Action` straight from the message it received, off a
+port dedicated to nothing else, ruling out every "wrong message" or
+"wrong port" theory before landing on the real one. Fixed by having
+`CAAPP.WHERE` trust any message that arrives on its own dedicated
+port rather than gating on `IsRexxMsg()` at all — see the doc comment
+on `HandleWhereMessage()` in `fixtures/classact-app/src/main.c` for
+the full account, and `server/README.md`'s own WHERE section for what
+this means for `MUIREXX` (same latent gap, not fixed there since it
+isn't this issue's scope and no real MUI target has ever tripped it).
+
 ## Ad hoc smoke testing (debugging, new fixtures)
 
 For anything `run.sh` doesn't already assert on, write

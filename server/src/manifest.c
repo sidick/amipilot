@@ -115,16 +115,20 @@ int AmipManifestParse(const char *text, AmipManifest *out,
 
         if (ci_streq(kw, "MANIFEST")) {
             char ver[8];
+            int verNum;
             p = skip_ws(p);
             p = read_field(p, ver, sizeof(ver));
             if (sawVersion) {
                 fail(errBuf, errBufCap, line, "duplicate MANIFEST record");
                 return -1;
             }
-            if (atoi(ver) != AMIP_MANIFEST_FORMAT_VERSION) {
+            verNum = atoi(ver);
+            if (verNum < AMIP_MANIFEST_FORMAT_VERSION_MIN
+                || verNum > AMIP_MANIFEST_FORMAT_VERSION_MAX) {
                 fail(errBuf, errBufCap, line, "unsupported manifest format version");
                 return -1;
             }
+            out->declaredVersion = verNum;
             sawVersion = 1;
         } else if (!sawVersion) {
             /* Spec: MANIFEST must be the first record; anything else
@@ -203,6 +207,60 @@ int AmipManifestParse(const char *text, AmipManifest *out,
             }
             g->windowIndex = winIndex;
             g->gadgetId = strtol(idField, NULL, 10);
+            g->viaWherePort = 0;
+            out->gadgetCount++;
+        } else if (ci_streq(kw, "WHEREPORT")) {
+            if (out->declaredVersion < 2) {
+                fail(errBuf, errBufCap, line, "WHEREPORT requires MANIFEST 2");
+                return -1;
+            }
+            if (out->wherePort[0] != '\0') {
+                fail(errBuf, errBufCap, line, "duplicate WHEREPORT record");
+                return -1;
+            }
+            p = skip_ws(p);
+            p = read_field(p, out->wherePort, sizeof(out->wherePort));
+            if (out->wherePort[0] == '\0') {
+                fail(errBuf, errBufCap, line, "WHEREPORT needs a port name");
+                return -1;
+            }
+        } else if (ci_streq(kw, "WHEREGADGET")) {
+            AmipManifestGadget *g;
+            char winName[AMIP_MANIFEST_MAX_NAME];
+            int winIndex;
+            if (out->declaredVersion < 2) {
+                fail(errBuf, errBufCap, line, "WHEREGADGET requires MANIFEST 2");
+                return -1;
+            }
+            if (out->wherePort[0] == '\0') {
+                fail(errBuf, errBufCap, line, "WHEREGADGET requires a WHEREPORT declared above it");
+                return -1;
+            }
+            if (out->gadgetCount >= AMIP_MANIFEST_MAX_GADGETS) {
+                fail(errBuf, errBufCap, line, "too many GADGET/WHEREGADGET records");
+                return -1;
+            }
+            g = &out->gadgets[out->gadgetCount];
+            p = skip_ws(p);
+            p = read_field(p, g->name, sizeof(g->name));
+            p = skip_ws(p);
+            p = read_field(p, winName, sizeof(winName));
+            if (!valid_logical_name(g->name)) {
+                fail(errBuf, errBufCap, line, "WHEREGADGET logical name must be [a-z0-9_]+");
+                return -1;
+            }
+            winIndex = find_window(out, winName);
+            if (winIndex < 0) {
+                fail(errBuf, errBufCap, line, "WHEREGADGET names a WINDOW not declared above it");
+                return -1;
+            }
+            if (find_gadget(out, g->name) >= 0) {
+                fail(errBuf, errBufCap, line, "duplicate GADGET/WHEREGADGET logical name");
+                return -1;
+            }
+            g->windowIndex = winIndex;
+            g->gadgetId = 0;
+            g->viaWherePort = 1;
             out->gadgetCount++;
         } else {
             /* Unknown record type: version-1 consumers must reject, not
@@ -239,19 +297,25 @@ int AmipManifestParse(const char *text, AmipManifest *out,
 }
 
 int AmipManifestResolve(const AmipManifest *manifest, const char *gadgetName,
-                        const char **outTitleSubstring, long *outGadgetId)
+                        const char **outTitleSubstring, long *outGadgetId,
+                        int *outViaWherePort)
 {
     int gi;
+    const AmipManifestGadget *g;
 
     if (manifest == NULL || gadgetName == NULL) return -1;
     gi = find_gadget(manifest, gadgetName);
     if (gi < 0) return -1;
+    g = &manifest->gadgets[gi];
 
     if (outTitleSubstring != NULL) {
-        *outTitleSubstring = manifest->windows[manifest->gadgets[gi].windowIndex].titleSubstring;
+        *outTitleSubstring = manifest->windows[g->windowIndex].titleSubstring;
     }
-    if (outGadgetId != NULL) {
-        *outGadgetId = manifest->gadgets[gi].gadgetId;
+    if (outViaWherePort != NULL) {
+        *outViaWherePort = g->viaWherePort;
+    }
+    if (outGadgetId != NULL && !g->viaWherePort) {
+        *outGadgetId = g->gadgetId;
     }
     return 0;
 }

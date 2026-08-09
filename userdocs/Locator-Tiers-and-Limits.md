@@ -14,13 +14,18 @@ defines four locator tiers: **1** (manifest logical names — or a
 community-authored [quirk profile](https://github.com/sidick/amipilot/blob/main/manifest/SPEC.md#quirk-profiles-the-same-format-for-apps-you-dont-control),
 same format), **2** (semantic — window pattern + role/`GA_ID`), **3**
 (the MUI-ARexx bridge), and **4** (raw coordinates, the fragile floor).
+Between 1 and 2 sits a fifth, cooperative variant of tier 1 (issue
+#49): a `WHEREGADGET` manifest entry, resolved by querying an ARexx
+port the *target application itself* exposes for a gadget's live
+geometry, rather than a `GA_ID` — see [ARexx Reference](ARexx-Reference.md#driving-layoutgadget-only-applications).
 This table is the honest answer to "which tier actually reaches my
 application's UI today":
 
 | UI built from | Reaches | Why |
 | --- | --- | --- |
 | Plain GadTools gadgets (button/checkbox/string/integer/slider), top-level `BOOPSI`/ReAction gadgets attached directly to a window (`button.gadget`, `string.gadget`, etc., not nested inside a layout) | **Tier 1** with a manifest/quirk profile, or **Tier 2** without one | Fully classified and structurally reachable — see "What's classified today" below. |
-| A `window.class` + `layout.gadget` window's nested button/string/checkbox children | **Tier 4 only** (raw coordinates) | The confirmed `layout.gadget` limit below — invisible to structural walking, so tiers 1–3 can't name them at all, not even via a quirk profile (there's no `GA_ID` to record). The design doc's "cooperative geometry port" (a design note, not yet scheduled) is the intended fix. |
+| A `window.class` + `layout.gadget` window's nested button/string/checkbox children, where the application implements a `WHERE` port | **Tier 1 (cooperative)** — a `WHEREGADGET` manifest entry | The confirmed `layout.gadget` limit below — invisible to structural walking, so plain tiers 1–3 can't name them at all (not even via a quirk profile, since there's no `GA_ID` to record). The application's own cooperation closes the gap: it reports its own gadgets' geometry live, and AmiPilot still does the actual clicking with real `input.device` input. |
+| The same nested children, where the application does **not** implement a `WHERE` port | **Tier 4 only** (raw coordinates) | Nothing changes without the target's own cooperation — a third party can't retrofit a `WHERE` port onto a binary that doesn't offer one, the same way a quirk profile can't retrofit a `GA_ID` onto an unreachable gadget. |
 | MUI applications | **Tier 3** (`MUIREXX`) for whatever the app's own ARexx commands cover, **Tier 4** for anything else | `intuition-model`'s class-name walker has no MUI recognition, so Tier 2 doesn't reach MUI gadgets at all — confirmed live that a MUI window attaches only its own single top-level object to `window->FirstGadget`, the same limit `window.class`/`layout.gadget` has. Tier 3 (see [ARexx Reference](ARexx-Reference.md#driving-mui-applications)) drives through the ARexx port every MUI app carries automatically, but MUI's own *built-in* support there is a small, universal set (`quit`/`hide`/`show`/`activate`/`deactivate`/`info`/`help`) — confirmed against AmigaOS 3.2's own MUI-Demo, which registers zero commands beyond it. Genuine per-widget interaction needs the target application to have added its own ARexx commands; `MUIREXX` passes them through, it can't invent them. |
 | Custom-rendered UIs (games, hand-rolled bitmap rendering) | **Tier 4 only** (raw coordinates) | Out of scope by definition — nothing structural exists for a walker to find, and there's no ARexx port to assume. |
 
@@ -85,6 +90,20 @@ and even then, a quirk profile can't help name them, since they're
 invisible to structural walking regardless of who wrote the file down
 (see the [quirk profiles section](https://github.com/sidick/amipilot/blob/main/manifest/SPEC.md#quirk-profiles-the-same-format-for-apps-you-dont-control)
 of the manifest spec).
+
+This particular limit now has a real escape hatch, though only for
+applications that opt into it: a `WHEREGADGET` manifest entry
+(format version 2) resolves such a gadget by querying a small,
+optional ARexx port the application itself exposes, reporting its own
+live geometry — see [Driving layout.gadget-only
+applications](ARexx-Reference.md#driving-layoutgadget-only-applications).
+It doesn't change what `AmiInspect`/structural walking can *see* (a
+`WHEREGADGET`-addressed gadget still never appears in a `TREE`/
+`AmiInspect` dump — this is a discovery mechanism cooperating with the
+application, not a walker enhancement), only what `CLICK`/`TYPE` can
+*act on*. A third party still can't retrofit this onto a binary that
+doesn't implement the port, the same honest boundary a quirk profile
+already has.
 
 **Custom-rendered UIs are invisible.** Anything an application draws
 directly into a bitmap rather than building from real gadget structures
