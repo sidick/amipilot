@@ -169,6 +169,40 @@ header and no `reaction_macros.h` convenience macro exists for either)
 -- see `userdocs/Locator-Tiers-and-Limits.md`'s own writeup for the
 full reasoning behind each.
 
+Issue #52's Requester gap is real too now, on the acting half (the
+detection half, `WAITFOR REQUESTER`, already shipped in phase 0.5 --
+see below): investigating live (2026-08-09) whether the original
+design sketch's `REQ=` locator idea was actually needed turned up a
+genuine surprise that made it unnecessary for the common case. A
+window-owned `AutoRequest()`/`BuildSysRequest()`/`EasyRequest()`
+requester doesn't attach invisibly to the owning window at all -- it
+opens as a completely ordinary, SEPARATE `struct Window` (confirmed
+live via `TREE`: while the requester is up, the SAME window pattern
+resolves to a different window with different bounds and a real,
+directly-walkable gadget list -- two `frbuttonclass` objects for
+Yes/No, no trace of the app's own gadgets). That new window shares its
+owner's EXACT title text (already the detection mechanism
+`WaitForRequesterPresent()` relies on, see below), so ordinary `CLICK
+<window-pattern> <gadget-id>` already reaches it -- zero new locator
+syntax, zero wire changes. `BuildSysRequest()`'s own autodoc documents
+a fixed, app-independent `GadgetID` convention (PosText's gadget is
+always `GadgetID` `TRUE`/1, NegText's is always `FALSE`/0) --
+confirmed by actually clicking `GadgetID` 1 against
+`fixtures/gadtools-app`'s own `Ask` button and watching a real
+`AutoRequest()` genuinely dismiss (`tests/copperline/
+requester-test.py`'s `REQUESTER-YES-CLICKED`/`REQUESTER-DISMISSED`
+checks, verified by a subsequent `WAITFOR REQUESTER` correctly timing
+out again -- not a stale-state false pass). Two real limits remain,
+both genuinely open, not silently worked around: a requester's own
+body text (`ReqText`) is rendered directly as `IntuiText`, never
+exposed as any gadget's attribute, so `GETTEXT` has nothing to read;
+and the system-wide, no-owning-window case (a real disk-swap/DOS-
+error/Guru requester, `BuildSysRequest(NULL, ...)`) opens on the
+default public screen with no known title to pattern-match against at
+all -- still detection-only, the harder half of the original issue
+that stays genuinely open. See `server/README.md`'s own WAITFOR
+REQUESTER section for the full mechanism.
+
 Phase 0.5 (reliability and reach into the wider ecosystem)
 before it: `WAITFOR` (including its
 `TEXT=` condition) and `CLICK`'s `EXPECT=` (wait/expectation

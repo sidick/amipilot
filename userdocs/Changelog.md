@@ -9,6 +9,24 @@ for the full engineering detail and phase sequencing behind each one.
 
 ## Unreleased
 
+- **`CLICK` can now dismiss a window-owned Requester** (issue #52
+  follow-up): a genuine `AutoRequest()`/`BuildSysRequest()`/
+  `EasyRequest()` requester with a real owning window turns out to
+  open as a completely ordinary, separate `struct Window` (sharing its
+  owner's exact title text) rather than attaching invisibly to
+  `FirstRequest` the way the issue's original design sketch assumed —
+  so ordinary `CLICK <window-pattern> <gadget-id>` already reaches its
+  Yes/No gadgets today, no new locator or wire change needed.
+  `BuildSysRequest()`'s own autodoc documents a fixed, app-independent
+  `GadgetID` convention (`TRUE`=1 for the positive choice, `FALSE`=0
+  for the negative), confirmed live: `CLICK <same-pattern> 1`
+  genuinely dismisses the requester, verified by `WAITFOR REQUESTER`
+  correctly timing out again afterward. Two real limits remain, both
+  genuinely open: a requester's own body text isn't exposed as any
+  gadget attribute (`GETTEXT` has nothing to read), and a system-wide
+  requester with no owning window (a disk-swap prompt, a Guru) is
+  still detection-only, since it opens with no known title to
+  pattern-match against at all.
 - **BOOPSI/ReAction role classification for 12 WB3.2-era gadget
   classes** (issue #69): `clicktab.gadget`, `colorwheel.gadget`,
   `datebrowser.gadget`, `fuelgauge.gadget`, `getcolor.gadget`,

@@ -1595,7 +1595,7 @@ EOF
 # ordinary window), and succeeds once the Ask button is clicked and the
 # requester is genuinely up.
 run_requester_check() {
-	echo "run.sh: WAITFOR REQUESTER (issue #52 detection-only slice)"
+	echo "run.sh: WAITFOR REQUESTER + CLICK dismiss (issue #52)"
 
 	rm -f "$BUILD/requester-result.txt" "$BUILD/marker-requester-ready.txt"
 	cat > "$SMOKE_SCRIPT" <<EOF
@@ -1654,7 +1654,9 @@ EOF
 		'WINDOW-FOUND OK' \
 		'NO-REQUESTER-YET PASS' \
 		'ASK-CLICKED OK' \
-		'REQUESTER-DETECTED PASS'; do
+		'REQUESTER-DETECTED PASS' \
+		'REQUESTER-YES-CLICKED OK' \
+		'REQUESTER-DISMISSED PASS'; do
 		if ! grep -qF "$pattern" "$BUILD/requester-result.txt" 2>/dev/null; then
 			echo "run.sh: FAIL (requester): expected line not found: $pattern"
 			ok=0
@@ -1662,7 +1664,7 @@ EOF
 	done
 
 	if [ "$ok" -eq 1 ]; then
-		echo "run.sh: PASS (WAITFOR REQUESTER)"
+		echo "run.sh: PASS (WAITFOR REQUESTER + CLICK dismiss)"
 	else
 		echo "run.sh:   --- actual output ---"
 		sed 's/^/run.sh:   /' "$BUILD/requester-result.txt" 2>/dev/null || echo "run.sh:   (empty)"

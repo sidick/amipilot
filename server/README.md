@@ -751,8 +751,7 @@ Lands in phase 0.2 onward -- see
   `WAITFOR` also takes a fourth condition form, `REQUESTER`: `WAITFOR
   [SCREEN=<s>] REQUESTER [TIMEOUT=<n>]` polls until a genuine Intuition
   Requester appears anywhere (optionally narrowed to a screen) -- GitHub
-  issue #52's detection-only "cheap first step", no way yet to address
-  or click a Requester's own gadgets. No pattern argument, since a
+  issue #52's original "cheap first step". No pattern argument, since a
   Requester generally has no title of its own.
 
   Window-attached Requesters only, by design -- a system-wide Requester
@@ -777,6 +776,31 @@ Lands in phase 0.2 onward -- see
   future genuine `Request()`-based interaction path). Full story in
   `WaitForRequesterPresent()`'s own comment,
   `server/src/amipilotserver/main.c`.
+
+  **Acting on a window-owned requester needs no new verb at all** (issue
+  #52 follow-up, 2026-08-09) -- since it's a genuinely separate
+  `struct Window`, ordinary `CLICK <window-pattern> <gadget-id>`
+  already reaches its own gadgets today, confirmed live: while the
+  requester is up, `TREE` against the SAME window pattern (it shares
+  the owner's exact title, see above) resolves to the requester's own
+  window and shows its real gadgets directly, no `layout.gadget`-style
+  invisibility at all. `BuildSysRequest()`'s own autodoc documents a
+  fixed, app-independent `GadgetID` convention -- the PosText ("Yes"/
+  "OK"-style) gadget always gets `GadgetID` `TRUE` (1), NegText
+  ("No"/"Cancel") always gets `FALSE` (0) -- so `CLICK <same-pattern> 1`
+  reliably presses the positive choice on ANY window-owned system
+  requester, not just this fixture's own. `tests/copperline/
+  requester-test.py`'s `REQUESTER-YES-CLICKED`/`REQUESTER-DISMISSED`
+  checks confirm this end to end: a plain `CLICK` genuinely dismisses
+  a real `AutoRequest()`, verified by `WAITFOR REQUESTER` correctly
+  timing out again afterward (not a stale-state false pass). Two real
+  limits remain, both genuinely open, not silently worked around: a
+  Requester's own body text (`ReqText`) is rendered directly as
+  `IntuiText`, not exposed as any gadget's attribute, so `GETTEXT` has
+  no way to read "Are you sure?" itself; and the system-wide (no
+  owning window) case above is still detection-only -- `BuildSysRequest
+  (NULL, ...)` opens on the default public screen with no known title
+  to `CLICK`/`TREE` pattern-match against at all.
 
 - **MUI-ARexx bridge tier (phase 0.5, shipped in v0.5):** `MUIREXX <app-base> [TIMEOUT=<n>]
   <command...>` sends `<command>` verbatim to the ARexx port of the MUI
