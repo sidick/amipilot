@@ -33,10 +33,15 @@ application's UI today":
 
 **Plain GadTools gadgets** (`BOOLGADGET`/`STRGADGET`/`PROPGADGET`):
 
-- `STRING_KIND` and `INTEGER_KIND` → `role=string` (both share the same
-  underlying `GTYP_STRGADGET` type, and aren't yet distinguished from
-  each other — a smaller version of the button/checkbox problem below,
-  not yet solved).
+- `STRING_KIND` → `role=string`, `INTEGER_KIND` → `role=integer` (issue
+  #64). Both share the same underlying `GTYP_STRGADGET` type — the same
+  ambiguity `BUTTON_KIND`/`CHECKBOX_KIND` have below, solved the same
+  way: `GT_GetGadgetAttrsA`'s documented per-kind tag table lists
+  `GTIN_Number` under `INTEGER_KIND` only, so asking a plain string
+  gadget for it is a safe, documented no-op — the discriminator, not a
+  guess. Needs `gadtools.library` open, same caveat as the button/
+  checkbox case below; without it every `STRGADGET` reports as
+  `string`.
 - `PROPGADGET` (sliders/scrollers) → `role=slider`.
 - `BUTTON_KIND` and `CHECKBOX_KIND` both produce the exact same
   `GTYP_BOOLGADGET` — nothing in the gadget structure itself tells them
