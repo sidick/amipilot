@@ -67,6 +67,13 @@
  * above, exercising the walker's GTIN_Number kind-probe discriminator
  * (intuition-model/src/walk.c's ClassifyStringGadget()) against a
  * real target.
+ *
+ * Ask System (GID_ASK_SYSTEM, issue #52's remaining gap) is a second
+ * AutoRequest() button, deliberately given no owning window
+ * (AutoRequest(NULL, ...)) -- the real, documented mechanism
+ * dos.library itself uses internally for disk-swap/DOS-error
+ * requesters, not a hand-rolled simulation. See its own comment above
+ * for the "System Request" title finding this exercises.
  */
 
 #include <exec/types.h>
@@ -93,6 +100,7 @@ struct Library *GadToolsBase;
 #define GID_OPENREQ  6
 #define GID_ASK      7
 #define GID_COUNT    8
+#define GID_ASK_SYSTEM 9
 
 #define MENUNUM_PROJECT   0
 #define ITEMNUM_ABOUT     0
@@ -238,17 +246,44 @@ int main(void)
     ng.ng_Flags = PLACETEXT_IN;
     gad = CreateGadget(BUTTON_KIND, gad, &ng, GT_Underscore, '_', TAG_DONE);
 
-    /* AmiPilot's WAITFOR REQUESTER on-target check (issue #52's
-     * detection-only slice) needs a REAL genuine Intuition Requester
-     * to detect, not a second plain window (GID_OPENREQ above is
-     * exactly that, kept as-is for its own existing WAITFOR/EXPECT=
-     * race-condition check). AutoRequest() below is a real, blocking
-     * modal Requester attached to THIS window (window->FirstRequest
-     * becomes non-NULL for its whole duration) -- the actual thing
-     * WAITFOR REQUESTER is meant to detect. */
+    /* AmiPilot's WAITFOR REQUESTER on-target check (issue #52) needs a
+     * REAL genuine Intuition Requester to detect, not a second plain
+     * window (GID_OPENREQ above is exactly that, kept as-is for its
+     * own existing WAITFOR/EXPECT= race-condition check). AutoRequest()
+     * below is a real, blocking window-owned Requester -- the actual
+     * thing WAITFOR REQUESTER is meant to detect. NOT window->
+     * FirstRequest, despite the RKRM's own text suggesting it would be:
+     * confirmed live (2026-08-09) that AutoRequest()/BuildSysRequest()
+     * given a real owning window on this target's OS/ROM opens a
+     * genuinely SEPARATE struct Window sharing the owner's exact title
+     * text instead -- FirstRequest stays NULL on both windows for the
+     * whole duration. See server/README.md's own WAITFOR REQUESTER
+     * section for the full story. */
     ng.ng_TopEdge += 24;
     ng.ng_GadgetText = (UBYTE *)"_Ask";
     ng.ng_GadgetID = GID_ASK;
+    ng.ng_Flags = PLACETEXT_IN;
+    gad = CreateGadget(BUTTON_KIND, gad, &ng, GT_Underscore, '_', TAG_DONE);
+
+    /* GID_ASK_SYSTEM: the SYSTEM-WIDE case (issue #52's remaining
+     * gap) -- AutoRequest(NULL, ...) below, no owning window, exactly
+     * what dos.library itself does internally for a real disk-swap
+     * "Please insert volume..." prompt (AutoRequest()'s own autodoc,
+     * NOTES section) or a DOS error requester. Confirmed live
+     * (2026-08-09) this produces a window titled exactly "System
+     * Request" -- Intuition's own documented default title for a
+     * titleless system requester (intuition.doc's EasyRequestArgs
+     * es_Title description: "if this is NULL, the title will be taken
+     * to be the same as the title of 'Window', if provided, or else
+     * 'System Request.'" -- AutoRequest()/BuildSysRequest() share the
+     * same underlying default since neither takes an explicit title
+     * parameter at all). Structurally identical to the window-owned
+     * case above (same frbuttonclass Yes/No gadgets, same fixed
+     * GadgetID TRUE=1/FALSE=0 convention) -- CLICK reaches it via the
+     * exact same mechanism, no new code needed there either. */
+    ng.ng_TopEdge += 24;
+    ng.ng_GadgetText = (UBYTE *)"Ask S_ystem";
+    ng.ng_GadgetID = GID_ASK_SYSTEM;
     ng.ng_Flags = PLACETEXT_IN;
     gad = CreateGadget(BUTTON_KIND, gad, &ng, GT_Underscore, '_', TAG_DONE);
 
@@ -288,7 +323,7 @@ int main(void)
 
     window = OpenWindowTags(NULL,
                              WA_Left, 40, WA_Top, 40,
-                             WA_Width, 220, WA_Height, 238,
+                             WA_Width, 220, WA_Height, 262,
                              WA_Title, (ULONG)"AmiPilot GadTools Fixture",
                              WA_Gadgets, (ULONG)glist,
                              WA_CloseGadget, TRUE,
@@ -387,19 +422,18 @@ int main(void)
                         }
                     } else if (((struct Gadget *)msg->IAddress)->GadgetID == GID_ASK) {
                         /* A REAL, blocking modal Requester (RKRM/NDK
-                         * AutoRequest() -- window->FirstRequest is
-                         * genuinely non-NULL for its whole duration),
-                         * not a second window -- the actual thing
-                         * WAITFOR REQUESTER (issue #52's detection-only
-                         * slice) is meant to detect. AutoRequest()
-                         * itself runs its own internal message loop on
-                         * window->UserPort until answered; calling it
-                         * from inside an IDCMP_GADGETUP handler like
-                         * this is the RKRM's own documented usage
-                         * pattern, not a hack. PosFlags/NegFlags both 0
-                         * -- IDCMP_GADGETUP is always an implicit
-                         * dismiss condition, no extra flags needed for
-                         * a plain Yes/No. */
+                         * AutoRequest()) -- the actual thing WAITFOR
+                         * REQUESTER (issue #52) is meant to detect. Not
+                         * window->FirstRequest -- see this fixture's own
+                         * GID_ASK gadget-creation comment above for why.
+                         * AutoRequest() itself runs its own internal
+                         * message loop on window->UserPort until
+                         * answered; calling it from inside an
+                         * IDCMP_GADGETUP handler like this is the RKRM's
+                         * own documented usage pattern, not a hack.
+                         * PosFlags/NegFlags both 0 -- IDCMP_GADGETUP is
+                         * always an implicit dismiss condition, no extra
+                         * flags needed for a plain Yes/No. */
                         struct IntuiText body = { 0, 1, JAM2, 4, 4, NULL,
                                                    (UBYTE *)"Are you sure?", NULL };
                         struct IntuiText posText = { 0, 1, JAM2, 4, 4, NULL,
@@ -407,6 +441,18 @@ int main(void)
                         struct IntuiText negText = { 0, 1, JAM2, 4, 4, NULL,
                                                       (UBYTE *)"No", NULL };
                         AutoRequest(window, &body, &posText, &negText, 0, 0, 220, 60);
+                    } else if (((struct Gadget *)msg->IAddress)->GadgetID == GID_ASK_SYSTEM) {
+                        /* System-wide case (no owning window) -- see
+                         * this fixture's own GID_ASK_SYSTEM
+                         * gadget-creation comment above for the full
+                         * "System Request" title finding. */
+                        struct IntuiText body = { 0, 1, JAM2, 4, 4, NULL,
+                                                   (UBYTE *)"Are you sure?", NULL };
+                        struct IntuiText posText = { 0, 1, JAM2, 4, 4, NULL,
+                                                      (UBYTE *)"Yes", NULL };
+                        struct IntuiText negText = { 0, 1, JAM2, 4, 4, NULL,
+                                                      (UBYTE *)"No", NULL };
+                        AutoRequest(NULL, &body, &posText, &negText, 0, 0, 220, 60);
                     }
                     break;
                 /* Diagnostic: IDCMP_MOUSEBUTTONS only arrives for clicks

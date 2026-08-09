@@ -57,7 +57,7 @@ for disambiguating two same-titled windows on different screens; see
 | `DRAG` | `<window-pattern> <locator> <dx> <dy>` or `<window-pattern> <locator> TO (<dest-gadget-id> \| @<dest-name>)` | A genuine press/move/release drag. The offset form (`<dx> <dy>`) moves the gadget's current center by a pixel delta — the natural shape for a slider/scroller. The `TO` form drags onto a second gadget's center instead, both resolved live, for drag-and-drop/reorder — the destination must be in the same window as the source. `<locator>` is the same numeric `GA_ID`, `ROLE=`/`LABEL=`/`INDEX=`, or `@name` form CLICK/TYPE/GETTEXT accept. |
 | `WINDOWMOVE` | `[SCREEN=<s>] <window-pattern> <dx> <dy>` | Moves the WHOLE window by a pixel offset — a genuine title-bar drag (`WFLG_DRAGBAR`), built on the same primitive `DRAG`'s gadget forms use. Classic locator form only, no `@name` — a window-level action, same scope as `TREE`/`MENU`. `RC=20` ("window has no drag bar") if the window never had one. No separate "get position" verb — `TREE`'s own `[left,top WxH]` header already carries it. |
 | `WINDOWSIZE` | `[SCREEN=<s>] <window-pattern> <width> <height>` | Resizes the WHOLE window to an ABSOLUTE target size — a genuine sizing-gadget drag (`WFLG_SIZEGADGET`) from its current bottom-right corner. Doesn't pre-check against the window's own min/max — Intuition clamps the drag as it would a real one; confirm the actual result with a follow-up `TREE`. `RC=20` ("window has no sizing gadget") if the window never had one. Same classic-form-only scope as `WINDOWMOVE`. |
-| `WAITFOR` | `[SCREEN=<s>] WINDOW=<pattern> [TIMEOUT=<n>]` or `[SCREEN=<s>] NOWINDOW=<pattern> [TIMEOUT=<n>]` or `[SCREEN=<s>] <window-pattern> (<gadget-id> \| ROLE=<r> [LABEL=<l>] [INDEX=<n>]) TEXT=<value> [TIMEOUT=<n>]` or `@<name> TEXT=<value> [TIMEOUT=<n>]` or `[SCREEN=<s>] REQUESTER [TIMEOUT=<n>]` | Polls (server-side, one round trip) until a window matching `<pattern>` appears, until none does, until a gadget's text exactly equals `<value>`, or until a genuine Intuition Requester appears (window-attached only — issue #52's detection-only slice). `TIMEOUT` defaults to 10 seconds. `RC=15` if the condition never becomes true in time — a new RC distinct from "nothing matched" (`RC=5`) or "the action itself failed" (`RC=20`). See [Wait/expectation primitives](#waitexpectation-primitives). |
+| `WAITFOR` | `[SCREEN=<s>] WINDOW=<pattern> [TIMEOUT=<n>]` or `[SCREEN=<s>] NOWINDOW=<pattern> [TIMEOUT=<n>]` or `[SCREEN=<s>] <window-pattern> (<gadget-id> \| ROLE=<r> [LABEL=<l>] [INDEX=<n>]) TEXT=<value> [TIMEOUT=<n>]` or `@<name> TEXT=<value> [TIMEOUT=<n>]` or `[SCREEN=<s>] REQUESTER [TIMEOUT=<n>]` | Polls (server-side, one round trip) until a window matching `<pattern>` appears, until none does, until a gadget's text exactly equals `<value>`, or until a genuine Intuition Requester appears (window-attached only — issue #52; once detected, its own gadgets are reachable via ordinary `CLICK` against the same window pattern, no separate verb needed — see below). `TIMEOUT` defaults to 10 seconds. `RC=15` if the condition never becomes true in time — a new RC distinct from "nothing matched" (`RC=5`) or "the action itself failed" (`RC=20`). See [Wait/expectation primitives](#waitexpectation-primitives). |
 | `AUTH` | `<password>` | Authenticates a TCP connection (no effect on ARexx or serial.device, which have their own implicit trust boundaries). Until it succeeds, the TCP transport refuses every command except `VERSION`/`AUTH`/`QUIT` with `RC=10`. See [Securing TCP](Wire-Protocol.md#securing-tcp). |
 | `MUIREXX` | `<app-base> [TIMEOUT=<n>] <command...>` | Sends `<command>` verbatim to a MUI application's own ARexx port. The MUI-ARexx bridge tier — see [Driving MUI applications](#driving-mui-applications). |
 | `WHERE` | `@<name> [TIMEOUT=<n>]` | Diagnostic query of the cooperative geometry port: returns `<name>`'s current `"<x> <y> <w> <h>"` geometry from the application's own declared `WHEREPORT`. Manifest-only, `WHEREGADGET` names only — see [Driving layout.gadget-only applications](#driving-layoutgadget-only-applications). |
@@ -182,9 +182,8 @@ This condition is `WAITFOR`-only, not available on `CLICK`'s
 click is often a *different* gadget than the one clicked.
 
 `WAITFOR` also has a fourth condition, for detecting an Intuition
-Requester (GitHub issue #52's detection-only "cheap first step" —
-a way to know a modal requester appeared, without addressing its own
-gadgets):
+Requester (GitHub issue #52's original "cheap first step" — a way to
+know a modal requester appeared):
 
 ```rexx
 'CLICK GadTools 7'
@@ -215,8 +214,60 @@ same screen as the one containing your window") — the actual signal
 is that separate window sharing its owning window's exact title text,
 which no ordinary well-behaved app window does on its own. Full
 technical story in `WaitForRequesterPresent()`'s own comment,
-`server/src/amipilotserver/main.c`. There's no way yet to address or
-click a Requester's own gadgets — issue #52 stays open for that half.
+`server/src/amipilotserver/main.c`.
+
+**Acting on a window-owned requester needs no new verb** (issue #52
+follow-up): since it's a genuinely separate `struct Window` sharing
+its owner's exact title, ordinary `CLICK <window-pattern> <gadget-id>`
+already reaches it. `BuildSysRequest()`'s own autodoc documents a
+fixed, app-independent `GadgetID` convention: the positive/"Yes"
+gadget is always `GadgetID` `TRUE` (1), the negative/"No" gadget is
+always `FALSE` (0) — so `CLICK <same-pattern> 1` reliably dismisses
+ANY window-owned system requester with the positive choice:
+
+```rexx
+'CLICK GadTools 7'
+'WAITFOR REQUESTER TIMEOUT=10'
+'CLICK GadTools 1'
+```
+
+Confirmed live (`tests/copperline/requester-test.py`'s
+`REQUESTER-YES-CLICKED`/`REQUESTER-DISMISSED` checks) — a real dismiss,
+verified by `WAITFOR REQUESTER` correctly timing out again afterward.
+
+**System-wide requesters (no owning window) work too**, the same way
+(`BuildSysRequest(NULL, ...)` — exactly what `dos.library` calls
+internally for a real disk-swap "Please insert volume..." prompt or a
+DOS error requester): confirmed live to produce a window titled
+EXACTLY `"System Request"` — Intuition's own documented fallback
+title when no owning window (or explicit title) is given, not a
+coincidence:
+
+```rexx
+'CLICK GadTools 9'
+'WAITFOR REQUESTER TIMEOUT=10'
+'CLICK "System Request" 1'
+```
+
+Same fixed `GadgetID` convention, same plain `CLICK` mechanism — no
+special casing needed once you know the title. English-locale
+specific (like every window/screen title this project already treats
+as Locale-sensitive), and a real app titling its own window exactly
+`"System Request"` would false-positive here — an accepted,
+exceedingly unlikely collision.
+
+**`GETTEXT` cannot read a Requester's body text — confirmed as a
+permanent limit, not left open.** `struct Requester->ReqText` (a
+`struct IntuiText *`) is where `BuildSysRequest()`'s own autodoc says
+the body text ends up — but that field lives on a `struct Requester`
+this project confirmed (2026-08-09) genuinely does not exist anywhere
+reachable here: dumping `FirstRequest`/`ReqCount` for every open
+window while a real `AutoRequest()` was up showed both NULL/0 on the
+owning window (blocked inside `AutoRequest()` at the time) AND the
+requester's own separate window. The text is rendered directly at
+open time with no structural field retaining it — `GETTEXT` has
+nothing to query, the same shape as other confirmed structural-reading
+limits (a `PLACETEXT_IN` button's baked-in label).
 
 **Scope today:** `WINDOW=`/`NOWINDOW=`/`TEXT=`/`REQUESTER` conditions
 are understood, and only `CLICK` composes with `EXPECT=` (`WINDOW=`/

@@ -607,8 +607,7 @@ different condition shape (needs a gadget locator) `wait_for()`'s
 plain `condition` string doesn't carry.
 
 `wait_for("requester")` waits for a genuine Intuition Requester to
-appear (GitHub issue #52's detection-only "cheap first step" — no way
-yet to address or click a Requester's own gadgets). No pattern
+appear (GitHub issue #52's original "cheap first step"). No pattern
 argument, and window-attached Requesters only — a system-wide one
 with no owning window (a disk-swap prompt, say) is a stated, harder
 problem left open. See `userdocs/ARexx-Reference.md`'s own WAITFOR
@@ -620,6 +619,29 @@ turned out to be set by `AutoRequest()`/`BuildSysRequest()`/
 owning window — detection instead relies on the confirmed-live fact
 that these calls open a genuinely separate window sharing their
 owner's exact title text.
+
+Once detected, a window-owned requester's own gadgets need no new
+client method at all: since it's a genuinely separate window sharing
+its owner's exact title, `client.click(window_pattern, gadget_id=1)`
+(the RKRM-documented, fixed `GadgetID` for the positive/"Yes" choice —
+`0` for negative/"No") already reaches it through the ordinary `click()`
+path. Confirmed live in `tests/copperline/requester-test.py`.
+
+System-wide requesters (no owning window, e.g. a real disk-swap
+prompt via `BuildSysRequest(NULL, ...)`) are detectable AND
+click-able too now: confirmed live to produce a window titled EXACTLY
+`"System Request"` (Intuition's own documented default), which
+`wait_for("requester")` now matches, and which `client.click("System
+Request", gadget_id=1)` reaches through the exact same mechanism as
+the window-owned case.
+
+`get_text()` cannot read a requester's own body text -- confirmed as a
+permanent limit (2026-08-09): `struct Requester->ReqText` would be the
+obvious field, but a live dump of every open window's `FirstRequest`
+while a real `AutoRequest()` was up showed it NULL on both the owning
+window and the requester's own separate window -- no `struct
+Requester` exists anywhere reachable here for this OS/ROM's
+`AutoRequest()`, so there is no field for `get_text()` to query.
 
 This IS a genuine server-side blocking wait, not a host-side
 workaround: `AmiPilotServer`'s dispatch is single-threaded, so while

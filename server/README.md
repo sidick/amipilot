@@ -751,8 +751,7 @@ Lands in phase 0.2 onward -- see
   `WAITFOR` also takes a fourth condition form, `REQUESTER`: `WAITFOR
   [SCREEN=<s>] REQUESTER [TIMEOUT=<n>]` polls until a genuine Intuition
   Requester appears anywhere (optionally narrowed to a screen) -- GitHub
-  issue #52's detection-only "cheap first step", no way yet to address
-  or click a Requester's own gadgets. No pattern argument, since a
+  issue #52's original "cheap first step". No pattern argument, since a
   Requester generally has no title of its own.
 
   Window-attached Requesters only, by design -- a system-wide Requester
@@ -777,6 +776,77 @@ Lands in phase 0.2 onward -- see
   future genuine `Request()`-based interaction path). Full story in
   `WaitForRequesterPresent()`'s own comment,
   `server/src/amipilotserver/main.c`.
+
+  **Acting on a window-owned requester needs no new verb at all** (issue
+  #52 follow-up, 2026-08-09) -- since it's a genuinely separate
+  `struct Window`, ordinary `CLICK <window-pattern> <gadget-id>`
+  already reaches its own gadgets today, confirmed live: while the
+  requester is up, `TREE` against the SAME window pattern (it shares
+  the owner's exact title, see above) resolves to the requester's own
+  window and shows its real gadgets directly, no `layout.gadget`-style
+  invisibility at all. `BuildSysRequest()`'s own autodoc documents a
+  fixed, app-independent `GadgetID` convention -- the PosText ("Yes"/
+  "OK"-style) gadget always gets `GadgetID` `TRUE` (1), NegText
+  ("No"/"Cancel") always gets `FALSE` (0) -- so `CLICK <same-pattern> 1`
+  reliably presses the positive choice on ANY window-owned system
+  requester, not just this fixture's own. `tests/copperline/
+  requester-test.py`'s `REQUESTER-YES-CLICKED`/`REQUESTER-DISMISSED`
+  checks confirm this end to end: a plain `CLICK` genuinely dismisses
+  a real `AutoRequest()`, verified by `WAITFOR REQUESTER` correctly
+  timing out again afterward (not a stale-state false pass).
+
+  **The system-wide (no owning window) case is real too now**
+  (2026-08-09) -- `BuildSysRequest(NULL, ...)` (exactly what
+  `dos.library` itself calls internally for a genuine disk-swap
+  "Please insert volume..." prompt or a DOS error requester, per
+  `AutoRequest()`'s own autodoc NOTES section, not a simulation)
+  confirmed live to produce a window titled EXACTLY `"System
+  Request"` -- Intuition's own documented fallback title for a
+  titleless requester (`EasyRequestArgs()`'s own autodoc: "if this is
+  NULL, the title will be taken to be the same as the title of
+  'Window', if provided, or else 'System Request.'"), not a
+  coincidence tied to any one fixture, since `AutoRequest()`/
+  `BuildSysRequest()` have no title parameter of their own to override
+  it with. `WaitForRequesterPresent()` now matches that exact title as
+  a third detection branch, and -- since the resulting window is
+  structurally identical to the window-owned case (same
+  `frbuttonclass` Yes/No gadgets, same fixed `GadgetID` convention --
+  `CLICK "System Request" 1` reaches it via the exact same mechanism
+  already proven above, no new action-engine code needed.
+  `fixtures/gadtools-app`'s second button, "Ask System"
+  (`GID_ASK_SYSTEM`), exercises this real path;
+  `SYSTEM-REQUESTER-DETECTED`/`SYSTEM-REQUESTER-YES-CLICKED`/
+  `SYSTEM-REQUESTER-DISMISSED` in `tests/copperline/requester-test.py`
+  confirm detection, action, and a genuine dismiss end to end, the
+  same rigor as the window-owned case. English-locale specific, like
+  every other window/screen title this project already treats as
+  Locale-sensitive -- and, in principle, a real third-party app
+  titling its own window exactly `"System Request"` would
+  false-positive here, an accepted, exceedingly unlikely real-world
+  collision, not a design flaw.
+
+  **`GETTEXT` genuinely cannot read a Requester's own body text, on
+  this target -- a confirmed permanent limit, not an unfinished
+  feature.** `struct Requester`'s `ReqText` field (a `struct
+  IntuiText *`, per `BuildSysRequest()`'s own autodoc: "this IntuiText
+  pointer will be stored in the ReqText variable of the new
+  requester") would be the obvious place to read "Are you sure?" back
+  from -- but that field is only reachable via a live `struct
+  Requester`, and confirmed directly (2026-08-09, dumping
+  `FirstRequest`/`ReqCount` for EVERY open window while a real
+  `AutoRequest()` was up): `FirstRequest` is NULL and `ReqCount` is 0
+  on BOTH the owning window (genuinely blocked inside `AutoRequest()`
+  at the time) and the new synthetic requester window this section
+  above already established CLICK can reach -- not just on one of
+  them, ruling out "checked the wrong window" as the explanation. No
+  `struct Requester` exists anywhere in this scenario on this target's
+  real OS/ROM to read `ReqText` off of at all; the body text is
+  rendered directly into the requester window's own bitmap at open
+  time with no structural field retaining it afterward. `GETTEXT`
+  needs a live field to query -- there genuinely isn't one here, the
+  same shape as this project's other confirmed structural-reading
+  limits (a `PLACETEXT_IN` button's baked-in label, `layout.gadget`'s
+  invisible children).
 
 - **MUI-ARexx bridge tier (phase 0.5, shipped in v0.5):** `MUIREXX <app-base> [TIMEOUT=<n>]
   <command...>` sends `<command>` verbatim to the ARexx port of the MUI

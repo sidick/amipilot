@@ -496,7 +496,27 @@ static BOOL WaitForGadgetText(struct Window *window, ULONG gadgetId,
  * requester is up" is a real, if indirect, signal -- not a guess.
  * window->FirstRequest is still checked first, both because it's
  * free and because a future genuine Request()-based interaction path
- * (issue #52's still-open second half) may rely on it directly. */
+ * may rely on it directly.
+ *
+ * SYSTEM-WIDE requesters (no owning window -- issue #52's originally
+ * "genuinely harder" remaining half) turned out to have their own
+ * real, documented signal too, confirmed live (2026-08-09) by calling
+ * AutoRequest(NULL, ...) -- exactly what dos.library itself does
+ * internally for a real disk-swap "Please insert volume..." prompt or
+ * a DOS error requester (AutoRequest()'s own autodoc NOTES section),
+ * not a hand-rolled simulation: the resulting window is titled EXACTLY
+ * "System Request". This isn't a coincidence specific to this
+ * fixture -- intuition.doc's EasyRequestArgs() autodoc documents this
+ * as Intuition's own fallback title whenever no owning window (and no
+ * explicit title) is given, and AutoRequest()/BuildSysRequest() share
+ * that same default since neither takes a title parameter at all.
+ * English-locale specific (like every other window/screen title this
+ * project already treats as Locale-sensitive, see tests/copperline/
+ * README.md's "Golden-tree fixtures and Locale" section) -- and, in
+ * principle, a real third-party app titling its OWN window exactly
+ * "System Request" would false-positive here, but that's an
+ * exceedingly unlikely real-world collision, not a design flaw. */
+#define AMIP_SYSTEM_REQUEST_TITLE "System Request"
 static BOOL WaitForRequesterPresent(CONST_STRPTR screenPattern, long timeoutSeconds)
 {
     ULONG ticksTotal = (ULONG)(timeoutSeconds > 0 ? timeoutSeconds : AMIP_EXPECT_DEFAULT_TIMEOUT) * 50;
@@ -522,6 +542,9 @@ static BOOL WaitForRequesterPresent(CONST_STRPTR screenPattern, long timeoutSeco
                 }
                 if (outer->Title == NULL || outer->Title[0] == '\0') {
                     continue;
+                }
+                if (strcmp((const char *)outer->Title, AMIP_SYSTEM_REQUEST_TITLE) == 0) {
+                    return TRUE;
                 }
                 for (inner = outer->NextWindow; inner != NULL; inner = inner->NextWindow) {
                     if (inner->Title != NULL
