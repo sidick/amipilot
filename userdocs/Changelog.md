@@ -61,6 +61,10 @@ machine profile and against real Picasso96/RTG.
   not just serial), and an automated P96 `SCREENSHOT` capture-path
   check — plus a dedicated pre-1.0 code review whose findings were
   all fixed before this release.
+- **Protocol verbs promoted to stable**: the implementation plan's
+  own 1.0 gate — every verb the `VERSION` handshake reports is now
+  `STABLE` (won't break within a major), not `EXPERIMENTAL`. See
+  [Wire Protocol](Wire-Protocol.md#talking-to-it).
 
 Known gaps, stated plainly: requester support is detection-only;
 menu selection still needs a keyboard shortcut (pointer-based
@@ -68,8 +72,8 @@ selection for shortcut-less items isn't built); a `window.class`
 window's `layout.gadget`-nested children remain unreachable on
 classic OS 3.x (a documented platform limit, not a bug — see
 [Locator Tiers and Limits](Locator-Tiers-and-Limits.md)); and TCP
-remains LAN-only trust — no TLS, see
-[Securing TCP](Wire-Protocol.md#securing-tcp).
+remains LAN-only trust — no TLS, even though every verb is now
+stable, see [Securing TCP](Wire-Protocol.md#securing-tcp).
 
 ## v0.5 — 2026-08-08
 

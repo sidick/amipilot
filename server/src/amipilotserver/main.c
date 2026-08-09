@@ -796,13 +796,16 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
 
         case AMIP_AREXX_CMD_VERSION:
             /* The handshake payload, byte-identical on both transports
-             * -- shape and stable/experimental split per server/WIRE.md
-             * (everything but VERSION itself is experimental until the
-             * 1.0 promotion pass). */
+             * -- shape and stable/experimental split per server/WIRE.md.
+             * The 1.0 promotion pass moved every verb from EXPERIMENTAL
+             * to STABLE (implementation plan's own 1.0 gate); there is
+             * no EXPERIMENTAL line at all now, not just an empty one --
+             * WireClient's handshake() parser (host/amipilot/wire.py)
+             * only looks for a line by its own leading keyword, so this
+             * is a compatible payload shape for existing clients. */
             snprintf(g_resultBuf, sizeof(g_resultBuf),
                      "AMIPILOT " XSTR(VERSION) "." XSTR(REVISION) " PROTOCOL 1\n"
-                     "STABLE VERSION\n"
-                     "EXPERIMENTAL TREE CLICK TYPE GETTEXT MANIFEST LAUNCH "
+                     "STABLE VERSION TREE CLICK TYPE GETTEXT MANIFEST LAUNCH "
                      "FSLIST FSSTAT FSMKDIR FSDELETE FSGET FSPUT WBLAUNCH MENU "
                      "MENUPICK DRAG WINDOWMOVE WINDOWSIZE WAITFOR SCREENS "
                      "SCREENSHOT AUTH MUIREXX QUIT\n");
