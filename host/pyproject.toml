@@ -7,10 +7,24 @@ name = "amipilot"
 version = "1.0.0"
 description = "Host-side client for AmiPilot: object-level GUI automation for classic AmigaOS"
 readme = "README.md"
+license = {text = "BSD-2-Clause"}
+authors = [{name = "Simon Dick", email = "simond@irrelevant.org"}]
 requires-python = ">=3.9"
 # Stdlib-only by design (sockets, argparse) -- matches the wire's own
 # no-JSON-parser, no-dependency spirit (docs/implementation-plan.md).
 dependencies = []
+classifiers = [
+    "Framework :: Pytest",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: BSD License",
+    "Operating System :: OS Independent",
+    "Topic :: Software Development :: Testing",
+    "Topic :: Software Development :: Quality Assurance",
+]
+
+[project.urls]
+Repository = "https://github.com/sidick/amipilot"
+Documentation = "https://sidick.github.io/amipilot/"
 
 [project.optional-dependencies]
 test = ["pytest"]
