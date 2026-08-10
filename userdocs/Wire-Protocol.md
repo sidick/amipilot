@@ -110,7 +110,7 @@ $ nc 127.0.0.1 1234
 VERSION
 RC 0 217
 AMIPILOT 1.0 PROTOCOL 1
-STABLE VERSION TREE CLICK TYPE GETTEXT MANIFEST LAUNCH FSLIST FSSTAT FSMKDIR FSDELETE FSGET FSPUT WBLAUNCH MENU MENUPICK DRAG WINDOWMOVE WINDOWSIZE WAITFOR SCREENS SCREENSHOT AUTH MUIREXX WHERE QUIT
+STABLE VERSION TREE CLICK TYPE GETTEXT MANIFEST LAUNCH FSLIST FSSTAT FSMKDIR FSDELETE FSGET FSPUT WBLAUNCH MENU MENUPICK DRAG WINDOWMOVE WINDOWSIZE WAITFOR SCREENS SCREENSHOT AUTH MUIREXX WHERE PICK QUIT
 GETTEXT GadTools 2
 RC 0 10
 aminet.net
@@ -723,6 +723,56 @@ of which takes one either. There's no separate "get window position/
 size" call: `tree()`'s own result already carries `left`/`top`/
 `width`/`height`, so query before or after a move/resize with a
 regular `tree()` call.
+
+## PICK
+
+The platform's first genuine interactive element-picker equivalent
+([issue #65](https://github.com/sidick/amipilot/issues/65)): point at
+a gadget, get back its exact locator, no batch `tree()` dump required.
+
+```python
+from amipilot import Amipilot, NotFound
+
+with Amipilot.connect("127.0.0.1", 1234) as client:
+    result = client.pick()                       # frontmost screen
+    print(result.title, result.gadgets)           # gadgets: 0 or 1 entry
+
+    scoped = client.pick(screen="Second Screen")
+
+    try:
+        client.pick(screen="NoSuchScreen")
+    except NotFound:
+        pass
+```
+
+`pick()` hit-tests the LIVE global pointer position against
+`screen`'s windows (the frontmost screen if omitted, same convention
+`screenshot()`'s own `screen` parameter uses) and returns the `Window`
+containing it. `result.gadgets` has at most one entry — the gadget
+under the pointer, if any; an empty list means the pointer is over
+bare window background, not an error (this can still include a real
+system gadget, e.g. `gadget_id == 0` with `class_name ==
+"gadgetclass"`, for the drag bar/close/depth/size decorations —
+`tree()` already reports those the same way). Raises `NotFound` if no
+window on the target screen contains the pointer at all, including
+when `screen` itself doesn't match any open screen.
+
+This is a single point-in-time snapshot, not a live subscription —
+call it repeatedly (e.g. in a poll loop) for a "hover and watch it
+update" experience. `AmiInspect PICK` (see [AmiInspect
+Reference](AmiInspect-Reference.md)) is the standing-at-the-machine
+equivalent, looping locally with no host connection at all.
+
+Built on `intuition-model`'s own coordinate-to-gadget hit test over an
+already-walked screen model (`AmipHitTest()`), reusing the same
+role/label classification `TREE`/`AmiInspect` already do — not a new
+Intuition mechanism. The server corrects for a real, live-confirmed
+quirk in the live pointer position it reads back internally (roughly
+2x the real pixel Y, present on this project's own default Workbench
+screen configuration); this is handled server-side and needs nothing
+from the caller — see `server/README.md`'s own PICK section for the
+full story, including the two real findings (window z-order and
+pointer-Y scaling) building this turned up.
 
 ## Securing TCP
 

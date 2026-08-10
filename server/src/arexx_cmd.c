@@ -221,6 +221,7 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
     else if (ci_streq(kw, "SCREENSHOT")) out->type = AMIP_AREXX_CMD_SCREENSHOT;
     else if (ci_streq(kw, "WINDOWMOVE")) out->type = AMIP_AREXX_CMD_WINDOWMOVE;
     else if (ci_streq(kw, "WINDOWSIZE")) out->type = AMIP_AREXX_CMD_WINDOWSIZE;
+    else if (ci_streq(kw, "PICK"))     out->type = AMIP_AREXX_CMD_PICK;
     else if (ci_streq(kw, "MUIREXX"))  out->type = AMIP_AREXX_CMD_MUIREXX;
     else if (ci_streq(kw, "WHERE"))    out->type = AMIP_AREXX_CMD_WHERE;
     else if (ci_streq(kw, "QUIT"))     out->type = AMIP_AREXX_CMD_QUIT;
@@ -462,6 +463,26 @@ int AmipArexxParse(const char *cmdline, AmipArexxParsed *out)
             } else if (ci_streq_prefix(p, "WINDOW=")) {
                 p += 7; /* strlen("WINDOW=") */
                 p = read_token(p, out->windowPattern, sizeof(out->windowPattern), &trunc);
+                if (fail_if_trunc(trunc, out)) return -1;
+            } else {
+                out->type = AMIP_AREXX_CMD_UNKNOWN;
+                return -1;
+            }
+        }
+        return 0;
+    }
+
+    if (out->type == AMIP_AREXX_CMD_PICK) {
+        int trunc;
+
+        for (;;) {
+            p = skip_ws(p);
+            if (*p == '\0') {
+                break;
+            }
+            if (ci_streq_prefix(p, "SCREEN=")) {
+                p += 7; /* strlen("SCREEN=") */
+                p = read_token(p, out->screenPattern, sizeof(out->screenPattern), &trunc);
                 if (fail_if_trunc(trunc, out)) return -1;
             } else {
                 out->type = AMIP_AREXX_CMD_UNKNOWN;

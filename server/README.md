@@ -1063,6 +1063,80 @@ Lands in phase 0.2 onward -- see
   since it's outside this issue's scope and continues to work
   correctly for what it actually receives.
 
+- **Interactive "pick mode" discovery (issue #65, not yet released):**
+  `PICK [SCREEN=<substring>]` hit-tests the LIVE global pointer
+  position against `SCREEN=`'s windows (the default/frontmost screen
+  if omitted, `AmipFindScreen()`'s own convention -- same as
+  `SCREENSHOT`'s `SCREEN=`) and returns the same `TREE`-shaped window
+  line for whichever window contains it, plus (if any) a single
+  gadget line for whichever gadget within that window also contains
+  it -- point at a gadget, get back its exact locator (role/label/
+  `GA_ID`/index via the usual tier-2 machinery), no batch `TREE` dump
+  required. `RC 5` if no window on the target screen contains the
+  point at all (including when `SCREEN=` itself matches nothing); a
+  window hit with no gadget hit is still `RC 0` -- the window line
+  alone, confirming the pointer is over that window's own chrome/
+  background, which can genuinely include a real system gadget (`GA_ID
+  0`, `class="gadgetclass"` -- the drag bar/close/depth/size
+  decorations `TREE` already reports the same way), not an error
+  either way.
+
+  Built on `intuition-model`'s own `AmipHitTest()`
+  (`intuition-model/src/walk.c`) -- a coordinate-to-gadget hit test
+  over an already-walked `AmipWalkScreen()` model, reusing the same
+  role/label classification `TREE`/`AmiInspect` already do, exactly
+  the mechanism the implementation plan's own "The inspector" section
+  sketched for this ("a later pick mode... hover a gadget, see its
+  identity"). `AmiInspect PICK [SCREEN=<substring>]` is the standing-
+  at-the-machine equivalent -- see its own `README.md`/`--help` --
+  looping locally (no host or server session at all) and printing the
+  identified window/gadget only when it actually changes, Ctrl-C to
+  stop.
+
+  **Two real findings from building this, live (2026-08-10), neither
+  a guess:**
+
+  1. `AmipWalkScreen()`'s own `screen->FirstWindow`/`NextWindow` chain
+     is NOT front-to-back z-order (an assumption tried first and
+     disproven immediately): Workbench's own full-screen backdrop
+     window -- untitled, spanning the whole screen below the title bar
+     -- was found ahead of a real foreground application window in
+     that same list. `AmipHitTest()` picks the SMALLEST-area matching
+     window instead of the first one in list order -- a backdrop is
+     essentially always larger than any real foreground window sitting
+     on it, regardless of which order Intuition's own list happens to
+     store them in (not a substitute for true z-order on two
+     same-size overlapping windows, a case that doesn't arise for the
+     backdrop-plus-app-window shape every real target actually has).
+  2. `IntuitionBase->MouseY` is not already in real screen-pixel
+     coordinates -- confirmed by clicking three different known
+     gadgets (via `AmipGadgetCenter()`'s own already-verified center
+     math, see above) and reading `MouseX`/`MouseY` back immediately
+     after each: `MouseX` matched the real pixel X exactly every time,
+     while `MouseY` came back at EXACTLY 2x the real pixel Y every
+     time. The obvious first guess -- interlace-specific, gated on the
+     target screen's own `ViewPort.Modes & LACE` -- was tried and is
+     WRONG: this project's own default 640x256 PAL Workbench screen's
+     `Modes` read back as `SPRITES|HIRES` with `LACE` clearly unset,
+     yet `MouseY` still doubled. `AmipReadPointerPosition()`
+     (`intuition-model/src/walk.c`) halves `MouseY` unconditionally
+     instead -- matching the actual live evidence rather than a
+     plausible-looking flag check that would have silently
+     mis-corrected this project's own default screen. **Not verified**:
+     whether the 2x relationship holds unchanged on other display
+     modes (superhires, NTSC, productivity/RTG) -- an open question
+     for follow-up if PICK ever misbehaves on a different mode, not a
+     silent assumption either way.
+
+  Verified end to end via `tests/copperline/run.sh`'s `run_pick_check`
+  (`tests/copperline/pick-test.py`) against `fixtures/gadtools-app`:
+  positions the REAL live pointer using already-verified `CLICK`/
+  `WINDOWMOVE` actions (not a second, separate control path into
+  Copperline), then confirms `PICK` reports back exactly the gadget it
+  should, the `SCREEN=`-scoped form gives the identical result, a
+  chrome hit correctly reports the drag-bar system gadget, and an
+  unknown `SCREEN=` cleanly raises `NotFound`.
+
 ## Phase 0.2 (shipped)
 
 - `src/action.c` + `include/action_engine.h` -- the action engine's

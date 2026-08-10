@@ -263,6 +263,26 @@ static void BuildTreeResult(const AmipWindowModel *model, char *buf, size_t cap)
     }
 }
 
+/* PICK's own result shape (issue #65): the same single "window ..."
+ * header line TREE/BuildTreeResult() use, plus AT MOST one gadget
+ * line -- whichever gadget AmipHitTest() found under the live pointer
+ * position, or none at all if the point was over chrome/background.
+ * Deliberately reuses AppendWindowHeaderLine()/AppendGadgetLine() so
+ * the host's existing parse_tree() (TREE's own parser) can parse a
+ * PICK payload with no changes at all -- 0 or 1 gadget line is
+ * already a shape it handles. */
+static void BuildPickResult(const AmipWindowModel *window, const AmipGadgetModel *gadget,
+                             char *buf, size_t cap)
+{
+    AppendWindowHeaderLine(window->title != NULL ? (const char *)window->title : NULL,
+                            (const char *)window->screenTitle,
+                            window->left, window->top, window->width, window->height,
+                            buf, cap);
+    if (gadget != NULL) {
+        AppendGadgetLine(buf, cap, gadget);
+    }
+}
+
 /* Appends one menu item's line, same shape AmiInspect's PrintMenuItemLine
  * prints it -- "item" for a top-level entry (num=<menu>/<item>),
  * "subitem" for one of its submenu children (num=<menu>/<item>/<sub>). */
@@ -1002,7 +1022,7 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                      "STABLE VERSION TREE CLICK TYPE GETTEXT MANIFEST LAUNCH "
                      "FSLIST FSSTAT FSMKDIR FSDELETE FSGET FSPUT WBLAUNCH MENU "
                      "MENUPICK DRAG WINDOWMOVE WINDOWSIZE WAITFOR SCREENS "
-                     "SCREENSHOT AUTH MUIREXX WHERE QUIT\n");
+                     "SCREENSHOT AUTH MUIREXX WHERE PICK QUIT\n");
             result = g_resultBuf;
             break;
 
@@ -1386,6 +1406,30 @@ static int HandleCommand(AmipArexxParsed *cmd, const char **resultOut,
                          screen == IntuitionBase->FirstScreen ? 1 : 0);
             }
             UnlockIBase(0);
+            result = g_treeBuf;
+            break;
+        }
+
+        case AMIP_AREXX_CMD_PICK: {
+            struct Screen *screen = AmipFindScreen((CONST_STRPTR)cmd->screenPattern);
+            AmipWindowModel *models;
+            AmipWindowModel *hitWindow;
+            AmipGadgetModel *hitGadget;
+            WORD px, py;
+
+            if (screen == NULL) {
+                rc = AMIP_AREXX_RC_WARN;
+                break;
+            }
+            AmipReadPointerPosition(&px, &py);
+            models = AmipHitTest(screen, px, py, &hitWindow, &hitGadget);
+            if (hitWindow == NULL) {
+                AmipFreeWindowModel(models);
+                rc = AMIP_AREXX_RC_WARN;
+                break;
+            }
+            BuildPickResult(hitWindow, hitGadget, g_treeBuf, sizeof(g_treeBuf));
+            AmipFreeWindowModel(models);
             result = g_treeBuf;
             break;
         }

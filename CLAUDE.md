@@ -245,6 +245,70 @@ as this project's other confirmed structural-reading limits (a
 children) -- `GETTEXT` needs a live field to query, and there
 genuinely isn't one here.
 
+Interactive "pick mode" discovery is real too (issue #65, not yet in a
+tagged release): `docs/implementation-plan.md`'s own "The inspector"
+section had always called this out by name as deliberate v2 polish
+("a later pick mode -- hover a gadget, see its identity"), not an
+oversight -- point at a gadget on the real screen, get back its exact
+locator directly, no batch `TREE`/`amipilot dump` required. `PICK
+[SCREEN=<substring>]` (`server/src/amipilotserver/main.c`) hit-tests
+the LIVE global pointer position against the target screen's windows
+and returns the same `TREE`-shaped window line, plus (if any) a
+single gadget line for whichever gadget also contains the point --
+`Amipilot.pick()` on the host side, `AmiInspect PICK
+[SCREEN=<substring>]` as the standing-at-the-machine equivalent with
+no host or server session at all, looping locally and printing only
+when the identified window/gadget actually changes. Built on two new
+`intuition-model` primitives (`intuition-model/src/walk.c`):
+`AmipHitTest()`, a coordinate-to-gadget hit test over an already-
+walked `AmipWalkScreen()` model (reusing the same role/label
+classification `TREE`/`AmiInspect` already do, not a new Intuition
+mechanism), and `AmipReadPointerPosition()`, the live-pointer read
+both the server and `AmiInspect` share.
+
+Two real, non-obvious findings from building this, live (2026-08-10),
+neither a guess: (1) `AmipWalkScreen()`'s own `screen->FirstWindow`/
+`NextWindow` chain is NOT front-to-back z-order, an assumption tried
+first and disproven immediately -- Workbench's own full-screen
+backdrop window (untitled, spanning the whole screen below the title
+bar) was found ahead of a real foreground application window in that
+same list. `AmipHitTest()` picks the SMALLEST-area matching window
+instead of the first one in list order -- a backdrop is essentially
+always larger than any real foreground window sitting on it,
+regardless of which order Intuition's own list happens to store them
+in (not a substitute for true z-order between two same-size
+overlapping windows, a case that doesn't arise for the backdrop-plus-
+app-window shape every real target actually has); and (2)
+`IntuitionBase->MouseY` is not already in real screen-pixel
+coordinates -- confirmed by clicking three different known gadgets
+(via `AmipGadgetCenter()`'s own already-verified center math,
+`server/src/action.c`) and reading `MouseX`/`MouseY` back immediately
+after each: `MouseX` matched the real pixel X exactly every time,
+while `MouseY` came back at EXACTLY 2x the real pixel Y every time.
+The obvious first guess -- interlace-specific, gated on the target
+screen's own `ViewPort.Modes & LACE` -- was tried and is WRONG: this
+project's own default 640x256 PAL Workbench screen's `Modes` read
+back as `SPRITES|HIRES` with `LACE` clearly unset, yet `MouseY` still
+doubled, so `AmipReadPointerPosition()` halves `MouseY`
+unconditionally instead -- matching the actual live evidence rather
+than a plausible-looking flag check that would have silently mis-
+corrected this project's own default screen (exactly the mistake
+"real functions, not guessed heuristics" exists to catch, caught
+here by testing before shipping it, not left in). Whether the 2x
+relationship holds unchanged on other display modes (superhires,
+NTSC, productivity/RTG) is NOT verified -- a real, open question for
+follow-up if `PICK`/`AmiInspect PICK` ever misbehave on a different
+mode, not a silent assumption either way. Verified end to end via
+`tests/copperline/run.sh`'s `run_pick_check`
+(`tests/copperline/pick-test.py`) against `fixtures/gadtools-app`:
+positions the REAL live pointer using already-verified `CLICK`/
+`WINDOWMOVE` actions (not a second, separate control path into
+Copperline), then confirms `PICK` finds the right gadget, the
+`SCREEN=`-scoped form gives the identical result, a chrome hit
+correctly reports the drag-bar system gadget (not "no gadget" --
+`TREE` already reports that gadget the same way), and an unknown
+`SCREEN=` cleanly raises `NotFound`.
+
 Phase 0.5 (reliability and reach into the wider ecosystem)
 before it: `WAITFOR` (including its
 `TEXT=` condition) and `CLICK`'s `EXPECT=` (wait/expectation

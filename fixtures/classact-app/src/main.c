@@ -514,7 +514,7 @@ int main(void)
         char logbuf[96];
         STRPTR hostText = NULL;
         GetAttr(STRINGA_TextVal, g_hostString, (ULONG *)&hostText);
-        sprintf(logbuf, "caapp: host=%s\n", hostText != NULL ? (const char *)hostText : "");
+        snprintf(logbuf, sizeof(logbuf), "caapp: host=%s\n", hostText != NULL ? (const char *)hostText : "");
         Diag(logbuf);
         DiagFile("SRC:build/caapp-log.txt", logbuf);
     }

@@ -90,6 +90,27 @@ typedef enum {
                               * target via a real sizing-gadget drag;
                               * classic form only, same reasoning as
                               * WINDOWMOVE above */
+    AMIP_AREXX_CMD_PICK,     /* PICK [SCREEN=<substring>] -- interactive
+                              * "pick mode" discovery (issue #65): hit-
+                              * tests the LIVE global pointer position
+                              * against SCREEN='s windows (default
+                              * screen if omitted, AmipFindScreen()'s
+                              * own convention) and returns the
+                              * TREE-shaped window line for whichever
+                              * window contains it, plus (if any) the
+                              * single gadget line for whichever gadget
+                              * within that window also contains it --
+                              * point at a gadget, get back its exact
+                              * locator, no batch dump required. RC 5
+                              * if no window on the target screen
+                              * contains the point at all; a window hit
+                              * with no gadget hit is still RC 0 (the
+                              * window line alone, confirming the
+                              * pointer is over chrome/background, not
+                              * an error). See intuition-model's
+                              * AmipReadPointerPosition() for the
+                              * real, live-confirmed interlaced-screen
+                              * pointer-Y correction this relies on. */
     AMIP_AREXX_CMD_QUIT      /* QUIT */
 } AmipArexxCmdType;
 

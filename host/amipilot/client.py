@@ -848,6 +848,42 @@ class Amipilot:
         rationale)."""
         return parse_screens(self._run("SCREENS").text)
 
+    def pick(self, *, screen: str | None = None) -> Window:
+        """PICK [SCREEN=<substring>] -- interactive "pick mode"
+        discovery (issue #65): hit-tests the LIVE global pointer
+        position against `screen`'s windows (the default/frontmost
+        screen if omitted, same convention as `screenshot()`'s own
+        `screen` parameter) and returns the `Window` containing it --
+        point at a gadget, get back its exact locator, no batch dump
+        required. `result.gadgets` has at most one entry: the gadget
+        under the pointer, if any (an empty list means the pointer is
+        over bare window background with no gadget at all, not an
+        error -- note this can still include a real SYSTEM gadget,
+        e.g. `gadget_id == 0` with `class_name == "gadgetclass"` for
+        the drag bar/close/depth/size decorations, the same as `tree()`
+        already reports for those).
+
+        Raises NotFound if no window on the target screen contains the
+        live pointer position at all (including when `screen` itself
+        doesn't match any open screen).
+
+        This is a single point-in-time snapshot, not a live subscription
+        -- call it repeatedly (e.g. in a poll loop) for a "hover and
+        watch it update" experience; `AmiInspect PICK` is the
+        standing-at-the-machine equivalent with no host connection
+        needed at all (server/README.md's own PICK section).
+
+        The server corrects for a real, live-confirmed quirk (present
+        on this project's own DEFAULT Workbench screen configuration)
+        where the live pointer position it reads back internally comes
+        back at roughly 2x the real pixel Y; this is handled server-
+        side, transparently, and needs nothing from the caller."""
+        parts = ["PICK"]
+        if screen is not None:
+            parts.append(f"SCREEN={_quote(screen)}")
+        reply = self._run(" ".join(parts))
+        return parse_tree(reply.text)
+
     def screenshot(
         self,
         *,

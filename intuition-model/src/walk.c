@@ -599,6 +599,142 @@ AmipWindowModel *AmipWalkScreen(struct Screen *screen)
     return head;
 }
 
+/* Reads the live global pointer position under a brief LockIBase()
+ * hold, corrected into the same real-screen-pixel coordinate space
+ * AmipWindowModel/AmipGadgetModel's own left/top already use.
+ *
+ * IntuitionBase->MouseY is NOT already in that space -- confirmed
+ * live building PICK mode (Copperline, 2026-08-10, real
+ * fixtures/gadtools-app on the project's own DEFAULT 640x256 PAL
+ * Workbench screen): clicking three different known gadgets (via
+ * AmipClickGadget's own already-verified center math, server/src/
+ * action.c's AmipGadgetCenter()) and reading MouseX/MouseY back
+ * immediately after each showed X matching the real pixel X exactly
+ * every time, while Y consistently came back at EXACTLY 2x the real
+ * pixel Y (55->110, 77->154 [checkbox center, half of 11 truncates to
+ * 5: 72+5=77], 103->206).
+ *
+ * The obvious first guess -- this is interlace-specific, correct only
+ * when the screen's own ViewPort.Modes has LACE set (graphics/
+ * view.h) -- was tried FIRST and is WRONG: this exact screen's own
+ * Modes read back as 0xc000 (SPRITES|HIRES), with LACE (0x0004)
+ * clearly NOT set, yet Y still doubled. So the correction below is
+ * unconditional, not gated on any Modes bit -- matching the actual
+ * live evidence rather than a plausible-looking flag check that
+ * would have silently mis-corrected the project's own default screen
+ * (house convention: CLAUDE.md's "real functions, not guessed
+ * heuristics"; this is exactly the mistake that convention exists to
+ * catch, caught by testing before shipping it).
+ *
+ * NOT verified: whether this 2x relationship holds unchanged across
+ * every other display mode (superhires, NTSC, productivity/RTG
+ * modes) -- only the one config above has live confirmation. A real,
+ * open question for follow-up if PICK/AmiInspect PICK ever misbehave
+ * on a different mode, not a silent assumption either way. */
+void AmipReadPointerPosition(WORD *outX, WORD *outY)
+{
+    LockIBase(0);
+    if (outX != NULL) {
+        *outX = IntuitionBase->MouseX;
+    }
+    if (outY != NULL) {
+        *outY = IntuitionBase->MouseY / 2;
+    }
+    UnlockIBase(0);
+}
+
+/* Hit-tests (screenX, screenY) -- real screen-pixel coordinates, same
+ * space AmipReadPointerPosition()/AmipWindowModel's own left/top use
+ * -- against every window on `screen`, walked via AmipWalkScreen().
+ *
+ * Picks the SMALLEST-area matching window as the hit, not the first
+ * one in AmipWalkScreen()'s own screen->FirstWindow list order.
+ * FirstWindow order was tried as a front-to-back proxy first and
+ * confirmed live (Copperline, 2026-08-10) NOT to be one for this
+ * purpose: Workbench's own full-screen backdrop window -- untitled,
+ * spanning the whole screen below the title bar -- was found ahead of
+ * a real foreground application window in that same list, meaning
+ * "first in FirstWindow order" silently reported the backdrop instead
+ * of the actual application under the pointer. Smallest-area is a
+ * real, verified fix for exactly this shape of problem: a full-screen
+ * (or otherwise large) backdrop is essentially always larger than any
+ * genuine foreground application window sitting on top of it,
+ * regardless of which order Intuition's own list happens to store
+ * them in. It is not a substitute for true z-order (two same-size
+ * overlapping windows would tie-break arbitrarily, by whichever is
+ * encountered first), but that case doesn't arise for the backdrop-
+ * plus-app-window shape every real target actually has.
+ *
+ * On a hit, *outGadget is the LAST matching gadget in the winning
+ * window's own walk-order list whose rectangle also contains the
+ * point (NULL if the point falls on that window's own chrome/
+ * background, not an error -- "last wins" is an arbitrary but
+ * harmless tie-break for the rare case of two gadgets genuinely
+ * overlapping; GadTools/ReAction layouts essentially never do).
+ * Returns NULL, leaving both outputs NULL, if no window on the screen
+ * contains the point at all, or on allocation failure -- same NULL-
+ * on-either-failure ambiguity AmipWalkScreen() already has.
+ *
+ * The returned list is owned by the caller exactly like
+ * AmipWalkScreen()'s own return value -- free with
+ * AmipFreeWindowModel() once done. *outWindow / *outGadget point INTO
+ * that same list, not separately-owned copies; they become invalid
+ * the instant the list is freed. */
+AmipWindowModel *AmipHitTest(struct Screen *screen, WORD screenX, WORD screenY,
+                              AmipWindowModel **outWindow, AmipGadgetModel **outGadget)
+{
+    AmipWindowModel *list;
+    AmipWindowModel *w;
+    AmipWindowModel *best = NULL;
+    LONG bestArea = 0;
+
+    if (outWindow != NULL) {
+        *outWindow = NULL;
+    }
+    if (outGadget != NULL) {
+        *outGadget = NULL;
+    }
+
+    list = AmipWalkScreen(screen);
+
+    for (w = list; w != NULL; w = w->next) {
+        WORD relX = screenX - w->left;
+        WORD relY = screenY - w->top;
+        LONG area;
+
+        if (relX < 0 || relX >= w->width || relY < 0 || relY >= w->height) {
+            continue;
+        }
+
+        area = (LONG)w->width * (LONG)w->height;
+        if (best == NULL || area < bestArea) {
+            best = w;
+            bestArea = area;
+        }
+    }
+
+    if (best != NULL) {
+        if (outWindow != NULL) {
+            *outWindow = best;
+        }
+        if (outGadget != NULL) {
+            AmipGadgetModel *g;
+            WORD relX = screenX - best->left;
+            WORD relY = screenY - best->top;
+
+            for (g = best->gadgets; g != NULL; g = g->next) {
+                WORD gx = relX - g->left;
+                WORD gy = relY - g->top;
+                if (gx >= 0 && gx < g->width && gy >= 0 && gy < g->height) {
+                    *outGadget = g;
+                }
+            }
+        }
+    }
+
+    return list;
+}
+
 void AmipFreeWindowModel(AmipWindowModel *model)
 {
     while (model != NULL) {

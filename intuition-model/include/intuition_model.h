@@ -168,6 +168,22 @@ AmipWindowModel *AmipWalkWindow(struct Window *window);
 
 void AmipFreeWindowModel(AmipWindowModel *model);
 
+/* Reads the live global pointer position (IntuitionBase->MouseX/
+ * MouseY) into *outX / *outY -- either may be NULL to skip that axis
+ * -- corrected into real screen-pixel coordinates. See walk.c's own
+ * doc comment on this function for the live-confirmed MouseY scaling
+ * this corrects for, and its stated residual uncertainty across
+ * untested display modes. */
+void AmipReadPointerPosition(WORD *outX, WORD *outY);
+
+/* Hit-tests (screenX, screenY) against every window on `screen` --
+ * see walk.c's own doc comment for the full contract (ownership,
+ * smallest-area-wins window selection, gadget tie-break). Returns the
+ * AmipWalkScreen()-owned list this hit test walked; free with
+ * AmipFreeWindowModel(). */
+AmipWindowModel *AmipHitTest(struct Screen *screen, WORD screenX, WORD screenY,
+                              AmipWindowModel **outWindow, AmipGadgetModel **outGadget);
+
 const char *AmipRoleName(AmipRole role);
 
 /* Reverse of AmipRoleName() -- case-insensitive match against its
