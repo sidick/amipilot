@@ -1,0 +1,1598 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Object-level GUI automation for classic AmigaOS">
+      
+      
+      
+        <link rel="canonical" href="https://sidick.github.io/amipilot/v1.1/Changelog/">
+      
+      
+        <link rel="prev" href="../Building-and-Testing/">
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Changelog - AmiPilot</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#changelog" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="AmiPilot" class="md-header__button md-logo" aria-label="AmiPilot" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            AmiPilot
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Changelog
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/sidick/amipilot" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sidick/amipilot
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="AmiPilot" class="md-nav__button md-logo" aria-label="AmiPilot" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    AmiPilot
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/sidick/amipilot" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sidick/amipilot
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Use-Cases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use Cases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting going
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting going
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using AmiInspect
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Using AmiInspect
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../AmiInspect-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AmiInspect Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Locator-Tiers-and-Limits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Locator Tiers and Limits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Driving GUIs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Driving GUIs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ARexx-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ARexx Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Wire-Protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wire Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Help
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Help
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting-and-FAQ/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting and FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Building-and-Testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building and Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#v11-2026-08-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.1 — 2026-08-10
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v10-2026-08-09" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.0 — 2026-08-09
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v05-2026-08-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.5 — 2026-08-08
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v04-2026-08-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.4 — 2026-08-07
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v03-2026-08-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.3 — 2026-08-06
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v02-2026-08-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.2 — 2026-08-05
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v01-2026-08-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.1 — 2026-08-05
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#v11-2026-08-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.1 — 2026-08-10
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v10-2026-08-09" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v1.0 — 2026-08-09
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v05-2026-08-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.5 — 2026-08-08
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v04-2026-08-07" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.4 — 2026-08-07
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v03-2026-08-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.3 — 2026-08-06
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v02-2026-08-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.2 — 2026-08-05
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#v01-2026-08-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        v0.1 — 2026-08-05
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/sidick/amipilot/edit/main/userdocs/Changelog.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">&para;</a></h1>
+<p>AmiPilot is developed phase by phase; each one is validated on-target
+under Copperline against real AmigaOS before being considered done. This
+page summarizes what landed in each release, in user-facing terms — see
+the repository's
+<a href="https://github.com/sidick/amipilot/blob/main/docs/implementation-plan.md"><code>docs/implementation-plan.md</code></a>
+for the full engineering detail and phase sequencing behind each one.</p>
+<h2 id="v11-2026-08-10">v1.1 — 2026-08-10<a class="headerlink" href="#v11-2026-08-10" title="Permanent link">&para;</a></h2>
+<p>Closes out every gap the 1.0 release itself named as open: requester
+support was detection-only, menu selection needed a keyboard shortcut,
+and <code>layout.gadget</code>-nested children were unreachable — all three are
+real now. Plus a new interactive discovery tool, and host-package
+polish.</p>
+<ul>
+<li><strong><code>PICK</code>, interactive "pick mode" discovery</strong> (issue #65): point at
+  a gadget on the real screen, get back its exact locator directly —
+  the platform's first genuinely interactive UIA-Inspect/browser-
+  element-picker equivalent, not just a batch dump. <code>PICK
+  [SCREEN=&lt;substring&gt;]</code> hit-tests the live global pointer position
+  against a screen's windows and returns the gadget under it, if
+  any; <code>AmiInspect PICK</code> is the standing-at-the-machine equivalent
+  with no host/server session at all, looping locally and printing
+  only when the identified window/gadget changes. Built on two new
+  <code>intuition-model</code> primitives shared by both: <code>AmipHitTest()</code> (a
+  coordinate-to-gadget hit test reusing the same role/label
+  classification <code>TREE</code>/<code>AmiInspect</code> already do) and
+  <code>AmipReadPointerPosition()</code>. Two real, non-obvious findings from
+  building this, live: Intuition's own window list is NOT
+  front-to-back z-order (Workbench's full-screen backdrop was found
+  ahead of a real foreground window — fixed by picking the
+  smallest-area matching window instead), and the live pointer
+  position's Y coordinate needs an unconditional 2x correction — an
+  interlace-gated first guess was tried and disproven against this
+  project's own default Workbench screen. See <a href="../Wire-Protocol/#pick">Wire
+  Protocol</a> and <a href="../AmiInspect-Reference/#pick-mode-pick">AmiInspect
+  Reference</a>.</li>
+<li><strong>Progress feedback for long wire transfers</strong> (issue #53):
+  <code>screenshot()</code>/<code>fs_get()</code> accept an optional
+  <code>on_progress(bytes_so_far, total_bytes)</code> callback, called as a
+  large payload streams in — a real <code>SCREENSHOT</code> over serial can take
+  anywhere from seconds to several minutes with previously zero
+  feedback. <code>amipilot.stderr_progress()</code> is a ready-made callback for
+  the common "print a progress line" case. Defaults to <code>None</code>
+  everywhere — no behavior change for existing callers.</li>
+<li><strong>The host package can now be published to PyPI</strong> (issue #77):
+  <code>host/pyproject.toml</code> gained the metadata (license, authors, URLs,
+  classifiers) a real PyPI listing needs, and the release workflow
+  gained a job that builds and publishes it via Trusted Publishing
+  (OIDC, no stored token) once tagged. The one-time PyPI-side setup
+  (registering the pending publisher, creating the required-reviewer
+  environment) is still outstanding — <code>pip install amipilot</code> isn't
+  live yet; installing from a clone remains the only path for now,
+  see <a href="../Installation/">Installation</a>.</li>
+<li><strong><code>CLICK</code> can now dismiss BOTH window-owned and system-wide
+  Requesters — issue #52 fully closed:</strong> a genuine <code>AutoRequest()</code>/
+  <code>BuildSysRequest()</code>/<code>EasyRequest()</code> requester with a real owning
+  window turns out to open as a completely ordinary, separate <code>struct
+  Window</code> (sharing its owner's exact title text) rather than attaching
+  invisibly to <code>FirstRequest</code> the way the issue's original design
+  sketch assumed — so ordinary <code>CLICK &lt;window-pattern&gt; &lt;gadget-id&gt;</code>
+  already reaches its Yes/No gadgets today, no new locator or wire
+  change needed. <code>BuildSysRequest()</code>'s own autodoc documents a fixed,
+  app-independent <code>GadgetID</code> convention (<code>TRUE</code>=1 for the positive
+  choice, <code>FALSE</code>=0 for the negative), confirmed live: <code>CLICK
+  &lt;same-pattern&gt; 1</code> genuinely dismisses the requester, verified by
+  <code>WAITFOR REQUESTER</code> correctly timing out again afterward. The
+  system-wide case (no owning window — a real disk-swap prompt, DOS
+  error, or Guru) works the same way: <code>BuildSysRequest(NULL, ...)</code>
+  (exactly what <code>dos.library</code> calls internally, not a simulation)
+  confirmed live to produce a window titled EXACTLY <code>"System
+  Request"</code> — Intuition's own documented fallback title, not a
+  coincidence — which <code>WAITFOR REQUESTER</code> now matches and <code>CLICK
+  "System Request" 1</code> dismisses through the same mechanism. Confirmed
+  separately that <code>GETTEXT</code> reading a requester's own body text is a
+  permanent limit, not an open gap: a live dump of every open window's
+  <code>FirstRequest</code> while a real <code>AutoRequest()</code> was up showed it NULL on
+  both the owning window and the requester's own window — no <code>struct
+  Requester</code> exists anywhere reachable here to read <code>ReqText</code> off of
+  on this target's real OS/ROM.</li>
+<li><strong>BOOPSI/ReAction role classification for 12 WB3.2-era gadget
+  classes</strong> (issue #69): <code>clicktab.gadget</code>, <code>colorwheel.gadget</code>,
+  <code>datebrowser.gadget</code>, <code>fuelgauge.gadget</code>, <code>getcolor.gadget</code>,
+  <code>getfile.gadget</code>, <code>getfont.gadget</code>, <code>getscreenmode.gadget</code>,
+  <code>gradientslider.gadget</code>, <code>palette.gadget</code>, <code>sketchboard.gadget</code>,
+  <code>speedbar.gadget</code>, and <code>texteditor.gadget</code> — previously all
+  <code>role=custom</code> — now get a real, AT-SPI-style role
+  (<code>page_tab_list</code>/<code>color_wheel</code>/<code>calendar</code>/<code>progress_bar</code>/
+  <code>color_chooser</code>/<code>file_chooser</code>/<code>font_chooser</code>/<code>screenmode_chooser</code>/
+  <code>slider</code>/<code>palette</code>/<code>canvas</code>/<code>toolbar</code>/<code>text_editor</code>), addressable via
+  tier-2 <code>ROLE=</code> locators. <code>speedbar.gadget</code> turned up a real,
+  easy-to-guess-wrong exception: its registered class name is literally
+  <code>"speedbar"</code>, not <code>"speedbar.gadget"</code> like every other class here —
+  found live, not from documentation, which follows the
+  <code>"name.gadget"</code> pattern uniformly. A new fixture
+  (<code>fixtures/reaction-classes-app</code>) exercises one instance of each
+  class directly (deliberately not nested inside <code>window.class</code>/
+  <code>layout.gadget</code>, which would make them unreachable the same way
+  issue #49 already documents), with a checked-in golden-tree file
+  locking in the live-confirmed output. <code>space.gadget</code>,
+  <code>virtual.gadget</code>, <code>listview.gadget</code>, <code>tabs.gadget</code>, and
+  <code>tapedeck.gadget</code> were deliberately left unclassified — see
+  <a href="../Locator-Tiers-and-Limits/">Locator Tiers and Limits</a> for why each
+  one is an honest gap rather than an oversight.</li>
+<li><strong><code>WHERE</code>, the cooperative geometry port</strong> (issue #49): the honest
+  escape hatch for gadgets nested inside a <code>window.class</code> window's
+  <code>layout.gadget</code> — permanently invisible to structural walking on
+  classic AmigaOS 3.x, so no plain manifest entry could ever name
+  them. An application implementing this exposes a small, optional
+  ARexx port answering <code>WHERE &lt;name&gt;</code> with a gadget's own live
+  geometry (it already holds the object pointer for its own event
+  dispatch); a format-version-2 manifest names such a gadget with
+  <code>WHEREGADGET</code> instead of <code>GADGET</code>. <code>CLICK</code>/<code>TYPE @name</code> then work
+  exactly as they would for any other manifest name — discovery is
+  cooperative, but the click itself is still genuine <code>input.device</code>
+  input, unlike <code>MUIREXX</code>, where the target's own port does the
+  acting too. Verified end to end against <code>fixtures/classact-app</code>'s
+  own new <code>CAAPP.WHERE</code> port, whose three gadgets are now addressed
+  entirely via <code>WHEREGADGET</code> (its manifest previously, deliberately,
+  named none at all). See <a href="../ARexx-Reference/#driving-layoutgadget-only-applications">ARexx Reference</a>.</li>
+<li><strong><code>MENUPICK</code>'s pointer-based fallback</strong> (issue #63): a menu item
+  with no keyboard shortcut used to be rejected outright — now it's
+  picked via a genuine synthesized right-mouse-button-down/move/move/
+  release sequence instead, chosen automatically whenever an item has
+  no shortcut, the same "real input.device events, not a shortcut"
+  principle every other verb already follows. Verified end to end
+  against two new shortcut-less items on <code>fixtures/gadtools-app</code>'s own
+  menu strip — a top-level item and a one-level-deep submenu item.</li>
+<li><strong><code>STRING_KIND</code> vs <code>INTEGER_KIND</code> classification</strong> (issue #64): both
+  GadTools kinds create the same underlying <code>GTYP_STRGADGET</code>, so
+  nothing in the raw gadget structure told them apart — a smaller
+  version of the <code>BUTTON_KIND</code>/<code>CHECKBOX_KIND</code> problem, solved the same
+  way. <code>GT_GetGadgetAttrsA</code>'s documented per-kind tag table lists
+  <code>GTIN_Number</code> under <code>INTEGER_KIND</code> only; asking a plain string gadget
+  for it is a safe, documented no-op, the discriminator rather than a
+  guess. Integer gadgets now report <code>role=integer</code>. Verified against a
+  new Count <code>INTEGER_KIND</code> gadget on <code>fixtures/gadtools-app</code>'s own
+  window.</li>
+</ul>
+<h2 id="v10-2026-08-09">v1.0 — 2026-08-09<a class="headerlink" href="#v10-2026-08-09" title="Permanent link">&para;</a></h2>
+<p>The first full release: everything the implementation plan's 1.0 gate
+asked for — getting files and programs <em>onto</em> the machine the way a
+real user would, seeing what's actually on screen, and manipulating
+whole windows — verified end to end, including on a completely bare
+machine profile and against real Picasso96/RTG.</p>
+<ul>
+<li><strong><code>FSPUT</code></strong>: push a file from the host onto the Amiga, completing
+  the file API's round trip (<code>FSGET</code> could already read one back).
+  The wire's first request to carry a raw binary body — and
+  deliberately wire-only, with no ARexx form at all, since ARexx
+  messages can only ever carry string arguments (a real, permanent
+  transport asymmetry, stated rather than papered over). See
+  <a href="../Wire-Protocol/#file-api">Wire Protocol</a>.</li>
+<li><strong><code>WBLAUNCH</code></strong>: launch a program the way Workbench itself does — a
+  genuine <code>WBStartup</code>/<code>WBArg</code> message to a real non-CLI process, the
+  same technique real launcher utilities use — with <code>TOOLTYPE=</code>
+  overrides (merged into a scratch copy of the icon in <code>T:</code>, never
+  the application's own <code>.info</code> file, because a Workbench-started
+  program reads its tooltypes back off disk — there is no in-memory
+  channel) and <code>ARG=</code> project-file arguments. <code>LAUNCH</code> (0.4) covers
+  the Shell-start case; this covers the other half of how real
+  software actually starts. See
+  <a href="../Wire-Protocol/#wblaunch">Wire Protocol</a>.</li>
+<li><strong><code>SCREENSHOT</code></strong>: capture a screen (or one window's region of it)
+  as raw pixels — classic planar screens <em>and</em> genuine
+  Picasso96/RTG bitmaps in their native pixel formats — with all
+  image-format work (PNG, IFF ILBM, P96 pixel-format decoding,
+  including the documented 16-bit <code>PC</code>-suffix byte-order pitfall)
+  done host-side, stdlib-only. The P96 path is verified against real
+  Picasso96 under emulation, both CLUT and truecolor, not just
+  compiled. Inspector tooling, not a locator mechanism. See
+  <a href="../Wire-Protocol/#screenshot">Wire Protocol</a>.</li>
+<li><strong><code>WINDOWMOVE</code>/<code>WINDOWSIZE</code></strong>: move or resize a whole window via
+  the same genuinely synthesized press/move/release drags gadgets
+  already get, anchored on the window's own title bar or sizing
+  gadget. See <a href="../Wire-Protocol/#window-move-and-resize">Wire Protocol</a>.</li>
+<li><strong><code>WAITFOR REQUESTER</code></strong>: wait for a genuine Intuition Requester to
+  appear — the detection-only first slice of requester support
+  (window-attached requesters only; addressing or clicking a
+  requester's own gadgets is stated, open follow-up work, not
+  quietly missing). See
+  <a href="../ARexx-Reference/#waitexpectation-primitives">ARexx Reference</a>.</li>
+<li><strong>Fixed</strong>: <code>CLICK</code> with a <code>ROLE=</code>/<code>INDEX=</code> locator could silently
+  act on the wrong <em>system</em> gadget (close/depth/drag) instead of the
+  application gadget the locator actually matched.</li>
+<li><strong>Verification hardened for 1.0</strong>: the on-target suite now includes
+  the implementation plan's own "bare machine" lifecycle check (a
+  stock boot with nothing pre-staged), an automated TCP-transport
+  check (real <code>bsdsocket.library</code> over Copperline's host networking,
+  not just serial), and an automated P96 <code>SCREENSHOT</code> capture-path
+  check — plus a dedicated pre-1.0 code review whose findings were
+  all fixed before this release.</li>
+<li><strong>Protocol verbs promoted to stable</strong>: the implementation plan's
+  own 1.0 gate — every verb the <code>VERSION</code> handshake reports is now
+  <code>STABLE</code> (won't break within a major), not <code>EXPERIMENTAL</code>. See
+  <a href="../Wire-Protocol/#talking-to-it">Wire Protocol</a>.</li>
+</ul>
+<p>Known gaps, stated plainly: requester support is detection-only;
+menu selection still needs a keyboard shortcut (pointer-based
+selection for shortcut-less items isn't built); a <code>window.class</code>
+window's <code>layout.gadget</code>-nested children remain unreachable on
+classic OS 3.x (a documented platform limit, not a bug — see
+<a href="../Locator-Tiers-and-Limits/">Locator Tiers and Limits</a>); and TCP
+remains LAN-only trust — no TLS, even though every verb is now
+stable, see <a href="../Wire-Protocol/#securing-tcp">Securing TCP</a>.</p>
+<h2 id="v05-2026-08-08">v0.5 — 2026-08-08<a class="headerlink" href="#v05-2026-08-08" title="Permanent link">&para;</a></h2>
+<p>Reliability and reach into the wider ecosystem: waiting on real
+conditions instead of guessed sleeps, community-authored coverage for
+apps you don't control, structural regression fixtures, verification
+against genuine stock AmigaOS and MUI software (not just purpose-built
+fixtures), and a real bridge into MUI's own ARexx-driven applications.</p>
+<ul>
+<li><strong>Wait/expectation primitives</strong> (<code>WAITFOR</code>, and <code>CLICK</code>'s trailing
+  <code>EXPECT=</code>): closes the classic click-then-check race by polling
+  server-side, in the same request, instead of a host-side loop.
+  <code>WAITFOR WINDOW=&lt;pattern&gt;</code> / <code>NOWINDOW=&lt;pattern&gt;</code> wait for a window
+  to appear or close; <code>CLICK</code>'s own <code>EXPECT=WINDOW=&lt;pattern&gt;</code> /
+  <code>EXPECT=NOWINDOW</code> compose the click atomically with the wait,
+  <code>EXPECT=NOWINDOW</code> checked by identity against the exact window the
+  click itself resolved (not a fresh pattern search). <code>WAITFOR</code> also
+  takes a <code>TEXT=&lt;value&gt;</code> condition — wait for a gadget's text to
+  exactly equal a value — reusing the same locator parsing and
+  gadget-text reading <code>CLICK</code>/<code>TYPE</code>/<code>GETTEXT</code> already share. A
+  condition that never becomes true is a new, distinct <code>RC=15</code>. See
+  <a href="../ARexx-Reference/#waitexpectation-primitives">ARexx Reference</a>.</li>
+<li><strong>Quirk profiles</strong>: the manifest format (<a href="https://github.com/sidick/amipilot/blob/main/manifest/SPEC.md">Manifest
+  contract</a>)
+  isn't only for an application's own developer — the same file
+  format, loaded the same way, works for a user or the community
+  describing a third-party application's structure, with a documented
+  convention for recording known behavioral oddities as comment
+  lines. No new machinery, one grammar for both cases.</li>
+<li><strong>The honest-limits toolkit-to-tier table</strong>
+  (<a href="../Locator-Tiers-and-Limits/">Locator Tiers and Limits</a>): which
+  locator tier actually reaches which kind of UI, and why — plain
+  GadTools/top-level ReAction gadgets, <code>window.class</code>+<code>layout.gadget</code>
+  nested children, MUI applications, and custom-rendered UIs each
+  land somewhere different, stated plainly rather than left to
+  discover the hard way.</li>
+<li><strong>Golden-tree fixtures</strong>: a saved structural dump doubles as a
+  regression fixture — <code>amipilot dump &lt;window&gt; --golden PATH
+  [--update-golden]</code>, or <code>Amipilot.assert_tree_matches()</code> inside a
+  test, compares a live window/gadget tree against a checked-in
+  snapshot and fails loudly on drift.</li>
+<li><strong>The stock-app conformance set</strong>: automation verified against
+  genuine, unmodified stock AmigaOS software, not only hand-written
+  fixtures — driving AmigaOS 3.2's own Time Preferences editor
+  end-to-end via tier-2 locators discovered purely from <code>AmiInspect</code>/
+  <code>amipilot dump</code> output. This also caught two real bugs: a host
+  client socket-timeout bug (<code>connect_with_retry()</code> could silently
+  break a legitimately slow-but-successful <code>WAITFOR</code>/<code>EXPECT=</code> wait)
+  and a genuine machine-wide hang walking a different stock
+  application's window (a custom gadget claiming a BOOPSI object
+  header it didn't actually have) — both fixed, the latter now
+  regression-tested directly against the real application.</li>
+<li><strong>The MUI-ARexx bridge tier</strong> (<code>MUIREXX &lt;app-base&gt; [TIMEOUT=&lt;n&gt;]
+  &lt;command...&gt;</code>): drives a MUI (Magic User Interface) application
+  through the ARexx port every MUI app carries automatically — a
+  different mechanism from <code>CLICK</code>/<code>TYPE</code>/<code>GETTEXT</code> entirely, since
+  MUI internals are opaque to structural walking. Verified live
+  against a real MUI application that MUI's own built-in ARexx
+  support is a small, universal command set (window lifecycle plus
+  fixed metadata), not a generic per-widget accessor — <code>MUIREXX</code>
+  passes an application's own commands through honestly rather than
+  promising generic MUI widget control it can't deliver. See
+  <a href="../ARexx-Reference/#driving-mui-applications">ARexx Reference</a>.</li>
+</ul>
+<h2 id="v04-2026-08-07">v0.4 — 2026-08-07<a class="headerlink" href="#v04-2026-08-07" title="Permanent link">&para;</a></h2>
+<p>Reach: everything 0.3's wire needed to actually be useful for driving
+a real application end to end — a second transport, launching the
+subject under test, moving files, menus, and two new ways to locate
+and act on a gadget.</p>
+<ul>
+<li><strong>TCP transport</strong> (<code>AmiPilotServer TCP TCPPORT=n</code>): the same wire
+  over <code>bsdsocket.library</code>, for real hardware with TCP/IP or an
+  emulator with no serial bridge — listen-mode only for now (the host
+  connects in). Opt-in hardening: <code>TCPALLOW</code> (a source-IP/CIDR
+  allowlist) and <code>TCPPASSWORD</code> (gates a new <code>AUTH</code> verb, defaulting to
+  a public starting password so it works out of the box). Neither
+  makes this internet-safe — no TLS, no rate-limiting; LAN/trusted-
+  network use only, see <a href="../Wire-Protocol/#securing-tcp">Wire Protocol</a>.</li>
+<li><strong>Program launch</strong> (<code>LAUNCH [STACK=n] &lt;command-line&gt;</code>): starts the
+  test subject itself over the wire — <code>SystemTagList()</code>-based,
+  asynchronous, with an overridable stack size — so a test session
+  doesn't need the target pre-staged via <code>S:User-Startup</code>.</li>
+<li><strong>The file API</strong> (<code>FSLIST</code>/<code>FSSTAT</code>/<code>FSMKDIR</code>/<code>FSDELETE</code>/<code>FSGET</code>):
+  allowlist-scoped to directories granted at startup (<code>FSROOT</code>),
+  disabled entirely otherwise. A test-staging channel for small
+  fixtures/config/log files, not a file manager — <code>FSGET</code> is capped at
+  the server's own internal buffer. <code>FSPUT</code> (host-to-Amiga writes)
+  needs a wire protocol addition and isn't built yet.</li>
+<li><strong>Menus</strong> (<code>MENU</code>/<code>MENUPICK</code>): walks a window's live menu strip —
+  every pulldown, its items, checkit/checked/enabled state, and any
+  keyboard shortcut — and selects an item via that shortcut, the same
+  input.device path a human pressing Right-Amiga+key would use.
+  Pointer-based selection for items with no shortcut isn't built yet.</li>
+<li><strong>Multi-screen support</strong> (<code>SCREENS</code>, <code>SCREEN=&lt;substring&gt;</code>): lists
+  every open screen and narrows any window-targeting verb's search to
+  a specific one, keyed off each screen's own <code>DefaultTitle</code>.</li>
+<li><strong>Tier-2 semantic locators</strong> (<code>ROLE=&lt;role&gt;</code>/<code>LABEL=&lt;substring&gt;</code>/
+  <code>INDEX=&lt;n&gt;</code>, in place of a bare <code>GA_ID</code> on <code>CLICK</code>/<code>TYPE</code>/<code>GETTEXT</code>):
+  find a gadget by role and label text, or by position among several
+  matches, instead of only by numeric ID or a manifest <code>@name</code> — see
+  <a href="../ARexx-Reference/#tier-2-semantic-locators">ARexx Reference</a>.
+  Proximity-to-a-label matching (the third tier-2 style from the
+  design docs) isn't built yet.</li>
+<li><strong><code>DRAG</code></strong>: a genuine press/move/release drag, either by a pixel
+  offset from a gadget's current center (the natural shape for
+  adjusting a slider/scroller) or onto a second gadget's center
+  (drag-and-drop/reorder, both resolved live, zero coordinates in the
+  script).</li>
+<li><strong>Host-side real serial port support</strong>
+  (<code>Amipilot.connect_serial()</code>/<code>WireClient.connect_serial()</code>, the
+  pytest plugin's <code>--amipilot-serial-device</code>): connect directly over a
+  real or virtual serial port — real Amiga hardware over a real cable,
+  or a Copperline config using a real serial device — instead of only
+  Copperline's TCP bridge. Optional <code>pyserial</code> dependency
+  (<code>pip install amipilot[serial]</code>).</li>
+</ul>
+<p><strong>Known gaps, tracked as real follow-up work, not silently accepted:</strong></p>
+<ul>
+<li>No wait/expectation primitives yet (<code>click</code> that waits for an
+  expected change, timeouts) — a script still adds its own polling.
+  Carried over from 0.1–0.3.</li>
+<li>The wire connects host-to-Amiga only; the Amiga dialing out to a
+  configured host (useful behind NAT) is a considered future addition
+  (<a href="https://github.com/sidick/amipilot/issues/12">#12</a>), not yet
+  built.</li>
+<li>The MUI locator tier (driving MUI apps through their own automatic
+  ARexx port) isn't started.</li>
+<li>No public CI on-target run yet, same reason as 0.1–0.3:
+  <code>make test-target</code> needs a machine-specific Workbench install CI
+  doesn't have.</li>
+</ul>
+<h2 id="v03-2026-08-06">v0.3 — 2026-08-06<a class="headerlink" href="#v03-2026-08-06" title="Permanent link">&para;</a></h2>
+<p>The wire and the host client: the same command set the ARexx port
+speaks, now reachable from a host machine — no ARexx interpreter or
+even a Workbench session on the Amiga side needed to drive it.</p>
+<ul>
+<li><strong>The wire protocol</strong> (<code>server/WIRE.md</code>): a length-prefixed line
+  protocol over serial.device, with no JSON anywhere — requests are the
+  exact same command grammar the ARexx port already parses, responses
+  are <code>RC &lt;code&gt; &lt;byte-count&gt;</code> followed by exactly that many payload
+  bytes, binary-safe with zero escaping. A <code>VERSION</code> handshake reports
+  the server version, the protocol number, and which verbs are stable
+  vs. experimental.</li>
+<li><strong><code>AmiPilotServer SERIAL</code></strong>: the commodity now optionally carries its
+  whole verb set over serial.device (<code>SERDEVICE</code>/<code>SERUNIT</code>/<code>BAUD</code> to
+  configure), alongside its existing ARexx port — the same dispatch
+  serves both, so results are identical either way. See the new
+  <a href="../Wire-Protocol/">Wire Protocol</a> page.</li>
+<li><strong>The host Python client</strong> (<code>host/</code>, <code>pip install -e host/</code>): a
+  transport-level <code>WireClient</code>, and <code>Amipilot</code> — the Pythonic object API
+  (<code>tree()</code>/<code>click()</code>/<code>type()</code>/<code>get_text()</code>/<code>manifest()</code>, plus <code>@name</code>
+  locator forms) that raises typed exceptions instead of requiring
+  manual RC checks.</li>
+<li><strong><code>amipilot dump &lt;window&gt;</code></strong>: the host half of "the inspector" —
+  connects and prints a window's gadget tree, either in the same format
+  <code>AmiInspect</code> prints or as ready-to-paste <code># name = &lt;id&gt;</code> suggestions
+  for a quirk profile.</li>
+<li><strong>A pytest plugin</strong>: the <code>amipilot</code> fixture boots a configured
+  Copperline (or real-hardware-adjacent) session and hands a test a
+  connected client — session-scoped, and it skips cleanly rather than
+  failing when no emulator config is set up. This delivers the phase's
+  actual release gate: a host pytest test types into a field, reads it
+  back, clicks a button, and asserts the window closed — driven
+  entirely from the host, with Copperline booted by the test itself.</li>
+</ul>
+<p><strong>Known gaps, tracked as real follow-up work, not silently accepted:</strong></p>
+<ul>
+<li>TCP transport (for real hardware or an emulator with no serial
+  bridge) is phase 0.4 scope, along with program launch, the file API,
+  menus, and drag.</li>
+<li>No wait/expectation primitives yet (<code>click</code> that waits for an
+  expected change, timeouts) — a script still adds its own polling.</li>
+<li>The wire connects host-to-Amiga only; the Amiga dialing out to a
+  configured host (useful behind NAT) is a considered future addition,
+  not yet built.</li>
+<li>No public CI on-target run yet, same reason as 0.1/0.2:
+  <code>make test-target</code> needs a machine-specific Workbench install CI
+  doesn't have.</li>
+</ul>
+<h2 id="v02-2026-08-05">v0.2 — 2026-08-05<a class="headerlink" href="#v02-2026-08-05" title="Permanent link">&para;</a></h2>
+<p>The act side of object-level GUI automation: a server commodity, driven
+by ARexx, with no host machine involved.</p>
+<ul>
+<li><strong><code>AmiPilotServer</code></strong>: a commodity hosting the action engine and the
+  <code>intuition-model</code> walker behind a genuine public ARexx port. See the
+  <a href="../ARexx-Reference/">ARexx Reference</a>.</li>
+<li><strong><code>TREE</code>/<code>CLICK</code>/<code>TYPE</code>/<code>GETTEXT</code>/<code>QUIT</code></strong> — locate a window by title,
+  click a gadget by <code>GA_ID</code> through a real <code>input.device</code> event (the
+  documented <code>IECLASS_NEWPOINTERPOS</code>/<code>IESUBCLASS_PIXEL</code> mechanism, not a
+  coordinate hack), type text into it via genuine <code>IECLASS_RAWKEY</code>
+  events paced to approximate human typing, and read state back —
+  proven end to end by driving <code>AmiPilotServer</code>'s own test fixture from
+  a real ARexx script: type into a field, read the value back, click a
+  button, confirm the window closed.</li>
+<li><code>AmiInspect</code>'s gadget-tree output gains a <code>value=</code> field for string
+  and integer gadgets — their live editable contents, not just their
+  label. See the updated <a href="../AmiInspect-Reference/">AmiInspect Reference</a>.</li>
+<li>BOOPSI/ReAction gadget geometry (<code>GA_Left</code>/<code>GA_Top</code>/<code>GA_Width</code>/
+  <code>GA_Height</code>) is now read correctly, including the classic
+  <code>GFLG_RELWIDTH</code>/<code>RELHEIGHT</code>/<code>RELRIGHT</code>/<code>RELBOTTOM</code> convention (a
+  gadget's size/position stored as an offset from its window's own
+  dimensions) — needed for <code>CLICK</code>/<code>TYPE</code> to land on a BOOPSI gadget at
+  all, not just for <code>AmiInspect</code> to report sane numbers.</li>
+<li>Both <code>AmiInspect</code> and <code>AmiPilotServer</code> now embed a standard <code>$VER:</code>
+  cookie — see <a href="../Installation/#checking-which-version-you-have">Installation</a>.</li>
+<li><code>amipilot.lha</code> now ships both binaries — see
+  <a href="../Installation/">Installation</a>.</li>
+</ul>
+<p><strong>Known gaps, tracked as real follow-up work, not silently accepted:</strong></p>
+<ul>
+<li><code>STRING_KIND</code> and <code>INTEGER_KIND</code> GadTools gadgets still aren't
+  distinguished from each other (both report as <code>string</code>) — carried
+  over from 0.1.</li>
+<li>No wire protocol yet — ARexx only reaches scripts running on the same
+  Amiga. Serial.device and a host Python client are phase 0.3 scope.</li>
+<li>No wait/expectation primitives yet (<code>click</code> that waits for an expected
+  change, timeouts) — a script has to add its own <code>Wait</code>/polling for now.</li>
+<li>No public CI on-target run yet, same reason as 0.1: <code>make test-target</code>
+  needs a machine-specific Workbench install CI doesn't have.</li>
+</ul>
+<h2 id="v01-2026-08-05">v0.1 — 2026-08-05<a class="headerlink" href="#v01-2026-08-05" title="Permanent link">&para;</a></h2>
+<p>First release: the read side of object-level GUI automation.</p>
+<ul>
+<li><code>intuition-model</code>: a reusable Intuition/BOOPSI walker library, reading
+  windows and gadgets under strict <code>LockIBase()</code> discipline (brief holds,
+  copy-out, no live pointers handed out, no patching or <code>SetFunction()</code>
+  anywhere).</li>
+<li><code>AmiInspect</code>: a standalone Shell command that prints any window's
+  gadget tree by role, label, class, ID, position, and state. See the
+  <a href="../AmiInspect-Reference/">AmiInspect Reference</a>.</li>
+<li>Plain GadTools role classification, including officially-sanctioned
+  <code>GT_GetGadgetAttrsA</code> kind-probing to distinguish a checkbox from a
+  button (both produce the same underlying gadget type).</li>
+<li>BOOPSI/ReAction class reading via <code>OCLASS()</code> — a documented NDK
+  mechanism, not a hack — correctly identifying real class names and
+  mapping known ones to roles.</li>
+<li>Verified against two purpose-built conformance fixtures and a real,
+  unmodified stock AmigaOS Prefs editor (<code>ScreenMode</code>) — not just
+  software built for this project.</li>
+<li>An automated on-target regression check (<code>make test-target</code>, headless
+  under Copperline) — see <a href="../Building-and-Testing/">Building and Testing</a>.</li>
+<li>Documented, permanent limits rather than silent gaps: <code>PLACETEXT_IN</code>
+  button labels and <code>layout.gadget</code>-nested gadgets are both genuinely
+  unreadable at this tier — see
+  <a href="../Locator-Tiers-and-Limits/">Locator Tiers and Limits</a>.</li>
+<li><code>amipilot.lha</code> — a pre-built binary release archive (<code>AmiInspect</code> +
+  license + this documentation as an AmigaGuide) — see
+  <a href="../Installation/">Installation</a>.</li>
+</ul>
+<p><strong>Known gaps, tracked as real follow-up work, not silently accepted:</strong></p>
+<ul>
+<li><code>AmiInspect</code> doesn't yet embed a <code>$VER:</code> cookie.</li>
+<li><code>STRING_KIND</code> and <code>INTEGER_KIND</code> GadTools gadgets aren't distinguished
+  from each other (both report as <code>string</code>).</li>
+<li>No public CI on-target run yet — <code>make test-target</code> needs a
+  machine-specific Workbench install (see
+  <a href="../Building-and-Testing/">Building and Testing</a>) that CI doesn't have.</li>
+</ul>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../Building-and-Testing/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Building and Testing">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Building and Testing
+              </div>
+            </div>
+          </a>
+        
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      AmiPilot — object-level GUI automation for classic AmigaOS. BSD 2-Clause.
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.footer", "content.action.edit"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

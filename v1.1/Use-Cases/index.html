@@ -1,0 +1,1487 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Object-level GUI automation for classic AmigaOS">
+      
+      
+      
+        <link rel="canonical" href="https://sidick.github.io/amipilot/v1.1/Use-Cases/">
+      
+      
+        <link rel="prev" href="..">
+      
+      
+        <link rel="next" href="../Installation/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Use Cases - AmiPilot</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#use-cases" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="AmiPilot" class="md-header__button md-logo" aria-label="AmiPilot" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            AmiPilot
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Use Cases
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/sidick/amipilot" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sidick/amipilot
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="AmiPilot" class="md-nav__button md-logo" aria-label="AmiPilot" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    AmiPilot
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/sidick/amipilot" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sidick/amipilot
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use Cases
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use Cases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#automated-regression-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automated regression testing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#catching-ui-regressions-before-they-ship" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Catching UI regressions before they ship
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layout-and-resize-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout and resize testing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ci-for-amiga-software" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI for Amiga software
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-version-and-cross-configuration-compatibility-matrices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-version and cross-configuration compatibility matrices
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#automated-screenshots-for-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automated screenshots for documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bug-reproduction-and-triage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug reproduction and triage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exploratory-gui-inspection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exploratory GUI inspection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#localization-and-catalog-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Localization and catalog testing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#workbench-launch-and-tooltype-behavior-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workbench-launch and tooltype behavior testing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#self-contained-test-runs-on-bare-hardware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Self-contained test runs on bare hardware
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#remote-and-real-hardware-test-farms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Remote and real-hardware test farms
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#long-running-reliability-soak-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Long-running reliability (soak) testing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#teaching-and-onboarding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Teaching and onboarding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#preservation-and-archival-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preservation and archival documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mui-application-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MUI application testing
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting going
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting going
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using AmiInspect
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Using AmiInspect
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../AmiInspect-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AmiInspect Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Locator-Tiers-and-Limits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Locator Tiers and Limits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Driving GUIs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Driving GUIs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ARexx-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ARexx Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Wire-Protocol/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wire Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Help
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Help
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting-and-FAQ/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting and FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Building-and-Testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building and Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#automated-regression-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automated regression testing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#catching-ui-regressions-before-they-ship" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Catching UI regressions before they ship
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#layout-and-resize-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Layout and resize testing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ci-for-amiga-software" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI for Amiga software
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#cross-version-and-cross-configuration-compatibility-matrices" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Cross-version and cross-configuration compatibility matrices
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#automated-screenshots-for-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Automated screenshots for documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#bug-reproduction-and-triage" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Bug reproduction and triage
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exploratory-gui-inspection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exploratory GUI inspection
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#localization-and-catalog-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Localization and catalog testing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#workbench-launch-and-tooltype-behavior-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Workbench-launch and tooltype behavior testing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#self-contained-test-runs-on-bare-hardware" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Self-contained test runs on bare hardware
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#remote-and-real-hardware-test-farms" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Remote and real-hardware test farms
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#long-running-reliability-soak-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Long-running reliability (soak) testing
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#teaching-and-onboarding" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Teaching and onboarding
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#preservation-and-archival-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Preservation and archival documentation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#mui-application-testing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MUI application testing
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/sidick/amipilot/edit/main/userdocs/Use-Cases.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="use-cases">Use Cases<a class="headerlink" href="#use-cases" title="Permanent link">&para;</a></h1>
+<p>AmiPilot exists because Amiga automation has historically meant one of two
+things: coordinate-level input injection (works on anything, breaks on any
+layout change, verifies nothing) or ARexx (semantic, but only reaches
+what an application chose to export). Everything below is a real, grounded
+use of the verbs and tools this project actually ships — not aspirational
+marketing copy — with a pointer to the feature that makes it possible.</p>
+<h2 id="automated-regression-testing">Automated regression testing<a class="headerlink" href="#automated-regression-testing" title="Permanent link">&para;</a></h2>
+<p>The core use case: drive a real GUI application the way a user would
+(<code>click()</code>/<code>type()</code>/<code>get_text()</code>), assert on its state, and run that as
+part of a normal test suite. The <a href="../Wire-Protocol/#the-host-client">pytest plugin</a>
+boots a configured emulator, hands your test a connected client, and tears
+down after — <code>pytest</code> sees it as an ordinary fixture. <code>wait_for()</code>/
+<code>click(expect=...)</code> (the "Async by design" wait/expectation primitives)
+eliminate the classic act-then-check race a naive <code>click()</code> followed
+immediately by an assertion has against anything that opens a window,
+changes a label, or closes asynchronously.</p>
+<h2 id="catching-ui-regressions-before-they-ship">Catching UI regressions before they ship<a class="headerlink" href="#catching-ui-regressions-before-they-ship" title="Permanent link">&para;</a></h2>
+<p><a href="../AmiInspect-Reference/">Golden-tree fixtures</a> (<code>amipilot dump --golden</code>,
+<code>Amipilot.assert_tree_matches()</code>) snapshot a window's whole structural
+shape — every gadget's role, label, position — as a checked-in fixture.
+A later build that accidentally moves a gadget, drops a label, or changes
+a control's type fails the comparison immediately, the same value a
+snapshot test gives a web/mobile team, but for a real AmigaOS window
+walked structurally rather than screenshotted pixel-for-pixel (see
+<a href="../Locator-Tiers-and-Limits/">Locator Tiers and Limits</a> for what "walked
+structurally" can and can't see).</p>
+<h2 id="layout-and-resize-testing">Layout and resize testing<a class="headerlink" href="#layout-and-resize-testing" title="Permanent link">&para;</a></h2>
+<p><code>WINDOWMOVE</code>/<code>WINDOWSIZE</code> (see
+<a href="../Wire-Protocol/#window-move-and-resize">Wire Protocol</a>) drive a real
+title-bar drag or sizing-gadget drag, the same way a user would
+reposition or resize a window — useful for asserting an application's
+layout actually adapts correctly (a <code>GadTools</code>/ReAction layout
+re-flowing gadgets, a scrollable view updating its visible extent)
+instead of only ever being tested at its default opening size, or for
+moving a window out of the way of another one mid-test without
+guessing screen coordinates by hand.</p>
+<h2 id="ci-for-amiga-software">CI for Amiga software<a class="headerlink" href="#ci-for-amiga-software" title="Permanent link">&para;</a></h2>
+<p>Because the whole stack is scriptable (Copperline's own <code>--control</code> JSON-RPC
+server, headless, frame-accurate <code>run_until</code> waits) a build pipeline can
+boot a real AmigaOS environment, launch the software under test
+(<code>LAUNCH</code>/<code>WBLAUNCH</code>), drive it, and assert on the outcome — gating a merge
+on <strong>real, observed behavior</strong>, not just "it compiled." No physical
+machine, no human clicking through a manual test plan before every
+release.</p>
+<h2 id="cross-version-and-cross-configuration-compatibility-matrices">Cross-version and cross-configuration compatibility matrices<a class="headerlink" href="#cross-version-and-cross-configuration-compatibility-matrices" title="Permanent link">&para;</a></h2>
+<p>The same test suite can run unmodified against different Copperline/
+Amiberry configs — AmigaOS 2.04 through 3.2, 68000 through 68020+, plain
+chip RAM through an expanded fast-RAM setup — surfacing "works on 3.1,
+breaks on 2.04" or "needs more than the default stack" long before a user
+does. This project's own <code>make test-target</code> does exactly this against its
+own fixtures already.</p>
+<h2 id="automated-screenshots-for-documentation">Automated screenshots for documentation<a class="headerlink" href="#automated-screenshots-for-documentation" title="Permanent link">&para;</a></h2>
+<p><code>SCREENSHOT</code> (raw capture, host-side <code>amipilot.screenshot</code> turning it into
+real <code>.png</code>/<code>.iff</code> files — see <a href="../Wire-Protocol/#screenshot">Wire Protocol</a>)
+means a scripted walkthrough — open this window, fill in this field, click
+this button — can capture a real, correctly-rendered image at every step
+without a human running a screen-grab tool by hand. A documentation build
+can regenerate every manual screenshot from a real running application
+whenever the UI changes, instead of manually re-capturing and re-cropping
+each one.</p>
+<h2 id="bug-reproduction-and-triage">Bug reproduction and triage<a class="headerlink" href="#bug-reproduction-and-triage" title="Permanent link">&para;</a></h2>
+<p>A scripted repro (<code>click()</code>/<code>type()</code> sequence plus a <code>SCREENSHOT</code> at the
+point of failure) turns "I can't reproduce this" into an attachable,
+re-runnable artifact — the exact sequence of actions plus a real captured
+image of the broken state, not a verbal description of what someone saw.</p>
+<h2 id="exploratory-gui-inspection">Exploratory GUI inspection<a class="headerlink" href="#exploratory-gui-inspection" title="Permanent link">&para;</a></h2>
+<p><code>AmiInspect</code>/<code>amipilot dump</code> are usable standing at the machine itself,
+with no host session at all — the platform's first UIA-Inspect/browser-
+devtools-element-picker equivalent for classic Intuition. Useful on its
+own for understanding an unfamiliar application's structure before writing
+any automation against it, or just to answer "what is this control,
+actually" when working on a foreign codebase.</p>
+<p><code>AmiInspect PICK</code> (or <code>Amipilot.pick()</code> from the host) goes one step
+further — the genuinely <em>interactive</em> element-picker experience, not
+just a batch dump: point at a gadget on the real screen and its exact
+locator (role/label/<code>GA_ID</code>) appears live, no reading through a whole
+tree to find the one control you care about. See the <a href="../AmiInspect-Reference/#pick-mode-pick">AmiInspect
+Reference</a>.</p>
+<h2 id="localization-and-catalog-testing">Localization and catalog testing<a class="headerlink" href="#localization-and-catalog-testing" title="Permanent link">&para;</a></h2>
+<p>Because golden-tree comparisons and <code>get_text()</code> both read live label
+text, a suite can run once per locale (wherever the target
+<code>locale.library</code> catalog is switched) and confirm translated strings
+actually appear where expected — catching a missing catalog entry or a
+truncated translation the same way a screenshot-diff localization test
+would, without needing pixel comparison at all (see
+<code>tests/copperline/README.md</code>'s own note on locale variance in golden
+trees for the real caveat this surfaced).</p>
+<h2 id="workbench-launch-and-tooltype-behavior-testing">Workbench-launch and tooltype behavior testing<a class="headerlink" href="#workbench-launch-and-tooltype-behavior-testing" title="Permanent link">&para;</a></h2>
+<p><code>WBLAUNCH</code> (a genuine <code>WBStartup</code>/<code>WBArg</code> message, not a Shell start) lets
+a test verify an application's own icon/tooltype handling — does it
+respect a <code>PORT=</code> override, does a project-icon launch pick the right
+default tool — without a human double-clicking an icon by hand for every
+test run.</p>
+<h2 id="self-contained-test-runs-on-bare-hardware">Self-contained test runs on bare hardware<a class="headerlink" href="#self-contained-test-runs-on-bare-hardware" title="Permanent link">&para;</a></h2>
+<p>The file API (<code>FSPUT</code>/<code>FSGET</code>/<code>FSLIST</code>/<code>FSMKDIR</code>/<code>FSDELETE</code>) means a test
+against real hardware with no shared drive or host-mounted filesystem can
+still be entirely self-contained: connect, stage input fixtures, launch,
+drive, harvest output/log files, clean up, disconnect — the wire is the
+only road in, and it's enough.</p>
+<h2 id="remote-and-real-hardware-test-farms">Remote and real-hardware test farms<a class="headerlink" href="#remote-and-real-hardware-test-farms" title="Permanent link">&para;</a></h2>
+<p>Since the wire protocol is transport-agnostic (serial.device or TCP,
+listen-mode today) and carries the exact same verb grammar either way, a
+CI runner can drive an actual physical Amiga over a real serial cable or
+network link — not just an emulator. The same test suite that runs against
+Copperline in CI can run against a real A1200 on a shelf somewhere,
+unchanged.</p>
+<h2 id="long-running-reliability-soak-testing">Long-running reliability (soak) testing<a class="headerlink" href="#long-running-reliability-soak-testing" title="Permanent link">&para;</a></h2>
+<p>Because actions compose with <code>wait_for()</code>/<code>expect=</code> rather than fixed
+sleeps, a repeated interaction loop (open, interact, close, repeat
+hundreds of times) can run unattended for hours, surfacing a slow memory
+leak, a resource exhaustion crash, or a rare race that a single manual
+test pass would never catch.</p>
+<h2 id="teaching-and-onboarding">Teaching and onboarding<a class="headerlink" href="#teaching-and-onboarding" title="Permanent link">&para;</a></h2>
+<p>A scripted, reproducible walkthrough of an application's UI — driven the
+same way a real user would use it, with real screenshots captured along
+the way — makes a much better onboarding artifact than a static manual:
+it's runnable, it stays accurate as long as the test suite does, and it
+can be regenerated on demand.</p>
+<h2 id="preservation-and-archival-documentation">Preservation and archival documentation<a class="headerlink" href="#preservation-and-archival-documentation" title="Permanent link">&para;</a></h2>
+<p>For software whose original hardware or media is degrading, a scripted
+session that drives the real application and captures real screenshots
+(<code>SCREENSHOT</code>, saved as both PNG for modern viewing and IFF ILBM for
+archival fidelity to the original platform) produces a documented,
+reproducible record of exactly how the software actually behaved — done
+systematically, once, rather than by hand and only when someone happens
+to remember to do it before the hardware fails entirely.</p>
+<h2 id="mui-application-testing">MUI application testing<a class="headerlink" href="#mui-application-testing" title="Permanent link">&para;</a></h2>
+<p><code>MUIREXX</code> bridges to a MUI application's own built-in ARexx port (<code>quit</code>/
+<code>hide</code>/<code>show</code>/<code>activate</code>/<code>deactivate</code>/<code>info</code>/<code>help</code>) — enough to script a
+MUI app's lifecycle (start it, confirm it's alive via <code>info</code>, quit it
+cleanly) as part of a larger automated flow, without pretending to a
+generic widget-value accessor MUI's built-in ARexx support doesn't
+actually provide (see <code>server/README.md</code>'s own section for the honest
+limits here).</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href=".." class="md-footer__link md-footer__link--prev" aria-label="Previous: Home">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Home
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../Installation/" class="md-footer__link md-footer__link--next" aria-label="Next: Installation">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Installation
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      AmiPilot — object-level GUI automation for classic AmigaOS. BSD 2-Clause.
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.footer", "content.action.edit"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>

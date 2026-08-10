@@ -1,0 +1,1979 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Object-level GUI automation for classic AmigaOS">
+      
+      
+      
+        <link rel="canonical" href="https://sidick.github.io/amipilot/v1.1/Wire-Protocol/">
+      
+      
+        <link rel="prev" href="../ARexx-Reference/">
+      
+      
+        <link rel="next" href="../Troubleshooting-and-FAQ/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Wire Protocol - AmiPilot</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#wire-protocol" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="AmiPilot" class="md-header__button md-logo" aria-label="AmiPilot" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            AmiPilot
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Wire Protocol
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/sidick/amipilot" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sidick/amipilot
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="AmiPilot" class="md-nav__button md-logo" aria-label="AmiPilot" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    AmiPilot
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/sidick/amipilot" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"/></svg>
+  </div>
+  <div class="md-source__repository">
+    sidick/amipilot
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Use-Cases/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Use Cases
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting going
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Getting going
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Installation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Installation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Getting-Started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting Started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Using AmiInspect
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Using AmiInspect
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../AmiInspect-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AmiInspect Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Locator-Tiers-and-Limits/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Locator Tiers and Limits
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Driving GUIs
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Driving GUIs
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ARexx-Reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ARexx Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wire Protocol
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Wire Protocol
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#starting-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Starting it
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Starting it">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#connecting-from-a-real-serial-port-host-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connecting from a real serial port (host side)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#talking-to-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Talking to it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-host-client" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The host client
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-object-api-and-amipilot-dump" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The object API and amipilot dump
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#launch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LAUNCH
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wblaunch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WBLAUNCH
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#screenshot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCREENSHOT
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+      
+        
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Help
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Help
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Troubleshooting-and-FAQ/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting and FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Building-and-Testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Building and Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../Changelog/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#starting-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Starting it
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Starting it">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#connecting-from-a-real-serial-port-host-side" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Connecting from a real serial port (host side)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#talking-to-it" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Talking to it
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-host-client" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The host client
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#the-object-api-and-amipilot-dump" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The object API and amipilot dump
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#launch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        LAUNCH
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#wblaunch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        WBLAUNCH
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#screenshot" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SCREENSHOT
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/sidick/amipilot/edit/main/userdocs/Wire-Protocol.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="wire-protocol">Wire Protocol<a class="headerlink" href="#wire-protocol" title="Permanent link">&para;</a></h1>
+<p>From 0.3, <code>AmiPilotServer</code> can carry its whole command set over a byte
+stream as well as ARexx — same verbs, same arguments, same <code>@name</code>
+manifest locators — so a <strong>host machine</strong> can drive Amiga GUIs. Two
+transports carry it: serial.device (0.3) and, from 0.4, TCP via
+bsdsocket.library. This page is the practical guide; the formal
+contract is
+<a href="https://github.com/sidick/amipilot/blob/main/server/WIRE.md"><code>server/WIRE.md</code></a>
+in the repository.</p>
+<h2 id="starting-it">Starting it<a class="headerlink" href="#starting-it" title="Permanent link">&para;</a></h2>
+<pre><code>&gt; Run AmiPilotServer SERIAL
+&gt; Run AmiPilotServer TCP TCPPORT=6800
+&gt; Run AmiPilotServer SERIAL TCP TCPPORT=6800
+&gt; Run AmiPilotServer SERIAL FSROOT=Work:amipilot-staging
+</code></pre>
+<p><code>SERIAL</code> and <code>TCP</code> are independent — enable either or both. Options
+(ReadArgs template <code>SERIAL/S,SERDEVICE/K,SERUNIT/K/N,BAUD/K/N,TCP/S,
+TCPPORT/K/N,FSROOT/K/M,TCPALLOW/K,TCPPASSWORD/K</code>):</p>
+<table>
+<thead>
+<tr>
+<th>Argument</th>
+<th>Default</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>SERIAL</code></td>
+<td>off</td>
+<td>Enable the serial.device transport (the ARexx port is always on)</td>
+</tr>
+<tr>
+<td><code>SERDEVICE</code></td>
+<td><code>serial.device</code></td>
+<td>Device driver — name a multi-port card's driver here</td>
+</tr>
+<tr>
+<td><code>SERUNIT</code></td>
+<td><code>0</code></td>
+<td>Device unit</td>
+</tr>
+<tr>
+<td><code>BAUD</code></td>
+<td><code>19200</code></td>
+<td>Line rate; both ends must agree. 19200 is a safe floor for a plain 68000; faster CPUs handle more</td>
+</tr>
+<tr>
+<td><code>TCP</code></td>
+<td>off</td>
+<td>Enable the TCP transport (bsdsocket.library)</td>
+</tr>
+<tr>
+<td><code>TCPPORT</code></td>
+<td><em>(required with <code>TCP</code>)</em></td>
+<td>Listen port</td>
+</tr>
+<tr>
+<td><code>FSROOT</code></td>
+<td>off (file API disabled)</td>
+<td>Grants a directory to the file API (see <a href="#file-api">File API</a> below). Repeatable — <code>FSROOT=Work:a FSROOT=Work:b</code> grants both. The directory must already exist; it's locked once at startup and held for the server's whole run.</td>
+</tr>
+<tr>
+<td><code>TCPALLOW</code></td>
+<td>off (every source accepted)</td>
+<td>A source-IP/CIDR allowlist for <code>TCP</code>, comma-separated for multiple entries in this one value (<code>TCPALLOW=192.168.1.0/24,10.0.0.5</code>) — <strong>not</strong> repeatable like <code>FSROOT</code>, see <a href="#securing-tcp">Securing TCP</a> for why.</td>
+</tr>
+<tr>
+<td><code>TCPPASSWORD</code></td>
+<td><code>amipilot</code> (public default)</td>
+<td>The password the <code>AUTH</code> verb checks, <code>TCP</code> only. See <a href="#securing-tcp">Securing TCP</a> — this is not real security on its own.</td>
+</tr>
+</tbody>
+</table>
+<p>The serial line is 8N1 with xon/xoff <strong>disabled</strong> (responses are
+binary-safe; software flow control would corrupt them). TCP is
+listen-mode only today — the server binds and listens, the host
+connects in, and only one connection is treated as active at a time (a
+new one replaces the old). If a requested transport can't be opened,
+the server exits with an error rather than silently running without
+it.</p>
+<p>Under an emulator you usually don't need a real cable or a network
+bridge for the <em>serial</em> transport: Copperline's <code>[serial] mode = "tcp"</code>
+(or <code>--serial tcp</code>) bridges the guest's serial port to a host TCP
+socket (default <code>127.0.0.1:1234</code>), which is exactly what the host test
+harness uses. Reaching the <em>TCP</em> transport instead needs the guest's
+own network reachable from the host — Copperline's <code>[hostsocket]</code>
+board bridged to a real or virtual adapter, or a real Amiga with
+TCP/IP on the LAN.</p>
+<h3 id="connecting-from-a-real-serial-port-host-side">Connecting from a real serial port (host side)<a class="headerlink" href="#connecting-from-a-real-serial-port-host-side" title="Permanent link">&para;</a></h3>
+<p>The Copperline-bridge path above is convenience, not the only option
+— <code>host/amipilot</code> can also connect directly over a real (or virtual)
+serial port on the host machine, no TCP bridge involved at all. This
+is what you need for <strong>real Amiga hardware</strong> over a real cable, or a
+Copperline config that itself uses a real serial device instead of
+<code>[serial] mode = "tcp"</code>. Requires the optional <code>pyserial</code> dependency
+(<code>pip install amipilot[serial]</code> once published on PyPI, or
+<code>pip install -e 'host/[serial]'</code> from a checkout) — everything else
+about <code>amipilot</code> works with no <code>pyserial</code> installed at all.</p>
+<pre><code class="language-python">from amipilot import Amipilot
+
+client = Amipilot.connect_serial(&quot;/dev/tty.usbserial-1420&quot;, 19200)
+</code></pre>
+<p><code>device</code> is OS-specific — <code>/dev/tty.usbserial-*</code> on macOS,
+<code>/dev/ttyUSB0</code>/<code>/dev/ttyS0</code> on Linux, <code>COM3</code> on Windows. <code>baud</code> must
+match whatever <code>AmiPilotServer SERIAL</code> was actually started with on
+the Amiga side — <code>BAUD</code> in the table above, default <code>19200</code> on both
+ends. This is genuinely the same wire, the same verbs, the same RC
+semantics as the TCP path; only the transport differs.</p>
+<p>Under pytest, the <code>amipilot</code> fixture (see
+<a href="../Building-and-Testing/">Building and Testing</a>) takes the same
+config via <code>--amipilot-serial-device</code>/<code>--amipilot-serial-baud</code> (or the
+<code>amipilot_serial_device</code> ini setting) instead of <code>--amipilot-config</code> —
+whichever one is set is what the fixture connects with; setting both
+is a configuration mistake and fails immediately rather than silently
+picking one. Unlike the Copperline path, this mode doesn't boot or
+manage any process itself — whatever's on the other end of the cable
+must already be running <code>AmiPilotServer SERIAL</code> before the test
+session starts.</p>
+<h2 id="talking-to-it">Talking to it<a class="headerlink" href="#talking-to-it" title="Permanent link">&para;</a></h2>
+<p>Send one command per line (LF-terminated; CRLF is fine). Every command
+gets exactly one response:</p>
+<pre><code>RC &lt;code&gt; &lt;byte-count&gt;
+</code></pre>
+<p>followed by exactly <code>&lt;byte-count&gt;</code> bytes of payload. The codes are the
+same as the ARexx port's <code>RC</code> values: <code>0</code> OK, <code>5</code> warning (nothing
+matched), <code>10</code> error (bad command), <code>15</code> timeout (an awaited condition
+or payload — <code>WAITFOR</code>, <code>CLICK ... EXPECT=</code>, <code>FSPUT</code> — never arrived
+within <code>TIMEOUT=</code>), <code>20</code> failure (the action didn't deliver). Parse
+payloads by the byte count, never by scanning for delimiters — a
+<code>TREE</code> payload contains newlines.</p>
+<p>A quick manual session over the Copperline bridge:</p>
+<pre><code>$ nc 127.0.0.1 1234
+VERSION
+RC 0 217
+AMIPILOT 1.0 PROTOCOL 1
+STABLE VERSION TREE CLICK TYPE GETTEXT MANIFEST LAUNCH FSLIST FSSTAT FSMKDIR FSDELETE FSGET FSPUT WBLAUNCH MENU MENUPICK DRAG WINDOWMOVE WINDOWSIZE WAITFOR SCREENS SCREENSHOT AUTH MUIREXX WHERE PICK QUIT
+GETTEXT GadTools 2
+RC 0 10
+aminet.net
+</code></pre>
+<p><code>VERSION</code> is the handshake: a client should send it first and check the
+<code>PROTOCOL</code> number before anything else. It works over ARexx too, for
+on-Amiga feature tests.</p>
+<h2 id="the-host-client">The host client<a class="headerlink" href="#the-host-client" title="Permanent link">&para;</a></h2>
+<p>The repository's <code>host/</code> Python package speaks this protocol
+(<code>amipilot.wire.WireClient</code>) — connect, handshake, command:</p>
+<pre><code class="language-python">from amipilot.wire import WireClient
+
+client = WireClient.connect(&quot;127.0.0.1&quot;, 1234)
+info = client.handshake()          # checks PROTOCOL 1
+client.command(&quot;TYPE GadTools 2 aminet.net&quot;)
+reply = client.command(&quot;GETTEXT GadTools 2&quot;)
+assert reply.text == &quot;aminet.net&quot;
+</code></pre>
+<p>The commands themselves are documented in the
+<a href="../ARexx-Reference/">ARexx Reference</a> — the wire adds no verbs of its
+own beyond <code>VERSION</code>.</p>
+<h2 id="the-object-api-and-amipilot-dump">The object API and <code>amipilot dump</code><a class="headerlink" href="#the-object-api-and-amipilot-dump" title="Permanent link">&para;</a></h2>
+<p>Most scripts won't touch <code>WireClient</code> directly — <code>amipilot.client</code>
+wraps it in a Pythonic API that raises exceptions on non-OK replies
+instead of requiring you to check RC codes by hand:</p>
+<pre><code class="language-python">from amipilot import Amipilot, NotFound
+
+with Amipilot.connect(&quot;127.0.0.1&quot;, 1234) as client:
+    client.type(&quot;GadTools&quot;, 2, &quot;aminet.net&quot;)
+    window = client.tree(&quot;GadTools&quot;)           # -&gt; Window, gadgets parsed
+    try:
+        client.click(&quot;GadTools&quot;, 99)
+    except NotFound:
+        ...
+</code></pre>
+<p><code>amipilot dump "&lt;window&gt;"</code> (installed via <code>pip install -e host/</code>) is the
+host-side half of <a href="https://github.com/sidick/amipilot/blob/main/docs/implementation-plan.md#the-inspector">the inspector</a>:
+connects, fetches a window's tree, and prints it — either the same text
+<code>AmiInspect</code> prints (<code>--format text</code>, the default) or quirk-profile-ready
+<code># name = &lt;id&gt;</code> suggestions (<code>--format python</code>) to copy into a test.</p>
+<h2 id="launch">LAUNCH<a class="headerlink" href="#launch" title="Permanent link">&para;</a></h2>
+<p>From 0.4, a connected session can start its own test subject instead of
+requiring it pre-staged (e.g. via <code>S:User-Startup</code>):</p>
+<pre><code class="language-python">from amipilot import Amipilot, NotFound
+
+with Amipilot.connect(&quot;127.0.0.1&quot;, 1234) as client:
+    try:
+        client.tree(&quot;GadTools&quot;)
+        raise AssertionError(&quot;should not be running yet&quot;)
+    except NotFound:
+        pass
+
+    client.launch(&quot;SRC:build/fixtures/GTApp&quot;, stack=8192)
+
+    # LAUNCH is asynchronous -- poll for the effect, don't assume timing.
+    import time
+    for _ in range(20):
+        try:
+            window = client.tree(&quot;GadTools&quot;)
+            break
+        except NotFound:
+            time.sleep(0.5)
+</code></pre>
+<p><code>stack</code> sets the new process's stack size in bytes (AmigaDOS's own
+default is 4000 if omitted — most Intuition/ReAction GUI apps need
+more). On the wire this is <code>LAUNCH [STACK=&lt;n&gt;] &lt;command-line...&gt;</code>; the
+command line is Shell syntax, sent verbatim, and must not itself
+contain a line terminator.</p>
+<p><strong>Read this before relying on <code>RC 0</code>:</strong> the launch is asynchronous
+(<code>SystemTagList()</code>, <code>SYS_Asynch</code>) so AmiPilotServer keeps servicing the
+connection while the launched process runs — necessary for anything
+that doesn't exit on its own, like a GUI app. That means <code>RC 0</code> only
+confirms the new AmigaDOS process could be <em>created</em> (no memory
+exhaustion, a free process slot) — <strong>not</strong> that the command was found
+or that it ran successfully; the shell resolves the command name after
+<code>LAUNCH</code>'s own reply has already gone out, and there's no output
+capture yet to see that failure. Always assert on the expected effect
+(a window appearing, as above) rather than trusting the RC alone. A
+<code>proc-wait</code> verb for real exit-code retrieval is planned but not built
+yet — see <code>server/README.md</code>.</p>
+<h2 id="wblaunch">WBLAUNCH<a class="headerlink" href="#wblaunch" title="Permanent link">&para;</a></h2>
+<p>From 1.0, a connected session can also start a target the way a user
+actually would — double-clicking its icon — instead of <code>launch()</code>'s
+Shell-style start:</p>
+<pre><code class="language-python">from amipilot import Amipilot, CommandError
+
+with Amipilot.connect(&quot;127.0.0.1&quot;, 1234) as client:
+    client.wb_launch(&quot;SRC:build/fixtures/WBApp&quot;)
+
+    client.wb_launch(
+        &quot;SRC:build/fixtures/WBApp&quot;,
+        tooltypes={&quot;PORT&quot;: &quot;7777&quot;},
+        args=[&quot;Work:data/one.txt&quot;],
+    )
+
+    try:
+        client.wb_launch(&quot;SRC:build/fixtures/NoSuchApp&quot;)
+    except CommandError:
+        pass  # RC 10, bad icon path
+</code></pre>
+<p>This is a genuinely different mechanism from <code>launch()</code>, not a
+cosmetic variant: it hand-builds a real <code>WBStartup</code>/<code>WBArg</code> message and
+sends it to a real non-CLI <code>CreateNewProc()</code> process, the exact
+handshake a Workbench-aware program's own startup code (libnix's
+<code>_WBenchMsg</code>, or any compiler's equivalent) waits for — so tooltype
+parsing and <code>WBStartup</code> argument handling are code paths the launched
+program actually exercises, which <code>launch()</code>'s Shell start never
+touches at all.</p>
+<p><code>icon_path</code> is the tool or project icon's path <strong>without</strong> the
+".info" suffix (icon.library's own convention) — <code>wb_launch()</code> reads
+the real icon, and for a project icon resolves its own default tool
+automatically (the project itself becomes a second argument, matching
+what double-clicking a project icon actually does).</p>
+<p><code>tooltypes</code>, if given, overrides (or adds, if not already present)
+just the named tooltypes for this one launch — everything else on the
+real icon is left alone. This needs a real, if surprising, mechanism:
+there is no in-memory channel to hand a tooltype override to an
+off-the-shelf binary, since the launched program discovers its own
+tooltypes by reading its own icon file back off disk. <code>wb_launch()</code>
+instead writes a <strong>scratch</strong> copy of the icon (merged tooltypes) to
+<code>T:</code> — never touching the app's real <code>.info</code> — and points the launch
+at that instead; it's cleaned up automatically once the launched
+process exits.</p>
+<p><code>args</code>, if given, are additional fully-qualified paths passed as
+further project-file arguments (the "multiple files selected, one is a
+tool" case double-clicking with extended-select icons produces).</p>
+<p>Same async honesty as <code>launch()</code>: this raises <code>CommandError</code> as soon
+as the icon/path itself is rejected (bad icon, unsupported icon type,
+an unlockable <code>ARG=</code>/<code>TOOLTYPE=</code>-scratch path), <code>ActionFailed</code> if
+<code>CreateNewProc()</code> itself fails (out of memory, no process slot) — but
+neither confirms the launched program actually finished starting;
+assert on its expected effect, same as <code>launch()</code>.</p>
+<p>Unlike <code>FSPUT</code>, <code>WBLAUNCH</code> carries no binary wire payload, so — unlike
+that verb — it's fully answerable over ARexx too; there's no wire-only
+asymmetry here.</p>
+<h2 id="screenshot">SCREENSHOT<a class="headerlink" href="#screenshot" title="Permanent link">&para;</a></h2>
+<p>From 1.0, a connected session can capture a screen's raw pixels for
+human viewing/debugging/documentation — [GitHub issue</p>
+<h1 id="41httpsgithubcomsidickamipilotissues41-this-is">41](https://github.com/sidick/amipilot/issues/41). This is<a class="headerlink" href="#41httpsgithubcomsidickamipilotissues41-this-is" title="Permanent link">&para;</a></h1>
+<p>inspector tooling, <strong>not</strong> a locator mechanism: <code>click()</code>/<code>type()</code>/
+<code>get_text()</code> stay structural/semantic, this doesn't change that.</p>
+<pre><code class="language-python">from amipilot import Amipilot, NotFound
+
+with Amipilot.connect(&quot;127.0.0.1&quot;, 1234) as client:
+    shot = client.screenshot()                     # frontmost screen
+    ilbm_path, png_path = shot.save(&quot;/tmp/capture&quot;)  # writes both
+
+    window_shot = client.screenshot(window=&quot;GadTools&quot;)
+    print(window_shot.crop)  # (x, y, w, h) within its owning screen
+
+    try:
+        client.screenshot(screen=&quot;NoSuchScreen&quot;)
+    except NotFound:
+        pass
+</code></pre>
+<p>Same "wire stays simple, host does the rendering" split this project
+already uses for <code>TREE</code>/<code>amipilot dump</code> (no JSON on the wire, ever):
+the Amiga side sends raw, <strong>uncompressed</strong> pixel bytes plus a small
+header — see <code>server/include/screenshot.h</code>'s own header comment for
+the exact byte layout. <strong>All image-format and colour-space work
+happens host-side</strong>, <code>amipilot.screenshot</code>, stdlib only (<code>zlib</code>, no
+Pillow):</p>
+<ul>
+<li><code>shot.to_ilbm()</code> — a real IFF <code>FORM ILBM</code> (<code>BMHD</code>/<code>CMAP</code>/<code>CAMG</code>/
+  <code>BODY</code>). For a planar capture, a near-direct copy since that's
+  ILBM's own native shape; for a Picasso96 CLUT (palette) capture, a
+  re-plane into a standard 8-bitplane/256-colour ILBM. Raises for a
+  P96 truecolor/hicolor capture — ILBM is fundamentally planar and has
+  no standard way to carry 15-32 bits of true colour; use <code>to_png()</code>
+  or <code>to_rgb888()</code> instead. Viewable with Multiview or any Amiga paint
+  program, and preserves the exact view mode the capture came from.</li>
+<li><code>shot.to_png()</code> — indexed-colour (palette) for anything with a
+  palette (planar or P96 CLUT), true-colour (24-bit RGB, no palette)
+  for a P96 truecolor/hicolor capture. Easier for modern tooling
+  (browsers, CI artifact viewers, image diffing) to work with than
+  ILBM, at the cost of real per-pixel unpacking/decoding work
+  host-side — cheap there, which is the whole point of doing it
+  host-side rather than on the 68000.</li>
+<li><code>shot.save(path)</code> writes both <code>&lt;path&gt;.iff</code> and <code>&lt;path&gt;.png</code> in one
+  call (raises from <code>to_ilbm()</code> for a P96 truecolor/hicolor capture —
+  call <code>to_png()</code> directly for those).</li>
+</ul>
+<p><strong>Picasso96/RTG support is real, optional, and never required</strong> —
+<a href="https://github.com/sidick/amipilot/issues/44">GitHub issue #44</a>. A
+Picasso96/CGX screen's <code>BitMap</code> still has <code>Planes[]</code>/<code>BytesPerRow</code>/
+<code>Depth</code> fields, but they're not real chip-mem bitplanes; walking them
+risks reading garbage pointers, the same risk class as the
+<code>WBPattern</code>/<code>GTYP_CUSTOMGADGET</code> hang found and fixed in issue #36. An
+earlier attempt to guard against this (<code>BitMap-&gt;Flags &amp; BMF_STANDARD</code>)
+turned out to be simply wrong, not just imperfect — live testing
+against a real, completely ordinary Copperline Workbench screen showed
+that flag is never set on Intuition's own screen bitmaps regardless of
+whether they're planar. The REAL, verified check, from
+Picasso96API.library's own published SDK interface data (not
+redistributed here — see <code>server/include/p96_compat.h</code>'s own header
+comment): <code>p96GetBitMapAttr(bm, P96BMA_ISP96)</code>, safe to call
+unlocked on any bitmap. The library is opened OPTIONALLY at server
+startup — absent, or the target screen isn't genuinely P96-backed,
+and the classic planar capture runs completely unchanged. When it IS
+a genuine P96 screen, its native pixel format (CLUT, or one of several
+truecolor/hicolor RGB byte orders — YUV formats aren't supported, the
+SDK's own docs mark them hardware-only) is sent raw over the wire and
+decoded host-side, including the documented <code>PC</code>-suffix byte-swap
+pitfall (16-bit <code>PC</code> formats are little-endian, non-<code>PC</code> big-endian —
+never assumed uniform). The P96-active capture path has been verified
+against real Picasso96 3.6 + <code>uaegfx</code> under Amiberry (both a CLUT and
+a truecolor screen, each decoding back correctly), and — since
+Copperline 0.15 added its own RTG support — is now a real, automated
+<code>make test-target</code> regression check too (<code>run_screenshot_p96_check</code>),
+skip-safe on machines without an RTG board configured; see
+<code>server/README.md</code>'s own SCREENSHOT section for the fuller story.</p>
+<p>With both <code>screen</code>/<code>window</code> omitted, <code>screenshot()</code> captures the
+frontmost/default public screen; <code>screen</code> alone selects one by
+<code>DefaultTitle</code> substring; <code>window</code> (optionally narrowed by <code>screen</code>,
+resolved exactly like <code>click()</code>'s own window pattern) captures that
+window's OWNING SCREEN in full, with the window's rectangle on
+<code>shot.crop</code> — there is no separate per-window pixel buffer to grab on
+classic Intuition (overlapping windows share one screen bitmap), so
+that's what a "window screenshot" actually is on any windowing system.</p>
+<p>Palette precision is 4-bit-per-gun (12-bit RGB, expanded to 8-bit-per-
+channel for the wire/PNG/ILBM) — the real, V33-era-safe way to read a
+<code>ColorMap</code> (<code>GetRGB4()</code>, not <code>ColorMap-&gt;ColorTable</code> directly, which is
+an opaque <code>APTR</code> in the real struct, not the plain array it might look
+like). A real AGA 8-bit-per-gun capture would need <code>GetRGB32()</code> (V39+,
+above this project's V37 floor) — not attempted here.</p>
+<p><strong>Serial transfer time, no compression on the wire (8N1, byte rate ≈
+baud/10):</strong></p>
+<table>
+<thead>
+<tr>
+<th>Capture (typical example)</th>
+<th>Size</th>
+<th>9600 baud</th>
+<th>19200 baud (default)</th>
+<th>38400 baud</th>
+<th>57600 baud</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>320x256, 16 colours (4 planes)</td>
+<td>~41 KB</td>
+<td>~43 s</td>
+<td>~21 s</td>
+<td>~11 s</td>
+<td>~7 s</td>
+</tr>
+<tr>
+<td>320x256, 32 colours (5 planes)</td>
+<td>~50 KB</td>
+<td>~53 s</td>
+<td>~27 s</td>
+<td>~13 s</td>
+<td>~9 s</td>
+</tr>
+<tr>
+<td>640x512 interlaced, 256 colours (8 planes, AGA)</td>
+<td>~320 KB</td>
+<td>~5.7 min</td>
+<td>~2.9 min</td>
+<td>~1.4 min</td>
+<td>~57 s</td>
+</tr>
+<tr>
+<td>Server's own size cap (<code>AMIP_SCREENSHOT_MAX_BYTES</code>)</td>
+<td>512 KB</td>
+<td>~9.1 min</td>
+<td>~4.6 min</td>
+<td>~2.3 min</td>
+<td>~1.5 min</td>
+</tr>
+</tbody>
+</table>
+<p>Serial is genuinely slow for anything beyond a small/low-colour
+screen — <strong>prefer TCP</strong> for <code>SCREENSHOT</code>, which isn't baud-limited at
+all. These numbers exist so a serial-only setup (real hardware without
+a network card, or a Copperline config without <code>--serial tcp</code>) knows
+what to expect rather than guessing why a capture appears to hang.</p>
+<p>Since a capture can genuinely take anywhere from seconds to several
+minutes with the client otherwise giving zero feedback, <code>screenshot()</code>
+(and <code>fs_get()</code>, below) accept an optional <code>on_progress(bytes_so_far,
+total_bytes)</code> callback, invoked as the payload streams in —
+<code>amipilot.stderr_progress()</code> is a ready-made callback for the common
+"print a progress line" case:</p>
+<pre><code class="language-python">from amipilot import stderr_progress
+
+shot = client.screenshot(on_progress=stderr_progress(&quot;screenshot&quot;))
+# stderr: &quot;screenshot: 51200/524288 bytes (9%)&quot; ... updated in place ...
+</code></pre>
+<p>Pass your own callback instead for a GUI progress bar or structured
+logging; omit it entirely for today's exact zero-overhead behavior.</p>
+<h2 id="file-api">File API<a class="headerlink" href="#file-api" title="Permanent link">&para;</a></h2>
+<p>From 0.4, a connected session can list/stat/create/delete files and
+read one back, scoped to directories explicitly granted at startup via
+one or more <code>FSROOT</code> options (above) — nothing is granted implicitly,
+and there is no way to grant a root once the server is running:</p>
+<pre><code class="language-python">from amipilot import Amipilot, CommandError, NotFound
+
+with Amipilot.connect(&quot;127.0.0.1&quot;, 1234) as client:
+    for entry in client.fs_list(&quot;Work:amipilot-staging&quot;):
+        print(entry.name, &quot;dir&quot; if entry.is_dir else &quot;file&quot;, entry.size)
+
+    data = client.fs_get(&quot;Work:amipilot-staging/results.log&quot;)
+
+    client.fs_mkdir(&quot;Work:amipilot-staging/run3&quot;)
+    client.fs_delete(&quot;Work:amipilot-staging/run3&quot;)
+
+    try:
+        client.fs_list(&quot;SYS:&quot;)          # outside every granted root
+    except CommandError:
+        pass                             # RC 10, expected
+</code></pre>
+<p><code>fs_stat()</code> returns the same <code>FsEntry</code> shape as one <code>fs_list()</code> row —
+name, <code>is_dir</code>, <code>size</code>, <code>prot</code> (the classic four-character <code>rwed</code>
+string, inverted-bit gotcha already handled), <code>date</code>, <code>comment</code> — for
+a single path without listing a whole directory.</p>
+<p><strong>Containment is checked by lock identity, not string matching</strong> —
+<code>Lock()</code>/<code>ParentDir()</code>/<code>SameLock()</code>, walking up from the target to see
+whether it lands on a granted root. Amiga assigns mean two different
+path <em>strings</em> can name the same or a nested location, so a prefix
+check would be both wrong (missing genuine matches) and unsafe
+(missing genuine escapes). A path outside every granted root raises
+<code>CommandError</code> (<code>RC 10</code>) naming what <em>is</em> granted; a genuinely missing
+path raises <code>NotFound</code> (<code>RC 5</code>).</p>
+<p><code>fs_get()</code> returns the file's exact bytes (<code>Reply.payload</code>, not the
+NUL-terminated <code>.text</code> other verbs use — a file's contents may
+legitimately contain embedded NULs, and the wire's length-prefixed
+framing carries them intact). The server caps this at its own small
+internal buffer (<code>server/src/fs.c</code>'s <code>AMIP_FS_BUF_SIZE</code>, currently
+16KB) and raises <code>ActionFailed</code> (<code>RC 20</code>) for anything larger — this
+is a test-staging channel for small fixtures, config, and log files,
+not a general file transfer mechanism.</p>
+<p><strong><code>fs_put(path, data, *, timeout=30.0)</code> writes a file host-to-Amiga</strong>,
+creating it if it doesn't exist and overwriting it if it does:</p>
+<pre><code class="language-python">    client.fs_put(&quot;Work:amipilot-staging/results.log&quot;, b&quot;hello\x00world&quot;)
+    assert client.fs_get(&quot;Work:amipilot-staging/results.log&quot;) == b&quot;hello\x00world&quot;
+</code></pre>
+<p>This is the wire's first request to carry a raw binary body: on the
+wire it's <code>FSPUT &lt;path&gt; &lt;byte-count&gt; [TIMEOUT=&lt;n&gt;]</code>, the request-line
+declaring how many raw bytes immediately follow it (no delimiter, no
+escaping — the same length-prefixed idea the response side already
+uses, just inverted). <code>fs_put()</code> is <strong>wire-only</strong> — there is no ARexx
+equivalent at all, because <code>RexxMsg</code>/<code>ARG0()</code> only ever carries string
+arguments, so there's genuinely no channel to receive a binary payload
+over that transport. Same allowlist/containment rules and
+<code>AMIP_FS_BUF_SIZE</code> cap as <code>fs_get()</code>. <code>timeout</code> (default 30s, longer
+than most other waits here — a real multi-KB payload over a slow
+serial link needs it) bounds how long the server waits for the
+declared payload to fully arrive after the request line; if it
+doesn't, <code>fs_put()</code> raises <code>Timeout</code> (<code>RC 15</code>), distinct from
+<code>ActionFailed</code> (<code>RC 20</code>) on a write that fails after a complete
+payload arrived (e.g. disk full).</p>
+<h2 id="menus">Menus<a class="headerlink" href="#menus" title="Permanent link">&para;</a></h2>
+<p>From 0.4, a connected session can read a window's menu strip and
+select an item by its keyboard shortcut:</p>
+<pre><code class="language-python">from amipilot import ActionFailed, Amipilot
+
+with Amipilot.connect(&quot;127.0.0.1&quot;, 1234) as client:
+    strip = client.menu(&quot;GadTools&quot;)
+    project = strip.menus[0]
+    print(project.title, [i.text for i in project.items])
+
+    about = strip.find(&quot;About&quot;)             # look up by label instead
+    client.menu_pick(&quot;GadTools&quot;, about.menu_num, about.item_num)
+
+    try:
+        client.menu_pick(&quot;GadTools&quot;, 0, 2)   # a disabled item, say
+    except ActionFailed:
+        pass                                  # RC 20, expected
+</code></pre>
+<p><code>menu()</code> returns a <code>MenuStrip</code>: one <code>Menu</code> per pulldown title, each
+with a list of <code>MenuItem</code>s and — one level deep, matching classic
+Intuition's own limit — their submenu items. Each <code>MenuItem</code> carries
+<code>text</code>, <code>checkit</code>/<code>checked</code> (for a checkmark toggle item),
+<code>enabled</code>, <code>shortcut</code> (the single keyboard character, or <code>None</code>), and
+<code>menu_num</code>/<code>item_num</code>/<code>sub_num</code> — the same 0-based chain positions
+Intuition itself reports via <code>IDCMP_MENUPICK</code>'s <code>MENUNUM()</code>/
+<code>ITEMNUM()</code>/<code>SUBNUM()</code> macros. <code>MenuStrip.find("some label")</code> looks up
+an item by its text instead of hand-counting positions.</p>
+<p><strong><code>menu_pick()</code> chooses the pick mechanism automatically, per item.</strong>
+For an item with a keyboard shortcut, it activates the window, then
+strikes the shortcut character with the right-Amiga qualifier held —
+the same input.device path a human pressing Right-Amiga+key produces;
+Intuition resolves that combination against the window's own live
+menu strip, so <code>RC 0</code> is real evidence the pick reached the app
+through the genuine menu-shortcut path. For an item with <strong>no</strong>
+shortcut, it instead drives a genuine synthesized RMB-down, moves onto
+the target menu's own title, moves onto the item (auto-opening its
+one-level submenu if it has one, purely as Intuition's own reaction to
+pointer position), moves into the submenu if picking a sub-item, then
+releases (RMB-up) over the target — exactly what Intuition turns into
+a real <code>IDCMP_MENUPICK</code>, the same "genuinely synthesized input, not a
+shortcut" path <code>click()</code>/<code>drag()</code> already use. Every box this needs is
+resolved live off the window's own current menu structure immediately
+before each move, never cached — menu layout depends on the user's own
+screen/menu font. Raises <code>ActionFailed</code> (<code>RC 20</code>) if the item is
+disabled, or — pointer path only — if the window traps the right mouse
+button (<code>WFLG_RMBTRAP</code>, a real Intuition window flag some apps set):
+no synthesized RMB-down can ever open that window's menu strip, a
+permanent limit for that window rather than a transient failure. See
+<code>server/README.md</code> for the full mechanism, including the (largely
+undocumented-by-Commodore) submenu geometry this was measured against
+a real screenshot to confirm.</p>
+<h2 id="screens">Screens<a class="headerlink" href="#screens" title="Permanent link">&para;</a></h2>
+<p>From 0.4, a connected session can see every open screen and target a
+specific one when a window-title pattern is ambiguous:</p>
+<pre><code class="language-python">from amipilot import Amipilot
+
+with Amipilot.connect(&quot;127.0.0.1&quot;, 1234) as client:
+    for screen in client.screens():
+        print(screen.title, screen.width, screen.height, screen.frontmost)
+
+    # Two windows both matching &quot;GadTools&quot; on different screens --
+    # narrow the search to a specific one:
+    window = client.tree(&quot;GadTools&quot;, screen=&quot;Second Screen&quot;)
+
+    # Waiting for an asynchronously launched program's own screen to
+    # appear, instead of a fixed sleep:
+    client.launch(&quot;SRC:build/fixtures/SecondScreenApp&quot;)
+    screen = client.wait_for_screen(&quot;Second Screen&quot;, timeout=20.0)
+    window = client.wait_for_window(&quot;GadTools&quot;, screen=screen.title)
+</code></pre>
+<p><code>screens()</code> returns every screen's <code>title</code> (its <code>DefaultTitle</code> — the
+app's own stable name for the screen, set once at open time — <strong>not</strong>
+the live title-bar text, which tracks whichever window is currently
+active on that screen via that window's own <code>WA_ScreenTitle</code> and so
+isn't a safe identity to match against), position, size, and whether
+it's frontmost.</p>
+<p><code>tree()</code>, <code>click()</code>, <code>type()</code>, <code>get_text()</code>, <code>menu()</code>, and
+<code>menu_pick()</code> all accept an optional <code>screen=</code> keyword that narrows
+the window search to screens whose title contains it — this is purely
+for <em>disambiguating</em> two same-titled windows on different screens;
+window-finding already searched every screen before this existed, it
+just couldn't tell two matches apart. <code>TREE</code>/<code>MENU</code>'s own payload
+gains a <code>screen="..."</code> field on the window line for the same reason
+(<code>Window.screen</code>/<code>MenuStrip.screen</code> on the host side), so you can
+confirm which screen a match actually landed on.</p>
+<p><strong>Acting on a window brings its screen forward automatically.</strong>
+<code>click()</code>, <code>type()</code>, and <code>menu_pick()</code> already call <code>ScreenToFront()</code>
+on the target window's own screen before injecting anything — this
+predates <code>SCREEN=</code>/<code>SCREENS</code>, and there's no separate "bring this
+screen to front" verb because none is needed. Read-only calls
+(<code>tree()</code>, <code>get_text()</code>, <code>menu()</code>) deliberately leave screen order
+alone.</p>
+<p><code>wait_for_window()</code>/<code>wait_for_screen()</code> poll <code>tree()</code>/<code>screens()</code>
+until the target appears or <code>timeout</code> elapses (<code>TimeoutError</code> on
+expiry) — a host-side poll loop, useful when there's no accompanying
+action to anchor a wait to (e.g. waiting for an externally-launched
+process's window). For anything tied to an action you just took, see
+<code>WAITFOR</code> below and <code>click()</code>'s own <code>expect=</code> parameter instead —
+these poll <strong>server-side</strong>, in one wire round trip, not from the host.</p>
+<h2 id="waitfor">WAITFOR<a class="headerlink" href="#waitfor" title="Permanent link">&para;</a></h2>
+<p>From 0.5, a connected session can wait for a condition to become true
+without a host-side poll loop at all: <code>WAITFOR [SCREEN=&lt;substring&gt;]
+&lt;condition&gt; [TIMEOUT=&lt;n&gt;]</code> blocks entirely server-side (one wire round
+trip) until <code>condition</code> becomes true or <code>TIMEOUT=</code> (default 10s)
+elapses.</p>
+<pre><code class="language-python">from amipilot import Amipilot, Timeout
+
+with Amipilot.connect(&quot;127.0.0.1&quot;, 1234) as client:
+    client.wait_for(&quot;window:Settings&quot;)       # a matching window appears
+    client.wait_for(&quot;nowindow:Settings&quot;)     # no window matches (fresh re-search each poll)
+
+    try:
+        client.wait_for(&quot;window:NeverOpens&quot;, timeout=2.0)
+    except Timeout:
+        pass  # RC 15
+</code></pre>
+<p><code>click()</code> also takes its own <code>expect=</code> parameter (<code>"window:&lt;pattern&gt;"</code>
+or <code>"nowindow"</code>, plus <code>timeout=</code>) to compose an action atomically with
+a wait for its effect — <code>expect="nowindow"</code> there is checked by
+POINTER IDENTITY against the exact window <code>click()</code> itself just acted
+on, not a fresh pattern re-search, which is the more precise "did the
+window I just clicked actually close" guarantee a standalone
+<code>wait_for("nowindow:...")</code> can't give (a different, same-titled window
+could satisfy a pattern re-search without the original ever closing).
+<code>wait_for_text()</code>/<code>wait_for_text_by_role()</code>/<code>wait_for_text_by_name()</code>
+cover waiting on a GADGET's text/state instead of a window — a
+different condition shape (needs a gadget locator) <code>wait_for()</code>'s
+plain <code>condition</code> string doesn't carry.</p>
+<p><code>wait_for("requester")</code> waits for a genuine Intuition Requester to
+appear (GitHub issue #52's original "cheap first step"). No pattern
+argument, and window-attached Requesters only — a system-wide one
+with no owning window (a disk-swap prompt, say) is a stated, harder
+problem left open. See <code>userdocs/ARexx-Reference.md</code>'s own WAITFOR
+section for the full detection story, including two genuine surprises
+found building it: neither <code>window-&gt;FirstRequest</code> nor the
+<code>GTYP_REQGADGET</code> bit <code>BuildSysRequest()</code>'s own 1990s autodoc documents
+turned out to be set by <code>AutoRequest()</code>/<code>BuildSysRequest()</code>/
+<code>EasyRequest()</code> on this project's target OS/ROM when given a real
+owning window — detection instead relies on the confirmed-live fact
+that these calls open a genuinely separate window sharing their
+owner's exact title text.</p>
+<p>Once detected, a window-owned requester's own gadgets need no new
+client method at all: since it's a genuinely separate window sharing
+its owner's exact title, <code>client.click(window_pattern, gadget_id=1)</code>
+(the RKRM-documented, fixed <code>GadgetID</code> for the positive/"Yes" choice —
+<code>0</code> for negative/"No") already reaches it through the ordinary <code>click()</code>
+path. Confirmed live in <code>tests/copperline/requester-test.py</code>.</p>
+<p>System-wide requesters (no owning window, e.g. a real disk-swap
+prompt via <code>BuildSysRequest(NULL, ...)</code>) are detectable AND
+click-able too now: confirmed live to produce a window titled EXACTLY
+<code>"System Request"</code> (Intuition's own documented default), which
+<code>wait_for("requester")</code> now matches, and which <code>client.click("System
+Request", gadget_id=1)</code> reaches through the exact same mechanism as
+the window-owned case.</p>
+<p><code>get_text()</code> cannot read a requester's own body text -- confirmed as a
+permanent limit (2026-08-09): <code>struct Requester-&gt;ReqText</code> would be the
+obvious field, but a live dump of every open window's <code>FirstRequest</code>
+while a real <code>AutoRequest()</code> was up showed it NULL on both the owning
+window and the requester's own separate window -- no <code>struct
+Requester</code> exists anywhere reachable here for this OS/ROM's
+<code>AutoRequest()</code>, so there is no field for <code>get_text()</code> to query.</p>
+<p>This IS a genuine server-side blocking wait, not a host-side
+workaround: <code>AmiPilotServer</code>'s dispatch is single-threaded, so while
+one <code>WAITFOR</code>/<code>CLICK ... EXPECT=</code> call is polling server-side, no
+other request on that connection is serviced until it resolves — by
+design, since TCP already only serves one active client connection at
+a time (<code>server/README.md</code>'s own TCP section). Keep <code>TIMEOUT=</code> values
+reasonable for this reason.</p>
+<h2 id="window-move-and-resize">Window move and resize<a class="headerlink" href="#window-move-and-resize" title="Permanent link">&para;</a></h2>
+<p>From phase 1.0, a connected session can move or resize a whole window
+via genuine input-device drags — the same synthesized press/move/
+release primitive <code>drag()</code> already uses for gadgets, just anchored on
+the window's own title bar or sizing gadget instead of a gadget's:</p>
+<pre><code class="language-python">from amipilot import Amipilot, ActionFailed
+
+with Amipilot.connect(&quot;127.0.0.1&quot;, 1234) as client:
+    before = client.tree(&quot;GadTools&quot;)
+    print(before.left, before.top, before.width, before.height)
+
+    client.window_move(&quot;GadTools&quot;, 30, 20)      # relative offset
+    client.window_resize(&quot;GadTools&quot;, 400, 300)  # absolute target size
+
+    after = client.tree(&quot;GadTools&quot;)
+    print(after.left, after.top, after.width, after.height)
+
+    try:
+        client.window_resize(&quot;SomeFixedSizeWindow&quot;, 800, 600)
+    except ActionFailed:
+        pass  # RC 20 -- window has no sizing gadget (WFLG_SIZEGADGET unset)
+</code></pre>
+<p><code>window_move(pattern, dx, dy)</code> sends <code>WINDOWMOVE [SCREEN=&lt;s&gt;] &lt;pattern&gt;
+&lt;dx&gt; &lt;dy&gt;</code>: a real drag of the window's title bar, anchored at its
+horizontal center vertically centered in the window's own <code>BorderTop</code>
+strip — a documented, honest heuristic (not an attempt to locate the
+close/depth/zoom system gadgets' exact pixel extents and dodge them
+precisely) that clears them for any window wider than roughly 120px.
+Raises <code>ActionFailed</code> if the window has no drag bar at all
+(<code>WFLG_DRAGBAR</code> unset).</p>
+<p><code>window_resize(pattern, width, height)</code> sends <code>WINDOWSIZE
+[SCREEN=&lt;s&gt;] &lt;pattern&gt; &lt;width&gt; &lt;height&gt;</code>: a real drag of the window's
+sizing gadget from its current bottom-right corner to wherever that
+corner needs to land to reach the given ABSOLUTE target size. It does
+<strong>not</strong> pre-check <code>width</code>/<code>height</code> against the window's own
+<code>min_width</code>/<code>min_height</code>/<code>max_width</code>/<code>max_height</code> — Intuition clamps
+the drag exactly as it would a genuine user drag, so confirm the
+actual resulting size with a follow-up <code>tree()</code> call rather than
+assuming the exact target was reached, the same "verify the real
+outcome" precedent <code>drag()</code> already sets. Raises <code>ActionFailed</code> if the
+window has no sizing gadget at all (<code>WFLG_SIZEGADGET</code> unset).</p>
+<p>Both take an optional <code>screen=</code> keyword, same as <code>tree()</code>/<code>click()</code>,
+and both bring the window/screen forward first, same as every other
+action call. Neither has a manifest (<code>@name</code>) form — this acts on a
+whole window, the same scope <code>tree()</code>/<code>menu()</code> already have, neither
+of which takes one either. There's no separate "get window position/
+size" call: <code>tree()</code>'s own result already carries <code>left</code>/<code>top</code>/
+<code>width</code>/<code>height</code>, so query before or after a move/resize with a
+regular <code>tree()</code> call.</p>
+<h2 id="pick">PICK<a class="headerlink" href="#pick" title="Permanent link">&para;</a></h2>
+<p>The platform's first genuine interactive element-picker equivalent
+(<a href="https://github.com/sidick/amipilot/issues/65">issue #65</a>): point at
+a gadget, get back its exact locator, no batch <code>tree()</code> dump required.</p>
+<pre><code class="language-python">from amipilot import Amipilot, NotFound
+
+with Amipilot.connect(&quot;127.0.0.1&quot;, 1234) as client:
+    result = client.pick()                       # frontmost screen
+    print(result.title, result.gadgets)           # gadgets: 0 or 1 entry
+
+    scoped = client.pick(screen=&quot;Second Screen&quot;)
+
+    try:
+        client.pick(screen=&quot;NoSuchScreen&quot;)
+    except NotFound:
+        pass
+</code></pre>
+<p><code>pick()</code> hit-tests the LIVE global pointer position against
+<code>screen</code>'s windows (the frontmost screen if omitted, same convention
+<code>screenshot()</code>'s own <code>screen</code> parameter uses) and returns the <code>Window</code>
+containing it. <code>result.gadgets</code> has at most one entry — the gadget
+under the pointer, if any; an empty list means the pointer is over
+bare window background, not an error (this can still include a real
+system gadget, e.g. <code>gadget_id == 0</code> with <code>class_name ==
+"gadgetclass"</code>, for the drag bar/close/depth/size decorations —
+<code>tree()</code> already reports those the same way). Raises <code>NotFound</code> if no
+window on the target screen contains the pointer at all, including
+when <code>screen</code> itself doesn't match any open screen.</p>
+<p>This is a single point-in-time snapshot, not a live subscription —
+call it repeatedly (e.g. in a poll loop) for a "hover and watch it
+update" experience. <code>AmiInspect PICK</code> (see <a href="../AmiInspect-Reference/">AmiInspect
+Reference</a>) is the standing-at-the-machine
+equivalent, looping locally with no host connection at all.</p>
+<p>Built on <code>intuition-model</code>'s own coordinate-to-gadget hit test over an
+already-walked screen model (<code>AmipHitTest()</code>), reusing the same
+role/label classification <code>TREE</code>/<code>AmiInspect</code> already do — not a new
+Intuition mechanism. The server corrects for a real, live-confirmed
+quirk in the live pointer position it reads back internally (roughly
+2x the real pixel Y, present on this project's own default Workbench
+screen configuration); this is handled server-side and needs nothing
+from the caller — see <code>server/README.md</code>'s own PICK section for the
+full story, including the two real findings (window z-order and
+pointer-Y scaling) building this turned up.</p>
+<h2 id="securing-tcp">Securing TCP<a class="headerlink" href="#securing-tcp" title="Permanent link">&para;</a></h2>
+<p><strong>AmiPilot's TCP transport is meant for a trusted LAN or a direct
+machine-to-machine link — never expose it on an open/internet-facing
+port.</strong> This server can run arbitrary shell commands (<code>LAUNCH</code>),
+read/write files inside a granted <code>FSROOT</code>, and inject GUI input;
+that's real exposure on any network it's reachable from. Two
+independent, opt-in, combinable options narrow who can connect and
+what they can do without one:</p>
+<ul>
+<li><strong><code>TCPALLOW=&lt;ip-or-cidr&gt;[,&lt;ip-or-cidr&gt;...]</code></strong> — a source-address
+  allowlist, e.g. <code>TCPALLOW=192.168.1.0/24,10.0.0.5</code>. A single value,
+  comma-separated for more than one entry (not repeatable like
+  <code>FSROOT</code> — AmigaDOS's <code>ReadArgs()</code> only allows one repeatable <code>/M</code>
+  keyword per template, and <code>FSROOT</code> already uses it). With none
+  granted, every source is accepted — today's unchanged default. A
+  rejected connection is closed immediately, with no reply ever sent.</li>
+<li><strong><code>TCPPASSWORD=&lt;value&gt;</code></strong> gates a new <code>AUTH &lt;password&gt;</code> verb — TCP
+  only, not ARexx or serial.device. If omitted, defaults to
+  <code>"amipilot"</code>, which <code>Amipilot.connect()</code>/<code>connect_with_retry()</code>
+  already send automatically, so TCP keeps working with zero config
+  changes on either side.</li>
+</ul>
+<pre><code class="language-python">from amipilot import Amipilot, CommandError
+
+# Matches a server started with TCPPASSWORD=correct-horse-battery-staple
+try:
+    client = Amipilot.connect(&quot;192.168.1.50&quot;, 6800, password=&quot;correct-horse-battery-staple&quot;)
+except CommandError:
+    ...  # wrong password
+</code></pre>
+<p><strong>Neither option is real security, and you should say so to anyone
+relying on this.</strong> The default password is public — it's in this
+open-source repository. There's no TLS, so even a custom password
+crosses the wire in cleartext, sniffable by anything on the same
+network segment. There's no rate-limiting or lockout on repeated
+<code>AUTH</code> guesses. <code>TCPALLOW</code>/<code>TCPPASSWORD</code> raise the bar above "wide
+open to anyone," the same way a router's default admin password does
+— nothing more. <code>AmiPilotServer</code> prints a warning to this effect every
+time <code>TCP</code> is enabled, precisely so this isn't something you only find
+out by reading documentation.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../ARexx-Reference/" class="md-footer__link md-footer__link--prev" aria-label="Previous: ARexx Reference">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                ARexx Reference
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../Troubleshooting-and-FAQ/" class="md-footer__link md-footer__link--next" aria-label="Next: Troubleshooting and FAQ">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Troubleshooting and FAQ
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      AmiPilot — object-level GUI automation for classic AmigaOS. BSD 2-Clause.
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.sections", "navigation.footer", "content.action.edit"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
