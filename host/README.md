@@ -55,6 +55,16 @@ needs installing beyond Python 3.9+.
   and IFF ILBM, stdlib-only, no Pillow. `Amipilot.screenshot()` is
   the client entry point; the byte-exact decode/encode logic has its
   own unit tests against synthetic captures.
+- **Progress feedback for long transfers** (`WireClient.command()`'s
+  `on_progress` parameter, `amipilot.wire.OnProgress`) -- a real
+  `SCREENSHOT` over serial can take anywhere from seconds to several
+  minutes (see `userdocs/Wire-Protocol.md`'s own transfer-time table)
+  with zero feedback otherwise. `on_progress(bytes_so_far,
+  total_bytes)` is called as a response payload streams in, threaded
+  through `Amipilot.screenshot()`/`fs_get()`; `amipilot.stderr_progress()`
+  is a ready-made "print a progress line" callback for the common
+  case. Defaults to `None` everywhere -- zero behavior change when
+  unused.
 - **The MUI-ARexx bridge tier** (phase 0.5 -- `Amipilot.mui_command()`):
   `MUIREXX <app-base> [TIMEOUT=<n>] <command...>`'s host wrapper --
   sends `command` verbatim to a MUI application's own ARexx port and

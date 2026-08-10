@@ -563,6 +563,14 @@ class Verbs(unittest.TestCase):
         c = client_with(b"RC 0 %d\n%s" % (len(payload), payload))
         self.assertEqual(c.fs_get("Work:build/data"), payload)
 
+    def test_fs_get_on_progress_reaches_final_full_count(self):
+        payload = b"hello\x00world"
+        c = client_with(b"RC 0 %d\n%s" % (len(payload), payload))
+        calls = []
+        result = c.fs_get("Work:build/data", on_progress=lambda d, n: calls.append((d, n)))
+        self.assertEqual(result, payload)
+        self.assertEqual(calls[-1], (len(payload), len(payload)))
+
     def test_fs_mkdir_and_delete_do_not_raise_on_ok(self):
         c = client_with(b"RC 0 0\n", b"RC 0 0\n")
         c.fs_mkdir("Work:newdir")
@@ -691,6 +699,13 @@ class Verbs(unittest.TestCase):
         c = client_with(b"RC 0 %d\n%s" % (len(payload), payload))
         c.screenshot(screen="Second", window="GadTools")
         self.assertEqual(c._wire._t.sent[0], b"SCREENSHOT SCREEN=Second WINDOW=GadTools\n")
+
+    def test_screenshot_on_progress_reaches_final_full_count(self):
+        payload = _fake_screenshot_capture()
+        c = client_with(b"RC 0 %d\n%s" % (len(payload), payload))
+        calls = []
+        c.screenshot(on_progress=lambda d, n: calls.append((d, n)))
+        self.assertEqual(calls[-1], (len(payload), len(payload)))
 
     def test_screenshot_no_match_raises_not_found(self):
         payload = b"no screen matched"
