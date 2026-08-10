@@ -4,11 +4,14 @@
 
 ```
 AmiInspect [WINDOW=<substring>]
+AmiInspect PICK [SCREEN=<substring>]
 ```
 
 | Argument | Meaning |
 |----------|---------|
-| `WINDOW` | Optional. A substring to match against window titles, across every screen. The first match wins. Omit it to inspect the active window instead. |
+| `WINDOW` | Optional. A substring to match against window titles, across every screen. The first match wins. Omit it to inspect the active window instead. Ignored (with a warning) if `PICK` is also given. |
+| `PICK` | Switch. Interactive "pick mode" (issue #65) instead of a one-shot dump — see below. |
+| `SCREEN` | Optional, `PICK` mode only. A substring to match against screen titles (`DefaultTitle`), narrowing which screen's windows are hit-tested. Omit it for the frontmost screen. |
 
 Examples:
 
@@ -16,7 +19,44 @@ Examples:
 > AmiInspect
 > AmiInspect WINDOW=Prefs
 > AmiInspect WINDOW="ScreenMode Preferences"
+> AmiInspect PICK
+> AmiInspect PICK SCREEN="Second Screen"
 ```
+
+## Pick mode (`PICK`)
+
+The platform's first genuine element-picker equivalent, standing at
+the machine itself — no host or server session at all. Once started,
+it polls the live pointer position roughly 5 times a second and
+prints the window/gadget under it *only when that changes* (not a
+fresh line every poll tick), in the same `window "..." [...]` /
+`gadget id=... role=...` shape a one-shot dump prints — the exact
+locator material a manifest's `GADGET` record needs. Point at a
+gadget, watch its identity appear:
+
+```
+> AmiInspect PICK
+AmiInspect: pick mode -- move the pointer, Ctrl-C to stop
+window "AmiPilot GadTools Fixture" screen="Workbench Screen" [40,0 220x256]
+  gadget id=3 role=checkbox class="" label="Enabled" [20,72 26x11]
+window "AmiPilot GadTools Fixture" screen="Workbench Screen" [40,0 220x256]
+  gadget id=6 role=button class="" label="" [20,144 100x14]
+AmiInspect: pick mode stopped
+```
+
+A window hit with no gadget under the pointer still prints the window
+line alone (chrome/background — not an error; this can genuinely
+include a real system gadget, e.g. `id=0 class="gadgetclass"` for the
+drag bar/close/depth/size decorations, printed the same as anywhere
+else). No window at all under the pointer on the target screen prints
+`(no window under the pointer)`. Stop with Ctrl-C.
+
+This is the same mechanism the wire's own `PICK` verb uses
+(`server/README.md`'s own PICK section, `Amipilot.pick()` on the host
+side) — `AmipHitTest()`/`AmipReadPointerPosition()`
+(`intuition-model`), including that function's own live-confirmed
+pointer-Y correction. Nothing here needs a host connection or
+`AmiPilotServer` running at all.
 
 ## Output format
 

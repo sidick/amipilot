@@ -1960,6 +1960,90 @@ EOF
 	fi
 }
 
+# --- PICK check (issue #65, "pick mode" interactive discovery) ------
+# Stages fixtures/gadtools-app (the golden-tree-tested fixture, so
+# GID_ENABLED's exact geometry is already checked-in and stable).
+# tests/copperline/pick-test.py positions the REAL live pointer via
+# already-verified CLICK/WINDOWMOVE actions (not a second, separate
+# control path into Copperline), then confirms PICK reports back
+# exactly the gadget/window/chrome it should, plus the SCREEN=-scoped
+# and unknown-screen (RC 5) cases.
+run_pick_check() {
+	echo "run.sh: interactive pick mode (PICK)"
+
+	rm -f "$BUILD/pick-result.txt" "$BUILD/marker-pick-ready.txt"
+	cat > "$SMOKE_SCRIPT" <<EOF
+Run >NIL: SRC:build/fixtures/GTApp
+Wait 5
+Run >NIL: SRC:build/AmiPilotServer SERIAL
+Wait 5
+Echo "READY" >SRC:build/marker-pick-ready.txt
+EOF
+
+	info="$REPO_ROOT/build/.copperline-ctl-info-$$.json"
+	rm -f "$info"
+	"$COPPERLINE" --config "$CONFIG" --model A1200 --chipset AGA --cpu 68020 --chip 2M --accelerator 8M \
+		--noaudio --serial tcp --control :0 --control-info "$info" \
+		> "$REPO_ROOT/build/.copperline-log-$$.txt" 2>&1 &
+	COPPERLINE_PID=$!
+
+	tries=0
+	while [ ! -f "$info" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 100 ]; then
+			echo "run.sh: FAIL (pick): copperline never wrote $info"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			return
+		fi
+		sleep 0.1
+	done
+
+	"$COPPERLINE_CTL" --info "$info" run_until '{"seconds": 600}' > /dev/null 2>&1 &
+
+	tries=0
+	while [ ! -f "$BUILD/marker-pick-ready.txt" ]; do
+		tries=$((tries + 1))
+		if [ "$tries" -gt 120 ]; then
+			echo "run.sh: FAIL (pick): guest never became ready -- crash or hang"
+			FAILED=1
+			kill "$COPPERLINE_PID" 2>/dev/null || true
+			COPPERLINE_PID=""
+			rm -f "$info"
+			return
+		fi
+		sleep 0.5
+	done
+
+	python3 "$REPO_ROOT/tests/copperline/pick-test.py" 127.0.0.1:1234 \
+		> "$BUILD/pick-result.txt" 2>&1 || true
+
+	kill "$COPPERLINE_PID" 2>/dev/null || true
+	COPPERLINE_PID=""
+	rm -f "$info"
+
+	ok=1
+	for pattern in \
+		'PICK-GADGET PASS' \
+		'PICK-SCREEN-SCOPED PASS' \
+		'PICK-CHROME PASS' \
+		'PICK-UNKNOWN-SCREEN PASS'; do
+		if ! grep -qF "$pattern" "$BUILD/pick-result.txt" 2>/dev/null; then
+			echo "run.sh: FAIL (pick): expected line not found: $pattern"
+			ok=0
+		fi
+	done
+
+	if [ "$ok" -eq 1 ]; then
+		echo "run.sh: PASS (pick mode)"
+	else
+		echo "run.sh:   --- actual output ---"
+		sed 's/^/run.sh:   /' "$BUILD/pick-result.txt" 2>/dev/null || echo "run.sh:   (empty)"
+		FAILED=1
+	fi
+}
+
 # --- pytest release gate (phase 0.3, host/amipilot/pytest_plugin.py) ------
 # The literal phase 0.3 release gate (docs/implementation-plan.md): "a
 # host pytest clicks a button and asserts a label changed,
@@ -2023,6 +2107,7 @@ run_screens_check
 run_windowmoveresize_check
 run_requester_check
 run_golden_check
+run_pick_check
 run_where_check
 run_pytest_release_gate_check
 

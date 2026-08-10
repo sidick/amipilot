@@ -4,7 +4,10 @@
  * or server session required. See docs/implementation-plan.md phase 0.1.
  *
  * Template: WINDOW/K -- window title to inspect (substring match);
- * defaults to the active window when omitted.
+ * defaults to the active window when omitted. PICK/S,SCREEN/K -- issue
+ * #65's interactive "pick mode": loops printing whichever window/gadget
+ * is under the LIVE pointer, standing at the machine itself, no host or
+ * server session at all (see PickLoop()'s own doc comment).
  */
 
 #include <exec/types.h>
@@ -49,10 +52,12 @@ struct IntuitionBase *IntuitionBase = NULL;
  * just means that discrimination degrades to "button", nothing fails. */
 struct Library *GadToolsBase = NULL;
 
-#define TEMPLATE "WINDOW/K"
+#define TEMPLATE "WINDOW/K,PICK/S,SCREEN/K"
 
 struct InspectArgs {
     STRPTR windowTitle;
+    LONG   pick;
+    STRPTR screenSubstring;
 };
 
 static struct Window *FindWindow(CONST_STRPTR titleSubstring)
@@ -72,6 +77,29 @@ static struct Window *FindWindow(CONST_STRPTR titleSubstring)
         }
     }
 
+    return NULL;
+}
+
+/* Mirrors AmipFindScreen() (server/src/action.c) exactly -- PICK mode's
+ * own SCREEN= narrowing -- but re-implemented locally rather than
+ * linking server/src/action.c into AmiInspect: that file pulls in
+ * input.device/action-engine dependencies (AmipActionInit() etc.)
+ * AmiInspect, a passive read-only inspector, has no other reason to
+ * need. Default (NULL/empty substring): the frontmost screen. */
+static struct Screen *FindScreen(CONST_STRPTR screenSubstring)
+{
+    struct Screen *screen;
+    BOOL wantFilter = (screenSubstring != NULL && screenSubstring[0] != '\0');
+
+    if (!wantFilter) {
+        return IntuitionBase->FirstScreen;
+    }
+    for (screen = IntuitionBase->FirstScreen; screen != NULL; screen = screen->NextScreen) {
+        if (screen->DefaultTitle != NULL
+            && strstr((const char *)screen->DefaultTitle, (const char *)screenSubstring) != NULL) {
+            return screen;
+        }
+    }
     return NULL;
 }
 
@@ -125,6 +153,93 @@ static void PrintModel(const AmipWindowModel *model)
         }
         printf(" [%d,%d %dx%d]\n",
                gadget->left, gadget->top, gadget->width, gadget->height);
+    }
+}
+
+/* Formats one PICK-mode result into `buf` -- the same "window ...
+ * [gadget ...]" text PrintModel() would print for a single-gadget
+ * TREE, but into a buffer rather than straight to stdout, so PickLoop()
+ * can compare successive polls and only print when the identified
+ * window/gadget actually CHANGES (not spam a fresh line every ~200ms
+ * poll tick, most of which land on the exact same gadget the pointer
+ * hasn't moved off yet). `window` NULL means "no window under the
+ * pointer on this screen at all". */
+static void FormatPickState(const AmipWindowModel *window, const AmipGadgetModel *gadget,
+                             char *buf, size_t cap)
+{
+    if (window == NULL) {
+        snprintf(buf, cap, "(no window under the pointer)\n");
+        return;
+    }
+
+    snprintf(buf, cap, "window \"%s\" screen=\"",
+              window->title != NULL ? EscapeQuotes((const char *)window->title) : "(untitled)");
+    snprintf(buf + strlen(buf), cap - strlen(buf), "%s\" [%d,%d %dx%d]\n",
+             EscapeQuotes((const char *)window->screenTitle),
+             window->left, window->top, window->width, window->height);
+
+    if (gadget == NULL) {
+        snprintf(buf + strlen(buf), cap - strlen(buf), "  (no gadget under the pointer)\n");
+        return;
+    }
+
+    snprintf(buf + strlen(buf), cap - strlen(buf), "  gadget id=%lu role=%s class=\"",
+             (unsigned long)gadget->gadgetId, AmipRoleName(gadget->role));
+    snprintf(buf + strlen(buf), cap - strlen(buf), "%s\" label=\"",
+             EscapeQuotes((const char *)gadget->className));
+    snprintf(buf + strlen(buf), cap - strlen(buf), "%s\"", EscapeQuotes((const char *)gadget->label));
+    if (gadget->value != NULL) {
+        snprintf(buf + strlen(buf), cap - strlen(buf), " value=\"");
+        snprintf(buf + strlen(buf), cap - strlen(buf), "%s\"", EscapeQuotes((const char *)gadget->value));
+    }
+    snprintf(buf + strlen(buf), cap - strlen(buf), " [%d,%d %dx%d]\n",
+             gadget->left, gadget->top, gadget->width, gadget->height);
+}
+
+/* Issue #65's interactive "pick mode": poll the live pointer position
+ * (AmipReadPointerPosition()) against `screen`'s windows
+ * (AmipHitTest()) roughly 5 times a second, printing the identified
+ * window/gadget locator only when it actually changes since the last
+ * poll -- point at a gadget on the real screen, see its exact locator
+ * appear in the Shell, standing at the machine itself. Stops on
+ * Ctrl-C (CheckSignal(), the standard Shell idiom -- checked explicitly
+ * each iteration rather than relying on libnix's own default abort
+ * handling, so this exits cleanly and predictably even if the pointer
+ * hasn't moved in a while and no stdio call has happened recently to
+ * give an implicit check a chance to fire).
+ *
+ * See intuition-model's own AmipReadPointerPosition() doc comment for
+ * the live-confirmed MouseY correction it applies before this loop
+ * ever sees a coordinate. */
+static void PickLoop(struct Screen *screen)
+{
+    char lastBuf[512] = "";
+    char curBuf[512];
+
+    printf("AmiInspect: pick mode -- move the pointer, Ctrl-C to stop\n");
+
+    for (;;) {
+        AmipWindowModel *hitWindow = NULL;
+        AmipGadgetModel *hitGadget = NULL;
+        AmipWindowModel *models;
+        WORD x, y;
+
+        if (CheckSignal(SIGBREAKF_CTRL_C)) {
+            printf("AmiInspect: pick mode stopped\n");
+            return;
+        }
+
+        AmipReadPointerPosition(&x, &y);
+        models = AmipHitTest(screen, x, y, &hitWindow, &hitGadget);
+        FormatPickState(hitWindow, hitGadget, curBuf, sizeof(curBuf));
+        if (strcmp(curBuf, lastBuf) != 0) {
+            printf("%s", curBuf);
+            strcpy(lastBuf, curBuf);
+        }
+        AmipFreeWindowModel(models);
+
+        Delay(10); /* ~200ms at NTSC/PAL's 50-60Hz tick -- frequent
+                    * enough to feel live, not a busy-poll */
     }
 }
 
@@ -194,23 +309,38 @@ int main(void)
         return RETURN_FAIL;
     }
 
-    target = FindWindow(args.windowTitle);
-    if (target == NULL) {
-        fprintf(stderr, "AmiInspect: no matching window found\n");
-        rc = RETURN_WARN;
-    } else {
-        model = AmipWalkWindow(target);
-        if (model == NULL) {
-            fprintf(stderr, "AmiInspect: out of memory walking window\n");
-            rc = RETURN_FAIL;
-        } else {
-            AmipMenuModel *menus = AmipWalkMenuStrip(target);
+    if (args.pick) {
+        struct Screen *screen = FindScreen((CONST_STRPTR)args.screenSubstring);
 
-            PrintModel(model);
-            AmipFreeWindowModel(model);
-            if (menus != NULL) {
-                PrintMenus(menus);
-                AmipFreeMenuModel(menus);
+        if (args.windowTitle != NULL) {
+            fprintf(stderr, "AmiInspect: WINDOW is ignored with PICK -- pick mode "
+                            "hit-tests the live pointer, it doesn't target one window\n");
+        }
+        if (screen == NULL) {
+            fprintf(stderr, "AmiInspect: no matching screen found\n");
+            rc = RETURN_WARN;
+        } else {
+            PickLoop(screen);
+        }
+    } else {
+        target = FindWindow(args.windowTitle);
+        if (target == NULL) {
+            fprintf(stderr, "AmiInspect: no matching window found\n");
+            rc = RETURN_WARN;
+        } else {
+            model = AmipWalkWindow(target);
+            if (model == NULL) {
+                fprintf(stderr, "AmiInspect: out of memory walking window\n");
+                rc = RETURN_FAIL;
+            } else {
+                AmipMenuModel *menus = AmipWalkMenuStrip(target);
+
+                PrintModel(model);
+                AmipFreeWindowModel(model);
+                if (menus != NULL) {
+                    PrintMenus(menus);
+                    AmipFreeMenuModel(menus);
+                }
             }
         }
     }

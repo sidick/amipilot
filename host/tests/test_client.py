@@ -687,6 +687,42 @@ class Verbs(unittest.TestCase):
         self.assertEqual(len(screens), 2)
         self.assertTrue(screens[0].frontmost)
 
+    def test_pick_bare_sends_no_args(self):
+        payload = (
+            'window "GadTools" screen="Workbench Screen" [10,20 300x200]\n'
+            '  gadget id=5 role=button class="" label="Connect" [40,60 80x20]\n'
+        )
+        c = client_with(b"RC 0 %d\n%s" % (len(payload), payload.encode()))
+        window = c.pick()
+        self.assertEqual(c._wire._t.sent[0], b"PICK\n")
+        self.assertEqual(len(window.gadgets), 1)
+        self.assertEqual(window.gadgets[0].gadget_id, 5)
+        self.assertEqual(window.gadgets[0].label, "Connect")
+
+    def test_pick_with_screen(self):
+        payload = 'window "GadTools" screen="Second" [0,0 10x10]\n'
+        c = client_with(b"RC 0 %d\n%s" % (len(payload), payload.encode()))
+        c.pick(screen="Second")
+        self.assertEqual(c._wire._t.sent[0], b"PICK SCREEN=Second\n")
+
+    def test_pick_no_gadget_under_pointer_returns_empty_list(self):
+        payload = 'window "GadTools" screen="Workbench Screen" [10,20 300x200]\n'
+        c = client_with(b"RC 0 %d\n%s" % (len(payload), payload.encode()))
+        window = c.pick()
+        self.assertEqual(window.gadgets, [])
+
+    def test_pick_no_window_under_pointer_raises_not_found(self):
+        payload = b"no window under the pointer on this screen"
+        c = client_with(b"RC 5 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(NotFound):
+            c.pick()
+
+    def test_pick_unknown_screen_raises_not_found(self):
+        payload = b"no screen matched"
+        c = client_with(b"RC 5 %d\n%s" % (len(payload), payload))
+        with self.assertRaises(NotFound):
+            c.pick(screen="NoSuchScreen")
+
     def test_screenshot_bare_sends_no_args(self):
         payload = _fake_screenshot_capture()
         c = client_with(b"RC 0 %d\n%s" % (len(payload), payload))
