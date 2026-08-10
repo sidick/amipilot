@@ -25,10 +25,19 @@ baud, same as any real serial link.
 from __future__ import annotations
 
 import socket
+import sys
 from dataclasses import dataclass, field
+from typing import Callable
 
 #: The one protocol version this client speaks (WIRE.md "Versioning").
 PROTOCOL = 1
+
+#: `on_progress(bytes_so_far, total_bytes)`, invoked as a large payload
+#: (SCREENSHOT, FSGET, or any future binary-payload verb) streams in --
+#: see `WireClient.command()`/`_read_exact()`. `total_bytes` is always
+#: the full count declared in the response header (never 0 unless the
+#: payload itself is empty), so a callback can safely divide by it.
+OnProgress = Callable[[int, int], None]
 
 #: Maximum request line, INCLUDING the trailing '\n' terminator --
 #: server/WIRE.md's own cap (enforced server-side by AMIP_SER_LINE/
@@ -168,7 +177,13 @@ class WireClient:
         if close is not None:
             close()
 
-    def command(self, line: str | bytes, payload: bytes | None = None) -> Reply:
+    def command(
+        self,
+        line: str | bytes,
+        payload: bytes | None = None,
+        *,
+        on_progress: OnProgress | None = None,
+    ) -> Reply:
         """Send one command line, return its Reply. The terminator is
         added here; passing a line containing one is an error.
 
@@ -180,7 +195,15 @@ class WireClient:
         method has no idea what the line means and does no such
         checking; it just sends `len(payload)` raw bytes right after
         the terminator, matching what the server's FSPUT handler reads
-        off the wire before even looking at the request further."""
+        off the wire before even looking at the request further.
+
+        `on_progress`, if given, is called as the RESPONSE payload
+        streams in (see `_read_exact()`) -- there is no equivalent
+        callback for sending `payload` itself, since every current
+        caller's request payload is small (FSPUT's own server-side
+        AMIP_FS_BUF_SIZE cap) while response payloads (SCREENSHOT,
+        FSGET) are the genuinely slow, multi-second-to-multi-minute
+        case this exists for."""
         if isinstance(line, str):
             line = line.encode("latin-1")
         if b"\n" in line or b"\r" in line:
@@ -202,7 +225,7 @@ class WireClient:
             raise WireError(f"malformed response header: {header!r}") from None
         if count < 0:
             raise WireError(f"negative byte count: {header!r}")
-        return Reply(rc, self._read_exact(count))
+        return Reply(rc, self._read_exact(count, on_progress))
 
     def handshake(self) -> ServerInfo:
         """VERSION exchange; raises ProtocolMismatch unless the server
@@ -250,8 +273,34 @@ class WireClient:
         line, self._buf = self._buf.split(b"\n", 1)
         return line
 
-    def _read_exact(self, count: int) -> bytes:
+    def _read_exact(self, count: int, on_progress: OnProgress | None = None) -> bytes:
+        if on_progress is not None:
+            on_progress(min(len(self._buf), count), count)
         while len(self._buf) < count:
             self._buf += self._recv()
+            if on_progress is not None:
+                on_progress(min(len(self._buf), count), count)
         data, self._buf = self._buf[:count], self._buf[count:]
         return data
+
+
+def stderr_progress(label: str = "") -> OnProgress:
+    """A ready-made `on_progress` callback (see `WireClient.command()`)
+    that prints a single self-overwriting `label: done/total bytes
+    (pct%)` line to stderr, ending with a newline once the transfer
+    completes -- the common case, so scripts don't all have to
+    hand-roll the same thing:
+
+        client.screenshot(on_progress=stderr_progress("screenshot"))
+
+    Callers wanting their own UI (a GUI progress bar, structured
+    logging, etc.) should pass their own callback instead; this one is
+    just the batteries-included default."""
+    prefix = f"{label}: " if label else ""
+
+    def _progress(done: int, total: int) -> None:
+        pct = f" ({done * 100 // total}%)" if total else ""
+        end = "\n" if done >= total else ""
+        print(f"\r{prefix}{done}/{total} bytes{pct}", end=end, file=sys.stderr, flush=True)
+
+    return _progress

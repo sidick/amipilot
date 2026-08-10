@@ -29,7 +29,7 @@ from .menu import MenuStrip, parse_menu_strip
 from .model import Window, parse_tree
 from .screen import Screen, parse_screens
 from .screenshot import Screenshot
-from .wire import RC_ERROR, RC_FAIL, RC_OK, RC_TIMEOUT, RC_WARN, Reply, ServerInfo, WireClient
+from .wire import RC_ERROR, RC_FAIL, RC_OK, RC_TIMEOUT, RC_WARN, OnProgress, Reply, ServerInfo, WireClient
 
 
 class AmipilotError(Exception):
@@ -374,8 +374,9 @@ class Amipilot:
         *,
         allow: tuple[int, ...] = (RC_OK,),
         payload: bytes | None = None,
+        on_progress: OnProgress | None = None,
     ) -> Reply:
-        reply = self._wire.command(command, payload)
+        reply = self._wire.command(command, payload, on_progress=on_progress)
         if reply.rc not in allow:
             raise _ERROR_CLASSES.get(reply.rc, AmipilotError)(
                 reply.rc, command, reply.text.strip() or "(no message)"
@@ -748,7 +749,7 @@ class Amipilot:
         allowlist and NotFound rules as fs_list()."""
         self._run(f"FSDELETE {_quote(path)}")
 
-    def fs_get(self, path: str) -> bytes:
+    def fs_get(self, path: str, *, on_progress: OnProgress | None = None) -> bytes:
         """FSGET <path> -- reads a file's full contents back as raw
         bytes (may contain embedded NULs; the wire's length-prefixed
         framing carries them intact, unlike the other verbs' NUL-
@@ -756,8 +757,13 @@ class Amipilot:
         internal buffer size (server/src/fs.c's AMIP_FS_BUF_SIZE, a
         test-staging channel, not a file manager) and raises
         ActionFailed for anything larger. See fs_put() for the
-        opposite direction."""
-        return self._run(f"FSGET {_quote(path)}").payload
+        opposite direction.
+
+        `on_progress`, if given, is called as the payload streams in --
+        `amipilot.stderr_progress()` is a ready-made callback for the
+        common "print a progress line" case; see `WireClient.command()`
+        for the full contract."""
+        return self._run(f"FSGET {_quote(path)}", on_progress=on_progress).payload
 
     def fs_put(self, path: str, data: bytes, *, timeout: float = 30.0) -> None:
         """FSPUT <path> <byte-count> [TIMEOUT=<n>] -- writes `data` to
@@ -842,7 +848,13 @@ class Amipilot:
         rationale)."""
         return parse_screens(self._run("SCREENS").text)
 
-    def screenshot(self, *, screen: str | None = None, window: str | None = None) -> Screenshot:
+    def screenshot(
+        self,
+        *,
+        screen: str | None = None,
+        window: str | None = None,
+        on_progress: OnProgress | None = None,
+    ) -> Screenshot:
         """SCREENSHOT [SCREEN=<substring>] [WINDOW=<pattern>] -- raw
         bitmap capture, planar or Picasso96/RTG (phase 1.0,
         `amipilot.screenshot`'s own module docstring has the full
@@ -874,13 +886,20 @@ class Amipilot:
         (IFF ILBM) and a `.png` (`.save()`/`.to_ilbm()` raise
         ScreenshotParseError for a P96 truecolor/hicolor capture, which
         ILBM has no way to represent -- use `.to_png()`/`.to_rgb888()`
-        directly for those)."""
+        directly for those).
+
+        `on_progress`, if given, is called as the capture streams in --
+        a real capture can take anywhere from seconds to several
+        minutes over serial (server/README.md's transfer-time table),
+        with no other feedback otherwise. `amipilot.stderr_progress()`
+        is a ready-made callback for the common "print a progress
+        line" case; see `WireClient.command()` for the full contract."""
         parts = ["SCREENSHOT"]
         if screen is not None:
             parts.append(f"SCREEN={_quote(screen)}")
         if window is not None:
             parts.append(f"WINDOW={_quote(window)}")
-        reply = self._run(" ".join(parts))
+        reply = self._run(" ".join(parts), on_progress=on_progress)
         return Screenshot.parse(reply.payload)
 
     def wait_for_window(

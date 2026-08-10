@@ -387,6 +387,23 @@ all. These numbers exist so a serial-only setup (real hardware without
 a network card, or a Copperline config without `--serial tcp`) knows
 what to expect rather than guessing why a capture appears to hang.
 
+Since a capture can genuinely take anywhere from seconds to several
+minutes with the client otherwise giving zero feedback, `screenshot()`
+(and `fs_get()`, below) accept an optional `on_progress(bytes_so_far,
+total_bytes)` callback, invoked as the payload streams in —
+`amipilot.stderr_progress()` is a ready-made callback for the common
+"print a progress line" case:
+
+```python
+from amipilot import stderr_progress
+
+shot = client.screenshot(on_progress=stderr_progress("screenshot"))
+# stderr: "screenshot: 51200/524288 bytes (9%)" ... updated in place ...
+```
+
+Pass your own callback instead for a GUI progress bar or structured
+logging; omit it entirely for today's exact zero-overhead behavior.
+
 ## File API
 
 From 0.4, a connected session can list/stat/create/delete files and

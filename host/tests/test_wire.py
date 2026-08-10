@@ -17,6 +17,7 @@ from amipilot.wire import (  # noqa: E402
     WireClient,
     WireError,
     _SerialTransport,
+    stderr_progress,
 )
 
 
@@ -106,6 +107,72 @@ class CommandFraming(unittest.TestCase):
         command = "TREE " + "x" * MAX_LINE
         with self.assertRaises(ValueError):
             client.command(command)
+
+
+class ProgressCallback(unittest.TestCase):
+    def test_called_once_per_chunk_and_covers_header_over_read(self):
+        # chunk=3 means the header line and the start of the payload
+        # can arrive in the same recv() -- the callback must still
+        # report correctly from wherever the buffer already stands,
+        # not assume progress starts at 0.
+        t = FakeTransport(b"RC 0 5\nhello", chunk=3)
+        calls = []
+        reply = WireClient(t).command("GETTEXT W 1", on_progress=lambda d, n: calls.append((d, n)))
+        self.assertEqual(reply, Reply(0, b"hello"))
+        # Every call reports the true total (5) and non-decreasing progress.
+        self.assertTrue(all(total == 5 for _, total in calls))
+        self.assertEqual([d for d, _ in calls], sorted(d for d, _ in calls))
+        self.assertEqual(calls[-1], (5, 5))
+
+    def test_zero_length_payload_still_calls_once(self):
+        calls = []
+        WireClient(FakeTransport(b"RC 0 0\n")).command(
+            "CLICK W 1", on_progress=lambda d, n: calls.append((d, n))
+        )
+        self.assertEqual(calls, [(0, 0)])
+
+    def test_not_called_when_omitted(self):
+        # No callback, no behavior change from before this existed.
+        t = FakeTransport(b"RC 0 5\nhello", chunk=1)
+        reply = WireClient(t).command("GETTEXT W 1")
+        self.assertEqual(reply, Reply(0, b"hello"))
+
+    def test_default_none_does_not_raise(self):
+        WireClient(FakeTransport(b"RC 0 0\n")).command("CLICK W 1", on_progress=None)
+
+
+class StderrProgress(unittest.TestCase):
+    def test_prints_overwriting_lines_ending_in_newline(self):
+        import io
+
+        buf = io.StringIO()
+        progress = stderr_progress("shot")
+        real_stderr = sys.stderr
+        sys.stderr = buf
+        try:
+            progress(0, 10)
+            progress(5, 10)
+            progress(10, 10)
+        finally:
+            sys.stderr = real_stderr
+        output = buf.getvalue()
+        self.assertIn("shot: 0/10 bytes (0%)", output)
+        self.assertIn("shot: 10/10 bytes (100%)", output)
+        # Only the final, completed line ends with a real newline.
+        self.assertTrue(output.rstrip("\n").count("\n") == 0)
+        self.assertTrue(output.endswith("\n"))
+
+    def test_zero_total_does_not_divide_by_zero(self):
+        import io
+
+        buf = io.StringIO()
+        real_stderr = sys.stderr
+        sys.stderr = buf
+        try:
+            stderr_progress()(0, 0)
+        finally:
+            sys.stderr = real_stderr
+        self.assertIn("0/0 bytes", buf.getvalue())
 
 
 class Handshake(unittest.TestCase):
