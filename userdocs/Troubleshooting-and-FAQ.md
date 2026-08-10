@@ -121,6 +121,29 @@ These map directly to the wire's own RC codes
   the `WBArg` it was launched with, it'll see the original tooltypes,
   not the override.
 
+## `PICK`/`client.pick()`/`AmiInspect PICK` finds the wrong gadget, or none at all
+
+- Confirm the pointer is actually over the window you expect at the
+  moment you call `PICK` — it's a single point-in-time snapshot of
+  wherever the live pointer happens to be right then, not a live
+  subscription. Call it repeatedly (a poll loop, or `AmiInspect PICK`'s
+  own built-in loop) rather than once.
+- An empty `gadgets` list isn't a failure — it means the pointer is
+  over that window's own chrome/background, which can genuinely
+  include a real system gadget (`gadget_id == 0`,
+  `class_name == "gadgetclass"`, for the drag bar/close/depth/size
+  decorations) rather than "nothing at all". See
+  [PICK](Wire-Protocol.md#pick).
+- The live pointer position the server reads back internally needs a
+  correction for a real, confirmed quirk (roughly 2x the real pixel
+  Y) — handled transparently, verified on this project's own default
+  Workbench screen configuration. Whether that correction holds
+  unchanged on every other display mode (superhires, NTSC,
+  productivity/RTG) is honestly **not verified** — if `PICK` seems
+  systematically off vertically on an unusual screen mode, that's a
+  real gap worth filing as an issue (`server/README.md`'s own PICK
+  section has the full story), not assumed already solid.
+
 ## `MUIREXX` says a command isn't recognized, even though I copied it from MUI documentation
 
 MUI's own built-in ARexx support is a small, fixed set of seven

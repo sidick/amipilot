@@ -13,9 +13,12 @@ protocol, and phase sequencing live in `docs/implementation-plan.md` —
 read that before making architectural decisions; this file only covers
 what's needed to build and navigate the code day to day.
 
-**Current state:** v1.0 released (phase 1.0 complete — the first full
-release). Since then, the cooperative geometry port is real too (issue
-#49, not yet in a tagged release): the escape hatch for gadgets nested
+**Current state:** v1.1 released (v1.0 was phase 1.0 complete — the
+first full release; v1.1 closes every gap v1.0 itself named as open —
+requesters, pointer-only menu items, `layout.gadget`-nested children —
+and adds `PICK`, interactive pick-mode discovery). The cooperative
+geometry port is real too (issue
+#49, shipped in v1.1): the escape hatch for gadgets nested
 inside a `window.class` window's `layout.gadget`, permanently invisible
 to structural walking on classic AmigaOS 3.x. A manifest gains a
 version-2 record pair, `WHEREPORT <port-name>` and `WHEREGADGET
@@ -65,7 +68,7 @@ about this fix, any third-party implementer (e.g. AmiAuth) needs only
 the same one-condition change.
 
 `MENUPICK`'s pointer-based fallback for shortcut-less items is real
-too now (issue #63, not yet in a tagged release): previously,
+too now (issue #63, shipped in v1.1): previously,
 `MENUPICK` only worked for items with a real keyboard shortcut
 (`AmipMenuPickByShortcut()`); an item with none was rejected outright.
 `AmipMenuPickByPointer()` (`server/src/action.c`) now drives the
@@ -245,8 +248,8 @@ as this project's other confirmed structural-reading limits (a
 children) -- `GETTEXT` needs a live field to query, and there
 genuinely isn't one here.
 
-Interactive "pick mode" discovery is real too (issue #65, not yet in a
-tagged release): `docs/implementation-plan.md`'s own "The inspector"
+Interactive "pick mode" discovery is real too (issue #65, shipped in
+v1.1): `docs/implementation-plan.md`'s own "The inspector"
 section had always called this out by name as deliberate v2 polish
 ("a later pick mode -- hover a gadget, see its identity"), not an
 oversight -- point at a gadget on the real screen, get back its exact

@@ -9,7 +9,7 @@ Stdlib-only by design, matching the wire's own no-dependency spirit
 (`docs/implementation-plan.md`, "Protocol and client") -- nothing here
 needs installing beyond Python 3.9+.
 
-## Current state (1.0)
+## Current state (1.1)
 
 - **`amipilot.wire`** -- `WireClient`: transport-level framing (strict
   by-byte-count reads, `VERSION` handshake with protocol pinning). The

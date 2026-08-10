@@ -2,7 +2,7 @@ Short:        Object-level AmigaOS GUI automation
 Author:       simond@irrelevant.org (Simon Dick)
 Uploader:     simond@irrelevant.org (Simon Dick)
 Type:         util/misc
-Version:      1.0
+Version:      1.1
 Architecture: m68k-amigaos
 Distribution: Aminet
 
@@ -76,6 +76,22 @@ Features
     windows via the same synthesized drags gadgets already get
     (WINDOWMOVE/WINDOWSIZE); and wait for an Intuition Requester to
     appear (WAITFOR REQUESTER, detection only).
+  - From 1.1: point at a gadget on the real screen and get back its
+    exact locator interactively, no batch dump needed (PICK), reachable
+    standing at the machine (AmiInspect PICK), from an ARexx script, or
+    over the wire; CLICK now genuinely dismisses Intuition Requesters
+    too, both window-owned and system-wide (e.g. a real disk-swap
+    prompt); menu items with no keyboard shortcut are now picked via a
+    genuine synthesized pointer sequence instead of being rejected
+    outright; a cooperative escape hatch (WHERE/WHEREGADGET) reaches
+    gadgets nested inside a window.class window's layout.gadget -
+    permanently invisible to plain structural walking - via a small,
+    optional ARexx port the target application itself exposes;
+    INTEGER_KIND GadTools gadgets are now told apart from STRING_KIND;
+    and twelve more WB3.2-era BOOPSI/ReAction gadget classes
+    (clicktab, colorwheel, datebrowser, fuelgauge, four get*.gadget
+    choosers, gradientslider, palette, sketchboard, speedbar,
+    texteditor) get a real role instead of reporting as custom.
 
 Requirements
 ------------

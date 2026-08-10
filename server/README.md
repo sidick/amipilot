@@ -968,7 +968,7 @@ Lands in phase 0.2 onward -- see
   forward correctly, not just in the single-screen case every prior
   on-target check has ever exercised.
 
-- **Cooperative geometry port (issue #49, not yet released):** `WHERE @<name> [TIMEOUT=<n>]`
+- **Cooperative geometry port (issue #49, shipped in v1.1):** `WHERE @<name> [TIMEOUT=<n>]`
   is the diagnostic form of the escape hatch for gadgets structural
   walking can never reach -- `layout.gadget` children on classic OS
   3.x (the project's own documented "Confirmed limit"; see
@@ -1063,7 +1063,7 @@ Lands in phase 0.2 onward -- see
   since it's outside this issue's scope and continues to work
   correctly for what it actually receives.
 
-- **Interactive "pick mode" discovery (issue #65, not yet released):**
+- **Interactive "pick mode" discovery (issue #65, shipped in v1.1):**
   `PICK [SCREEN=<substring>]` hit-tests the LIVE global pointer
   position against `SCREEN=`'s windows (the default/frontmost screen
   if omitted, `AmipFindScreen()`'s own convention -- same as

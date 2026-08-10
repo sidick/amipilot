@@ -89,6 +89,13 @@ own for understanding an unfamiliar application's structure before writing
 any automation against it, or just to answer "what is this control,
 actually" when working on a foreign codebase.
 
+`AmiInspect PICK` (or `Amipilot.pick()` from the host) goes one step
+further — the genuinely *interactive* element-picker experience, not
+just a batch dump: point at a gadget on the real screen and its exact
+locator (role/label/`GA_ID`) appears live, no reading through a whole
+tree to find the one control you care about. See the [AmiInspect
+Reference](AmiInspect-Reference.md#pick-mode-pick).
+
 ## Localization and catalog testing
 
 Because golden-tree comparisons and `get_text()` both read live label
