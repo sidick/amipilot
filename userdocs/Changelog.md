@@ -7,8 +7,53 @@ the repository's
 [`docs/implementation-plan.md`](https://github.com/sidick/amipilot/blob/main/docs/implementation-plan.md)
 for the full engineering detail and phase sequencing behind each one.
 
-## Unreleased
+## v1.1 — 2026-08-10
 
+Closes out every gap the 1.0 release itself named as open: requester
+support was detection-only, menu selection needed a keyboard shortcut,
+and `layout.gadget`-nested children were unreachable — all three are
+real now. Plus a new interactive discovery tool, and host-package
+polish.
+
+- **`PICK`, interactive "pick mode" discovery** (issue #65): point at
+  a gadget on the real screen, get back its exact locator directly —
+  the platform's first genuinely interactive UIA-Inspect/browser-
+  element-picker equivalent, not just a batch dump. `PICK
+  [SCREEN=<substring>]` hit-tests the live global pointer position
+  against a screen's windows and returns the gadget under it, if
+  any; `AmiInspect PICK` is the standing-at-the-machine equivalent
+  with no host/server session at all, looping locally and printing
+  only when the identified window/gadget changes. Built on two new
+  `intuition-model` primitives shared by both: `AmipHitTest()` (a
+  coordinate-to-gadget hit test reusing the same role/label
+  classification `TREE`/`AmiInspect` already do) and
+  `AmipReadPointerPosition()`. Two real, non-obvious findings from
+  building this, live: Intuition's own window list is NOT
+  front-to-back z-order (Workbench's full-screen backdrop was found
+  ahead of a real foreground window — fixed by picking the
+  smallest-area matching window instead), and the live pointer
+  position's Y coordinate needs an unconditional 2x correction — an
+  interlace-gated first guess was tried and disproven against this
+  project's own default Workbench screen. See [Wire
+  Protocol](Wire-Protocol.md#pick) and [AmiInspect
+  Reference](AmiInspect-Reference.md#pick-mode-pick).
+- **Progress feedback for long wire transfers** (issue #53):
+  `screenshot()`/`fs_get()` accept an optional
+  `on_progress(bytes_so_far, total_bytes)` callback, called as a
+  large payload streams in — a real `SCREENSHOT` over serial can take
+  anywhere from seconds to several minutes with previously zero
+  feedback. `amipilot.stderr_progress()` is a ready-made callback for
+  the common "print a progress line" case. Defaults to `None`
+  everywhere — no behavior change for existing callers.
+- **The host package can now be published to PyPI** (issue #77):
+  `host/pyproject.toml` gained the metadata (license, authors, URLs,
+  classifiers) a real PyPI listing needs, and the release workflow
+  gained a job that builds and publishes it via Trusted Publishing
+  (OIDC, no stored token) once tagged. The one-time PyPI-side setup
+  (registering the pending publisher, creating the required-reviewer
+  environment) is still outstanding — `pip install amipilot` isn't
+  live yet; installing from a clone remains the only path for now,
+  see [Installation](Installation.md).
 - **`CLICK` can now dismiss BOTH window-owned and system-wide
   Requesters — issue #52 fully closed:** a genuine `AutoRequest()`/
   `BuildSysRequest()`/`EasyRequest()` requester with a real owning

@@ -66,6 +66,10 @@ command-line template and output format, or
 [Locator Tiers and Limits](Locator-Tiers-and-Limits.md) for what
 `AmiInspect` can and can't see today.
 
+Rather point at the one gadget you care about than read through a
+whole tree? Try `AmiInspect PICK` — see [Pick
+mode](AmiInspect-Reference.md#pick-mode-pick).
+
 Once you've found the `GA_ID`s you need, drive them with
 `AmiPilotServer` — click, type, and read gadget state back from an
 ARexx script, no host machine involved. See the

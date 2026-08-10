@@ -59,8 +59,9 @@ serial port on the host machine, no TCP bridge involved at all. This
 is what you need for **real Amiga hardware** over a real cable, or a
 Copperline config that itself uses a real serial device instead of
 `[serial] mode = "tcp"`. Requires the optional `pyserial` dependency
-(`pip install amipilot[serial]`) — everything else about `amipilot`
-works with no `pyserial` installed at all.
+(`pip install amipilot[serial]` once published on PyPI, or
+`pip install -e 'host/[serial]'` from a checkout) — everything else
+about `amipilot` works with no `pyserial` installed at all.
 
 ```python
 from amipilot import Amipilot

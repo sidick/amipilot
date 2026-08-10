@@ -17,7 +17,8 @@ full design, phase sequencing, and minimum requirements, and
 
 ## Status
 
-**v1.0 — the first full release.**
+**v1.1 — closing out 1.0's own remaining gaps, plus interactive
+discovery.**
 What shipped in v0.1 (`intuition-model`, the standalone `AmiInspect`
 Shell command) is still there, but this is no longer a read-only
 inspector: `AmiPilotServer`, an on-Amiga commodity, actually drives a
@@ -28,11 +29,14 @@ suite on a different machine can launch, click through, assert on, and
 screenshot real AmigaOS software end to end. Verified against both
 Copperline and Amiberry, including a growing set of real, OS-shipped
 stock applications (not just purpose-built fixtures), MUI's own
-ARexx-driven apps, and real Picasso96/RTG hardware emulation. See the
-[Changelog](userdocs/Changelog.md) for what's in each release and its
-known gaps, `CLAUDE.md`'s "Current state" section for what's real on
-`main` right now, and the implementation plan's "Phases" section for
-how each phase built up to 1.0.
+ARexx-driven apps, and real Picasso96/RTG hardware emulation. 1.1
+closes every gap v1.0 itself named as open -- requesters, pointer-only
+menu items, `layout.gadget`-nested children -- and adds `PICK`, a
+genuinely interactive point-at-a-gadget-get-its-locator discovery
+mode. See the [Changelog](userdocs/Changelog.md) for what's in each
+release and its known gaps, `CLAUDE.md`'s "Current state" section for
+what's real on `main` right now, and the implementation plan's
+"Phases" section for how each phase built up to 1.0.
 
 ## Repository layout
 
