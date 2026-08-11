@@ -3,8 +3,9 @@ Author:       simond@irrelevant.org (Simon Dick)
 Uploader:     simond@irrelevant.org (Simon Dick)
 Type:         util/misc
 Version:      1.1
-Architecture: m68k-amigaos
+Architecture: m68k-amigaos >= 2.0.4
 Distribution: Aminet
+URL:          https://github.com/sidick/amipilot
 
 AmiPilot is an object-level GUI automation system for classic AmigaOS:
 find a window or gadget by ID, label, or role; act on it with genuinely
