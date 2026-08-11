@@ -814,25 +814,28 @@ class Amipilot:
         screen: str | None = None,
     ) -> None:
         """MENUPICK <window-pattern> <menu-num> <item-num> [<sub-num>]
-        -- selects a menu item via its keyboard shortcut (Right-Amiga
-        + the shortcut character), the same input.device path a human
-        pressing that combination would use. `menu_num`/`item_num`/
-        `sub_num` are the same 0-based chain positions `menu()`'s
-        MenuItem.menu_num/item_num/sub_num report -- use `menu(...).
-        find("Some Label")` to look one up by text instead of
-        hand-counting positions. `screen` narrows the window search
-        the same way `tree()`'s does; the target screen is brought to
-        front as part of the pick regardless.
+        -- selects a menu item, choosing automatically between two
+        real input.device paths per item (see server/README.md's
+        Menus section): an item with a real keyboard shortcut is
+        picked via Right-Amiga + the shortcut character, the same
+        combination a human pressing it would use; an item with no
+        shortcut is picked via a genuine synthesized pointer sequence
+        (RMB-down, move onto the menu title, move onto the item,
+        RMB-up) instead. Neither path synthesizes IDCMP_MENUPICK
+        directly. `menu_num`/`item_num`/`sub_num` are the same 0-based
+        chain positions `menu()`'s MenuItem.menu_num/item_num/sub_num
+        report -- use `menu(...).find("Some Label")` to look one up by
+        text instead of hand-counting positions. `screen` narrows the
+        window search the same way `tree()`'s does; the target screen
+        is brought to front as part of the pick regardless.
 
         Raises NotFound if the window or the addressed item doesn't
-        exist, ActionFailed if the item is disabled, has no keyboard
-        shortcut (pointer-based menu navigation for shortcut-less
-        items isn't built yet -- see server/README.md), or the
-        keystroke injection itself failed. RC 0 confirms the keystroke
-        was genuinely delivered to input.device; Intuition resolves it
-        against the window's live menu strip on its own, so this
-        doesn't (and can't) confirm the app's own IDCMP_MENUPICK
-        handler ran -- assert on the expected effect instead."""
+        exist, ActionFailed if the item is disabled or the input
+        injection itself failed. RC 0 confirms the input was genuinely
+        delivered to input.device; Intuition resolves it against the
+        window's live menu strip on its own, so this doesn't (and
+        can't) confirm the app's own IDCMP_MENUPICK handler ran --
+        assert on the expected effect instead."""
         cmd = f"MENUPICK {_screen_prefix(screen)}{_quote(window_pattern)} {menu_num} {item_num}"
         if sub_num is not None:
             cmd += f" {sub_num}"
